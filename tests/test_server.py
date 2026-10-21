@@ -52,6 +52,25 @@ def test_websocket_barge_in():
             pass
 
         assert "interrupted" in received_types or "text_chunk" in received_types
+def test_websocket_voice_turn():
+    import base64
+    import numpy as np
+    client = TestClient(app)
+    t = np.linspace(0, 0.5, 8000, endpoint=False)
+    pcm = (0.3 * np.sin(2 * np.pi * 440 * t) * 32767).astype(np.int16).tobytes()
+    b64_audio = base64.b64encode(pcm).decode("ascii")
+
+    with client.websocket_connect("/ws/chat") as ws:
+        ws.send_json({"type": "audio", "audio_base64": b64_audio})
+        received = []
+        for _ in range(15):
+            msg = ws.receive_json()
+            received.append(msg.get("type"))
+            if msg.get("type") == "turn_complete":
+                break
+        assert "turn_complete" in received
+        assert "user_transcription" in received or "audio_chunk" in received
+
 
 def test_companion_endpoints():
     client = TestClient(app)
