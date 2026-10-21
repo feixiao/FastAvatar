@@ -1,9 +1,11 @@
 """Sherpa-ONNX local offline ASR implementation."""
 
 import asyncio
-import wave
+import io
 from pathlib import Path
 from typing import Optional
+import numpy as np
+import soundfile as sf
 from src.asr.base import BaseASR
 
 
@@ -68,10 +70,6 @@ class SherpaOnnxASR(BaseASR):
         if self._recognizer is None:
             # Safe fallback if model weights are not yet downloaded locally
             return "本地Sherpa-ONNX模型未加载，请配置模型权重路径。"
-
-        import io
-        import soundfile as sf
-        import numpy as np
 
         try:
             audio, sr = sf.read(io.BytesIO(audio_data), dtype="float32")

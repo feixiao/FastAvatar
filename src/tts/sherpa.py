@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import asyncio
+import numpy as np
 from typing import Optional
 from src.tts.base import BaseTTS
 
@@ -84,6 +85,5 @@ class SherpaOnnxTTS(BaseTTS):
             return b""
         audio = await asyncio.to_thread(self._tts.generate, text, sid=self.speaker_id, speed=self.speed)
         # Convert float samples (-1..1) to int16 PCM bytes
-        import numpy as np
         samples = (np.array(audio.samples) * 32767).clip(-32768, 32767).astype(np.int16)
         return samples.tobytes()
