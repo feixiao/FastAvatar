@@ -1172,10 +1172,10 @@
       writeString(view, 36, 'data');
       view.setUint32(40, samples.length * 2, true);
 
-      let offset = 44;
-      for (let i = 0; i < samples.length; i++, offset += 2) {
+      const pcmView = new Int16Array(buffer, 44, samples.length);
+      for (let i = 0; i < samples.length; i++) {
         const s = Math.max(-1, Math.min(1, samples[i]));
-        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        pcmView[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
       }
 
       return new Blob([view], { type: 'audio/wav' });
