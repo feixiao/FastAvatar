@@ -1080,6 +1080,14 @@
       levelUpModal.style.display = "none";
     });
 
+    memoryModal.addEventListener("click", (e) => {
+      if (e.target === memoryModal) memoryModal.style.display = "none";
+    });
+
+    levelUpModal.addEventListener("click", (e) => {
+      if (e.target === levelUpModal) levelUpModal.style.display = "none";
+    });
+
     async function renderMemoryList() {
       try {
         const resp = await fetch("/api/companion");
