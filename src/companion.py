@@ -316,7 +316,7 @@ class CompanionManager:
 """
         return prompt
 
-    def add_fact(self, content: str, category: str = "preference") -> MemoryFact:
+    def add_fact(self, content: str, category: str = "preference", save: bool = True) -> MemoryFact:
         content = content.strip()
         # Avoid duplicate fact content
         for f in self.data.user_profile.facts:
@@ -324,7 +324,8 @@ class CompanionManager:
                 return f
         new_fact = MemoryFact(category=category, content=content)
         self.data.user_profile.facts.append(new_fact)
-        self.save()
+        if save:
+            self.save()
         return new_fact
 
     def remove_fact(self, fact_id: str) -> bool:
@@ -370,23 +371,26 @@ class CompanionManager:
 
         extracted_facts: List[MemoryFact] = []
         text = user_text.strip()
+        has_changes = False
 
         # Rule 1: Preference patterns
-        # 比如：我喜欢/我偏爱/我不喜欢/我爱吃/我平时喜欢
         m_pref = re.search(r"(?:我(?:很|特别|平时|最)?(?:喜欢|偏爱|爱吃|爱喝|超爱|中意)|我讨厌|我不喜欢)([^，。！？\n]{2,20})", text)
         if m_pref:
             fact_str = f"提到偏好：{m_pref.group(0)}"
-            extracted_facts.append(self.add_fact(fact_str, category="preference"))
+            extracted_facts.append(self.add_fact(fact_str, category="preference", save=False))
+            has_changes = True
 
         # Rule 2: Pet patterns
         m_pet = re.search(r"(?:我(?:家|养了)?(?:有一只|养了|的)?(?:猫|狗|小狗|小猫|英短|柴犬|橘猫|柯基|仓鼠|宠物)[^，。！？\n]{0,15})", text)
-        if m_pet and "猫" in text or "狗" in text:
-            extracted_facts.append(self.add_fact(m_pet.group(0), category="pet"))
+        if m_pet and ("猫" in text or "狗" in text):
+            extracted_facts.append(self.add_fact(m_pet.group(0), category="pet", save=False))
+            has_changes = True
 
         # Rule 3: Work/Study status
         m_work = re.search(r"(?:我(?:是做|从事|正在做|在学|是一名|在公司)|(?:今天|天天|又)?加班到|在准备(?:面试|考试|毕设))([^，。！？\n]{2,20})", text)
         if m_work:
-            extracted_facts.append(self.add_fact(f"生活与工作动态：{m_work.group(0)}", category="work"))
+            extracted_facts.append(self.add_fact(f"生活与工作动态：{m_work.group(0)}", category="work", save=False))
+            has_changes = True
 
         # Rule 4: Name/Identity
         m_name = re.search(r"(?:我(?:的名字|叫)|你可以叫我)([^，。！？\n]{1,10})", text)
@@ -394,7 +398,10 @@ class CompanionManager:
             new_name = m_name.group(1).strip()
             if 1 < len(new_name) <= 6:
                 self.data.user_profile.name = new_name
-                extracted_facts.append(self.add_fact(f"用户称谓定为：{new_name}", category="special"))
-                self.save()
+                extracted_facts.append(self.add_fact(f"用户称谓定为：{new_name}", category="special", save=False))
+                has_changes = True
+
+        if has_changes:
+            await asyncio.to_thread(self.save)
 
         return extracted_facts
