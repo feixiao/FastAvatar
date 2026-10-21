@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎙️</text></svg>">
+  <title>FastAvatar - 低时延语音互动数字人</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .container {
+      width: 100%;
+      max-width: 760px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    header {
+      text-align: center;
+    }
+    header h1 {
+      font-size: 26px;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+    header p {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .avatar-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      position: relative;
+    }
+    .rhythm-visualizer {
+      width: 100%;
+      height: 190px;
+      border-radius: 16px;
+      background: radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.95) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.6), 0 0 25px rgba(56, 189, 248, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .rhythm-visualizer canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    .rhythm-center-orb {
+      position: relative;
+      z-index: 2;
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      transition: transform 0.08s ease;
+    }
+    .orb-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid rgba(56, 189, 248, 0.35);
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+      transition: transform 0.1s ease, border-color 0.15s ease, opacity 0.15s ease;
+    }
+    .orb-ring.ring-1 {
+      width: 100%;
+      height: 100%;
+    }
+    .orb-ring.ring-2 {
+      width: 135%;
+      height: 135%;
+      border-color: rgba(168, 85, 247, 0.3);
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.25);
+    }
+    .orb-core {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #38bdf8 0%, #a855f7 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+      font-size: 20px;
+      user-select: none;
+      transition: transform 0.08s ease, box-shadow 0.15s ease;
+    }
+    .rhythm-visualizer.speaking .orb-core {
+      box-shadow: 0 0 35px rgba(236, 72, 153, 0.8), 0 0 15px rgba(56, 189, 248, 0.9);
+    }
+    .rhythm-status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .rhythm-badge {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .rhythm-badge.active {
+      background: rgba(236, 72, 153, 0.2);
+      color: #f472b6;
+      border-color: rgba(236, 72, 153, 0.5);
+      animation: pulse 1.2s infinite;
+    }
+    .status-badge {
+      font-size: 13px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      background: #334155;
+      color: var(--text-muted);
+    }
+    .status-badge.active {
+      background: #065f46;
+      color: #34d399;
+    }
+    .metrics-bar {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+      justify-content: space-around;
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .metrics-bar span b {
+      color: var(--accent);
+    }
+    .chat-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      height: 280px;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .msg {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: #2563eb;
+      color: #fff;
+    }
+    .msg.assistant {
+      align-self: flex-start;
+      background: #334155;
+      color: #f1f5f9;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+    }
+    input[type="text"] {
+      flex: 1;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+    }
+    input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+    button {
+      background: var(--accent);
+      color: #0f172a;
+      font-weight: 600;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.15s;
+    }
+    button:hover { background: var(--accent-hover); color: #fff; }
+    button.btn-danger {
+      background: #ef4444;
+      color: #fff;
+    }
+    button.btn-danger:hover {
+      background: #dc2626;
+    }
+    button.btn-recording {
+      background: #10b981;
+      color: #fff;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>FastAvatar</h1>
+      <p>低时延模块化端到端流式数字人 · 本地大模型优先 · 实时音画口型同步</p>
+    </header>
+
+    <div class="avatar-card">
+      <div id="rhythmVisualizer" class="rhythm-visualizer">
+        <canvas id="rhythmCanvas"></canvas>
+        <div class="rhythm-center-orb" id="rhythmCenterOrb">
+          <div class="orb-ring ring-1" id="orbRing1"></div>
+          <div class="orb-ring ring-2" id="orbRing2"></div>
+          <div class="orb-core" id="orbCore">
+            <span id="rhythmIcon">🎵</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rhythm-status-row">
+        <div id="statusBadge" class="status-badge">等待对话...</div>
+        <div id="rhythmBadge" class="rhythm-badge">音频律动 · 待机</div>
+      </div>
+
+      <div class="metrics-bar">
+        <span>首包时延 (TTFA): <b id="mLatency">-</b> ms</span>
+        <span>首字时延 (TTFT): <b id="mTTFT">-</b> ms</span>
+        <span>TTS 首句: <b id="mTTS">-</b> ms</span>
+      </div>
+    </div>
+
+    <div id="chatBox" class="chat-box">
+      <div class="msg assistant">你好！我是你的语音数字人助手。你可以打字或按住麦克风和我实时语音对话！随时可以打断我哦。</div>
+    </div>
+
+    <div class="controls">
+      <input id="textInput" type="text" placeholder="输入对话内容..." />
+      <button id="sendBtn">发送</button>
+      <button id="micBtn">🎤 语音交互</button>
+      <button id="interruptBtn" class="btn-danger">打断数字人</button>
+    </div>
+  </div>
+
+  <script>
+    let ws = null;
+    let audioCtx = null;
+    let isRecording = false;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let currentStream = null;
+
+    const chatBox = document.getElementById("chatBox");
+    const textInput = document.getElementById("textInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const micBtn = document.getElementById("micBtn");
+    const interruptBtn = document.getElementById("interruptBtn");
+    const statusBadge = document.getElementById("statusBadge");
+    const rhythmBadge = document.getElementById("rhythmBadge");
+    const rhythmVisualizer = document.getElementById("rhythmVisualizer");
+    const rhythmCanvas = document.getElementById("rhythmCanvas");
+    const rhythmCenterOrb = document.getElementById("rhythmCenterOrb");
+    const orbRing1 = document.getElementById("orbRing1");
+    const orbRing2 = document.getElementById("orbRing2");
+    const orbCore = document.getElementById("orbCore");
+    const mLatency = document.getElementById("mLatency");
+    const mTTFT = document.getElementById("mTTFT");
+    const mTTS = document.getElementById("mTTS");
+
+    let analyserNode = null;
+    let freqDataArray = null;
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      }
+      return audioCtx;
+    }
+
+    function getAnalyser() {
+      const ctx = getAudioContext();
+      if (!analyserNode) {
+        analyserNode = ctx.createAnalyser();
+        analyserNode.fftSize = 128; // 64 frequency bins
+        analyserNode.smoothingTimeConstant = 0.8;
+        freqDataArray = new Uint8Array(analyserNode.frequencyBinCount);
+        analyserNode.connect(ctx.destination);
+      }
+      return analyserNode;
+    }
+
+    function initWebSocket() {
+      const loc = window.location;
+      const wsUri = (loc.protocol === "https:" ? "wss:" : "ws:") + "//" + loc.host + "/ws/chat";
+      ws = new WebSocket(wsUri);
+
+      ws.onopen = () => {
+        statusBadge.textContent = "已连接服务";
+        statusBadge.classList.add("active");
+      };
+
+      ws.onmessage = async (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "text_chunk") {
+          appendAssistantText(msg.data.text);
+        } else if (msg.type === "audio_chunk") {
+          playAudioChunk(msg.data.audio_base64, msg.data.mouth_open);
+        } else if (msg.type === "metrics") {
+          mLatency.textContent = Math.round(msg.data.turn_latency_ms);
+          mTTFT.textContent = Math.round(msg.data.ttft_ms);
+          mTTS.textContent = Math.round(msg.data.tts_first_chunk_ms);
+        } else if (msg.type === "interrupted") {
+          statusBadge.textContent = "已打断数字人";
+          stopAllAudio();
+        }
+      };
+
+      ws.onclose = () => {
+        statusBadge.textContent = "连接断开，正在重试...";
+        statusBadge.classList.remove("active");
+        setTimeout(initWebSocket, 2000);
+      };
+    }
+
+    let currentAssistantMsgEl = null;
+
+    function appendUserMessage(text) {
+      const el = document.createElement("div");
+      el.className = "msg user";
+      el.textContent = text;
+      chatBox.appendChild(el);
+      chatBox.scrollTop = chatBox.scrollHeight;
+      currentAssistantMsgEl = null;
+    }
+
+    function appendAssistantText(chunk) {
+      if (!currentAssistantMsgEl) {
+        currentAssistantMsgEl = document.createElement("div");
+        currentAssistantMsgEl.className = "msg assistant";
+        chatBox.appendChild(currentAssistantMsgEl);
+      }
+      currentAssistantMsgEl.textContent += chunk;
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    let nextAudioPlayTime = 0;
+    let activeAudioSources = [];
+    let mouthAnimationTimers = [];
+
+    function stopAllAudio() {
+      activeAudioSources.forEach((s) => {
+        try { s.stop(); } catch (e) {}
+      });
+      activeAudioSources = [];
+      mouthAnimationTimers.forEach((t) => clearTimeout(t));
+      mouthAnimationTimers = [];
+      if (audioCtx) {
+        nextAudioPlayTime = audioCtx.currentTime;
+      }
+      resetAvatar();
+    }
+
+    // Play audio chunk with queue scheduling and multi-format decoding
+    async function playAudioChunk(base64Data, mouthFrames) {
+      try {
+        const ctx = getAudioContext();
+        if (ctx.state === "suspended") {
+          await ctx.resume();
+        }
+
+        const binary = atob(base64Data);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+
+        let audioBuffer = null;
+        // Detect audio container formats (WAV: "RIFF", MP3: "ID3" or syncword 0xFF 0xEx)
+        const isWav = bytes.length >= 4 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46;
+        const isMp3 = (bytes.length >= 3 && bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) ||
+                      (bytes.length >= 2 && bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0);
+
+        if (isWav || isMp3) {
+          try {
+            const copyBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+            audioBuffer = await ctx.decodeAudioData(copyBuffer);
+          } catch (decodeErr) {
+            console.warn("Browser decodeAudioData failed, trying raw PCM fallback:", decodeErr);
+          }
+        }
+
+        if (!audioBuffer) {
+          // Decode as raw 16-bit PCM little-endian at 16000Hz
+          const sampleCount = Math.floor(bytes.byteLength / 2);
+          const int16Array = new Int16Array(bytes.buffer, bytes.byteOffset, sampleCount);
+          const floatArray = new Float32Array(sampleCount);
+          for (let i = 0; i < sampleCount; i++) {
+            floatArray[i] = int16Array[i] / 32768.0;
+          }
+          audioBuffer = ctx.createBuffer(1, sampleCount, 16000);
+          audioBuffer.getChannelData(0).set(floatArray);
+        }
+
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        const analyser = getAnalyser();
+        source.connect(analyser);
+        // Schedule sequential playback to avoid overlapping chunks
+        const startTime = Math.max(ctx.currentTime, nextAudioPlayTime);
+        source.start(startTime);
+        nextAudioPlayTime = startTime + audioBuffer.duration;
+
+        activeAudioSources.push(source);
+        source.onended = () => {
+          const idx = activeAudioSources.indexOf(source);
+          if (idx !== -1) activeAudioSources.splice(idx, 1);
+          if (activeAudioSources.length === 0) {
+            resetAvatar();
+          }
+        };
+      } catch (e) {
+        console.error("Audio playback error:", e);
+      }
+    }
+
+    function resetAvatar() {
+      if (rhythmVisualizer) {
+        rhythmVisualizer.classList.remove("speaking");
+      }
+      if (rhythmBadge) {
+        rhythmBadge.classList.remove("active");
+        rhythmBadge.textContent = "音频律动 · 待机";
+      }
+    }
+    function resetMouth() {
+      resetAvatar();
+    }
+    sendBtn.addEventListener("click", () => {
+      const text = textInput.value.trim();
+      if (!text) return;
+      stopAllAudio();
+      appendUserMessage(text);
+      ws.send(JSON.stringify({ type: "text", text: text }));
+      textInput.value = "";
+    });
+
+    textInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendBtn.click();
+    });
+
+    interruptBtn.addEventListener("click", () => {
+        stopAllAudio();
+        ws.send(JSON.stringify({ type: "interrupt" }));
+    });
+
+    // Microphone voice recording
+
+    async function getAudioMediaStream() {
+      // Modern MediaDevices API
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        return await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+
+      // Legacy API fallback
+      const legacyGetUserMedia = navigator.getUserMedia ||
+                                 navigator.webkitGetUserMedia ||
+                                 navigator.mozGetUserMedia ||
+                                 navigator.msGetUserMedia;
+      if (legacyGetUserMedia) {
+        return new Promise((resolve, reject) => {
+          legacyGetUserMedia.call(navigator, { audio: true }, resolve, reject);
+        });
+      }
+
+      // Diagnostic error message for insecure contexts
+      if (!window.isSecureContext) {
+        throw new Error(
+          "当前页面处于非安全环境（HTTP 访问），浏览器出于安全策略禁止在此环境下调用麦克风。\n\n" +
+          "【解决方式】\n" +
+          "1. 本机访问：请在浏览器地址栏输入 http://localhost:8000 或 http://127.0.0.1:8000；\n" +
+          "2. 局域网访问：可在 Chrome 地址栏打开 chrome://flags/#unsafely-treat-insecure-origin-as-secure，填入当前网址并启用；\n" +
+          "3. 生产环境：请配置 HTTPS 证书访问。"
+        );
+      }
+
+      throw new Error("当前浏览器不支持录音 API（navigator.mediaDevices 不可用）或麦克风权限被策略禁用。");
+    }
+
+    micBtn.addEventListener("click", async () => {
+      if (!isRecording) {
+        try {
+          if (typeof MediaRecorder === "undefined") {
+            throw new Error("当前浏览器不支持 MediaRecorder 录音功能，请使用现代浏览器（Chrome、Edge 等）。");
+          }
+
+          currentStream = await getAudioMediaStream();
+          mediaRecorder = new MediaRecorder(currentStream);
+          recordedChunks = [];
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+              recordedChunks.push(e.data);
+            }
+          };
+          mediaRecorder.onstop = async () => {
+            if (currentStream) {
+              currentStream.getTracks().forEach((track) => track.stop());
+              currentStream = null;
+            }
+            const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64 = reader.result.split(",")[1];
+              appendUserMessage("[语音输入...]");
+              ws.send(JSON.stringify({ type: "audio", audio_base64: base64 }));
+            };
+            reader.readAsDataURL(blob);
+          };
+          stopAllAudio();
+          mediaRecorder.start();
+          isRecording = true;
+          micBtn.textContent = "⏹️ 停止录音";
+          micBtn.classList.add("btn-recording");
+        } catch (err) {
+          alert("麦克风启动失败: " + err.message);
+        }
+      } else {
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+          mediaRecorder.stop();
+        }
+        if (currentStream) {
+          currentStream.getTracks().forEach((track) => track.stop());
+          currentStream = null;
+        }
+        isRecording = false;
+        micBtn.textContent = "🎤 语音交互";
+        micBtn.classList.remove("btn-recording");
+      }
+    });
+
+    // Rhythmic Visualizer Engine
+    const rhythmCtx = rhythmCanvas ? rhythmCanvas.getContext("2d") : null;
+    const numBars = 36;
+    const barHeights = new Float32Array(numBars);
+    const barPeaks = new Float32Array(numBars);
+    const peakSpeeds = new Float32Array(numBars);
+    let animPhase = 0;
+    let smoothedEnergy = 0;
+
+    function resizeCanvas() {
+      if (!rhythmCanvas || !rhythmCtx) return;
+      const rect = rhythmCanvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      rhythmCanvas.width = rect.width * dpr;
+      rhythmCanvas.height = rect.height * dpr;
+      rhythmCtx.setTransform(1, 0, 0, 1, 0, 0);
+      rhythmCtx.scale(dpr, dpr);
+    }
+
+    function renderVisualizer() {
+      requestAnimationFrame(renderVisualizer);
+      if (!rhythmCanvas || !rhythmCtx) return;
+
+      animPhase += 0.05;
+      const rect = rhythmCanvas.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
+      if (width === 0 || height === 0) return;
+
+      rhythmCtx.clearRect(0, 0, width, height);
+
+      let instantaneousEnergy = 0;
+      if (analyserNode && freqDataArray) {
+        analyserNode.getByteFrequencyData(freqDataArray);
+        let sum = 0;
+        for (let i = 0; i < freqDataArray.length; i++) {
+          sum += freqDataArray[i];
+        }
+        instantaneousEnergy = (sum / freqDataArray.length) / 255;
+      }
+
+      smoothedEnergy += (instantaneousEnergy - smoothedEnergy) * 0.25;
+      const isPlaying = activeAudioSources.length > 0 && smoothedEnergy > 0.02;
+
+      if (isPlaying) {
+        rhythmVisualizer.classList.add("speaking");
+        rhythmBadge.classList.add("active");
+        rhythmBadge.textContent = "🎵 正在律动 · 播报中";
+      } else {
+        rhythmVisualizer.classList.remove("speaking");
+        rhythmBadge.classList.remove("active");
+        rhythmBadge.textContent = "音频律动 · 待机";
+      }
+
+      // Pulsating center orb
+      const orbScale = 1 + smoothedEnergy * 0.45 + (isPlaying ? Math.sin(animPhase * 3) * 0.05 : Math.sin(animPhase * 0.8) * 0.02);
+      const ring1Scale = 1 + smoothedEnergy * 0.7 + (isPlaying ? Math.cos(animPhase * 4) * 0.08 : 0);
+      const ring2Scale = 1 + smoothedEnergy * 1.1 + (isPlaying ? Math.sin(animPhase * 2.5) * 0.12 : 0);
+
+      if (rhythmCenterOrb) {
+        rhythmCenterOrb.style.transform = `scale(${orbScale.toFixed(3)})`;
+      }
+      if (orbRing1) {
+        orbRing1.style.transform = `scale(${ring1Scale.toFixed(3)})`;
+        orbRing1.style.borderColor = isPlaying ? `rgba(236, 72, 153, ${0.4 + smoothedEnergy * 0.5})` : "rgba(56, 189, 248, 0.35)";
+      }
+      if (orbRing2) {
+        orbRing2.style.transform = `scale(${ring2Scale.toFixed(3)})`;
+        orbRing2.style.borderColor = isPlaying ? `rgba(168, 85, 247, ${0.4 + smoothedEnergy * 0.6})` : "rgba(168, 85, 247, 0.25)";
+      }
+
+      // Center radial glow
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const glowRadius = Math.max(50, 90 + smoothedEnergy * 160);
+      const glowGrad = rhythmCtx.createRadialGradient(centerX, centerY, 15, centerX, centerY, glowRadius);
+      glowGrad.addColorStop(0, isPlaying ? "rgba(236, 72, 153, 0.28)" : "rgba(56, 189, 248, 0.12)");
+      glowGrad.addColorStop(0.5, isPlaying ? "rgba(168, 85, 247, 0.14)" : "rgba(56, 189, 248, 0.04)");
+      glowGrad.addColorStop(1, "rgba(15, 23, 42, 0)");
+      rhythmCtx.fillStyle = glowGrad;
+      rhythmCtx.fillRect(0, 0, width, height);
+
+      // Frequency bars calculation (symmetric from center)
+      const halfBars = numBars / 2;
+      for (let i = 0; i < halfBars; i++) {
+        let target = 0;
+        if (isPlaying && freqDataArray) {
+          const binIdx = Math.min(freqDataArray.length - 1, Math.floor((i / halfBars) * 28) + 2);
+          const val = freqDataArray[binIdx] / 255;
+          target = val * 0.9 + Math.sin(animPhase * 2 + i * 0.4) * 0.05;
+        } else {
+          target = 0.08 + Math.sin(animPhase + i * 0.35) * 0.05;
+        }
+        target = Math.max(0.04, Math.min(1.0, target));
+
+        const leftIdx = halfBars - 1 - i;
+        const rightIdx = halfBars + i;
+
+        barHeights[leftIdx] += (target - barHeights[leftIdx]) * 0.35;
+        barHeights[rightIdx] += (target - barHeights[rightIdx]) * 0.35;
+
+        [leftIdx, rightIdx].forEach((idx) => {
+          if (barHeights[idx] > barPeaks[idx]) {
+            barPeaks[idx] = barHeights[idx];
+            peakSpeeds[idx] = 0;
+          } else {
+            peakSpeeds[idx] += 0.0018;
+            barPeaks[idx] = Math.max(barHeights[idx], barPeaks[idx] - peakSpeeds[idx]);
+          }
+        });
+      }
+
+      const totalBarWidth = width * 0.88;
+      const barSlot = totalBarWidth / numBars;
+      const barW = Math.max(3, barSlot * 0.58);
+      const startX = (width - totalBarWidth) / 2;
+      const maxHeight = height * 0.42;
+
+      // Draw frequency spectrum bars
+      for (let i = 0; i < numBars; i++) {
+        const x = startX + i * barSlot + (barSlot - barW) / 2;
+        const h = Math.max(4, barHeights[i] * maxHeight);
+        const peakH = Math.max(4, barPeaks[i] * maxHeight);
+
+        const grad = rhythmCtx.createLinearGradient(0, centerY - h, 0, centerY + h);
+        if (isPlaying) {
+          grad.addColorStop(0, "#f472b6");
+          grad.addColorStop(0.5, "#a855f7");
+          grad.addColorStop(1, "#38bdf8");
+        } else {
+          grad.addColorStop(0, "rgba(56, 189, 248, 0.7)");
+          grad.addColorStop(0.5, "rgba(56, 189, 248, 0.35)");
+          grad.addColorStop(1, "rgba(30, 41, 59, 0.2)");
+        }
+
+        rhythmCtx.fillStyle = grad;
+        rhythmCtx.beginPath();
+        if (rhythmCtx.roundRect) {
+          rhythmCtx.roundRect(x, centerY - h, barW, h * 2, barW / 2);
+        } else {
+          rhythmCtx.rect(x, centerY - h, barW, h * 2);
+        }
+        rhythmCtx.fill();
+
+        // Floating peak indicator
+        if (isPlaying && peakH > h + 3) {
+          rhythmCtx.fillStyle = "#ffffff";
+          rhythmCtx.shadowColor = "#f472b6";
+          rhythmCtx.shadowBlur = 6;
+          rhythmCtx.beginPath();
+          rhythmCtx.arc(x + barW / 2, centerY - peakH, barW / 2, 0, Math.PI * 2);
+          rhythmCtx.arc(x + barW / 2, centerY + peakH, barW / 2, 0, Math.PI * 2);
+          rhythmCtx.fill();
+          rhythmCtx.shadowBlur = 0;
+        }
+      }
+
+      // Luminous connecting wave
+      rhythmCtx.beginPath();
+      rhythmCtx.strokeStyle = isPlaying ? "rgba(244, 114, 182, 0.65)" : "rgba(56, 189, 248, 0.35)";
+      rhythmCtx.lineWidth = 2;
+      rhythmCtx.shadowColor = isPlaying ? "rgba(236, 72, 153, 0.8)" : "rgba(56, 189, 248, 0.4)";
+      rhythmCtx.shadowBlur = isPlaying ? 10 : 4;
+      for (let i = 0; i < numBars; i++) {
+        const x = startX + i * barSlot + barSlot / 2;
+        const h = barHeights[i] * maxHeight;
+        const y = centerY - h - 3;
+        if (i === 0) rhythmCtx.moveTo(x, y);
+        else rhythmCtx.lineTo(x, y);
+      }
+      rhythmCtx.stroke();
+      rhythmCtx.shadowBlur = 0;
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+    window.addEventListener("DOMContentLoaded", () => {
+      initWebSocket();
+      resizeCanvas();
+      requestAnimationFrame(renderVisualizer);
+    });
+  </script>
+</body>
+</html>
