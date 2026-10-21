@@ -133,35 +133,48 @@ setup_lmstudio() {
 
   # 2. 拉取推荐模型
   echo ""
-  local target_model="qwen2.5-7b-instruct"
-  echo -e "FastAvatar 推荐模型为: ${GREEN}${target_model}${NC}"
-  echo -e "（Apple Silicon M系列统一内存推荐 7B；显存较小设备可选 3B 或 1.5B）"
-
-  read -p "是否通过 lms 拉取该模型? [Y/n] (输入 3b 或 1.5b 可换更小模型): " -r lms_opt || true
-  lms_opt="${lms_opt:-Y}"
-  case "$lms_opt" in
-    [yY][eE][sS]|[yY])
-      log_info "正在通过 lms 拉取 $target_model ..."
-      "$lms_bin" get "$target_model" -y
-      log_success "$target_model 下载完成！"
-      ;;
-    3b|3B)
-      target_model="qwen2.5-3b-instruct"
-      log_info "正在通过 lms 拉取 $target_model ..."
-      "$lms_bin" get "$target_model" -y
-      log_success "$target_model 下载完成！"
-      ;;
-    1.5b|1.5B)
+  local target_model="qwen2.5-1.5b-instruct"
+  local hf_model="Qwen/Qwen2.5-1.5B-Instruct-GGUF"
+  echo -e "针对 ${BOLD}Apple Silicon (M1 Pro / M系列)${NC}，强烈推荐极速轻量小模型："
+  echo -e "  1) ${GREEN}Qwen2.5-1.5B-Instruct${NC} (~1.0GB，首字响应时延 < 30ms，零显存压力，最推荐)"
+  echo -e "  2) ${GREEN}Qwen2.5-3B-Instruct${NC} (~2.0GB，兼顾推理能力与速度)"
+  echo -e "  3) ${YELLOW}Qwen2.5-7B-Instruct${NC} (~4.5GB，显存充裕时可选)"
+  echo ""
+  read -p "选择拉取规格 [1: 1.5B(默认), 2: 3B, 3: 7B, 0: 跳过]: " -r m_choice || true
+  m_choice="${m_choice:-1}"
+  case "$m_choice" in
+    1|"1.5b"|"1.5B")
       target_model="qwen2.5-1.5b-instruct"
-      log_info "正在通过 lms 拉取 $target_model ..."
-      "$lms_bin" get "$target_model" -y
-      log_success "$target_model 下载完成！"
+      hf_model="Qwen/Qwen2.5-1.5B-Instruct-GGUF"
+      ;;
+    2|"3b"|"3B")
+      target_model="qwen2.5-3b-instruct"
+      hf_model="Qwen/Qwen2.5-3B-Instruct-GGUF"
+      ;;
+    3|"7b"|"7B")
+      target_model="qwen2.5-7b-instruct"
+      hf_model="Qwen/Qwen2.5-7B-Instruct-GGUF"
+      ;;
+    0)
+      log_info "跳过命令行模型下载。"
+      target_model=""
       ;;
     *)
-      log_info "跳过模型拉取。"
+      target_model="qwen2.5-1.5b-instruct"
+      hf_model="Qwen/Qwen2.5-1.5B-Instruct-GGUF"
       ;;
   esac
 
+  if [ -n "$target_model" ]; then
+    log_info "正在尝试通过 lms 拉取 $hf_model ..."
+    if ! "$lms_bin" get "$hf_model" -y 2>/dev/null; then
+      log_warn "lms CLI Hub 检索受限。最便捷的下载方式："
+      echo -e "  👉 直接打开 ${BOLD}LM Studio 客户端${NC} 界面，在顶部搜索框输入: ${GREEN}$target_model${NC}"
+      echo -e "     找到带有 ${BOLD}Q4_K_M${NC} 或 ${BOLD}Q8_0${NC} 的版本，点击 ${GREEN}Download${NC} 即可（仅需 ~1GB）！"
+    else
+      log_success "$target_model 下载完成！"
+    fi
+  fi
   # 3. 检查服务与启动
   echo ""
   log_info "检查 LM Studio Local Server 状态..."
