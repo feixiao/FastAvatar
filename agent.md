@@ -43,6 +43,7 @@ FastAvatar/
 │   ├── sentence_splitter.py   # 流式断句器（零冗余分配、C级标点集合判定、数字保护）
 │   ├── lip_sync.py            # 口型特征提取器（单 pass 计算 RMS 振幅与 A/I/U/E/O 频域能量）
 │   ├── server.py              # FastAPI HTTP + WebSocket 服务端（音频/打断事件通信）
+│   ├── companion.py           # 养成系成长与记忆引擎（亲密度、等级、记忆抽取、时间感知）
 │   ├── vad/                   # 语音活动检测（EnergyVAD）
 │   ├── asr/                   # ASR 抽象与实现（MockASR, SherpaOnnxASR）
 │   ├── tts/                   # TTS 抽象与实现（MockTTS, EdgeTTS, MacSayTTS, SherpaOnnxTTS, FallbackTTS）

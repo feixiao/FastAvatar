@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎙️</text></svg>">
-  <title>FastAvatar - 低时延语音互动数字人</title>
+  <title>FastAvatar - 低时延语音互动数字人 (养成系)</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -14,6 +14,8 @@
       --text: #f8fafc;
       --text-muted: #94a3b8;
       --border: #334155;
+      --theme-color: #38bdf8;
+      --theme-glow: rgba(56, 189, 248, 0.4);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -28,7 +30,7 @@
     }
     .container {
       width: 100%;
-      max-width: 760px;
+      max-width: 780px;
       display: flex;
       flex-direction: column;
       gap: 16px;
@@ -38,18 +40,119 @@
     }
     header h1 {
       font-size: 26px;
-      color: var(--accent);
+      color: var(--theme-color);
       margin-bottom: 6px;
+      transition: color 0.3s ease;
     }
     header p {
       font-size: 14px;
       color: var(--text-muted);
     }
+
+    /* Companion Cultivation Bar */
+    .companion-bar {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .companion-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .companion-name-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .companion-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .companion-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: var(--theme-glow);
+      color: var(--theme-color);
+      font-weight: 600;
+      border: 1px solid var(--theme-color);
+    }
+    .companion-stage {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .companion-streak {
+      font-size: 11px;
+      padding: 2px 6px;
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .companion-mood {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .companion-xp-block {
+      flex: 1;
+      min-width: 180px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .xp-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .xp-progress-track {
+      width: 100%;
+      height: 8px;
+      background: #334155;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .xp-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--theme-color) 0%, #ec4899 100%);
+      border-radius: 4px;
+      transition: width 0.4s ease;
+      box-shadow: 0 0 8px var(--theme-color);
+    }
+    .btn-memory-vault {
+      background: #1e293b;
+      color: #cbd5e1;
+      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid #475569;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+    .btn-memory-vault:hover {
+      background: #334155;
+      color: #fff;
+      border-color: var(--theme-color);
+    }
+
     .avatar-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: 16px;
-      padding: 24px;
+      padding: 20px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -61,13 +164,14 @@
       height: 180px;
       border-radius: 16px;
       background: radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.95) 100%);
-      border: 1px solid rgba(56, 189, 248, 0.25);
-      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.6), 0 0 25px rgba(56, 189, 248, 0.15);
+      border: 1px solid var(--theme-glow);
+      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.6), 0 0 25px var(--theme-glow);
       display: flex;
       align-items: center;
       justify-content: center;
       position: relative;
       overflow: hidden;
+      transition: all 0.3s ease;
     }
     .rhythm-visualizer canvas {
       width: 100%;
@@ -93,9 +197,9 @@
     .orb-ring {
       position: absolute;
       border-radius: 50%;
-      border: 2px solid rgba(56, 189, 248, 0.35);
-      box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
-      transition: transform 0.1s ease, border-color 0.15s ease, opacity 0.15s ease;
+      border: 2px solid var(--theme-glow);
+      box-shadow: 0 0 15px var(--theme-glow);
+      transition: transform 0.1s ease, border-color 0.25s ease, box-shadow 0.25s ease;
     }
     .orb-ring.ring-1 {
       width: 100%;
@@ -111,21 +215,21 @@
       width: 44px;
       height: 44px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #38bdf8 0%, #a855f7 100%);
+      background: linear-gradient(135deg, var(--theme-color) 0%, #a855f7 100%);
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+      box-shadow: 0 0 20px var(--theme-color);
       font-size: 20px;
       user-select: none;
-      transition: transform 0.08s ease, box-shadow 0.15s ease;
+      transition: transform 0.08s ease, box-shadow 0.25s ease, background 0.25s ease;
     }
     .rhythm-visualizer.speaking .orb-core {
-      box-shadow: 0 0 35px rgba(236, 72, 153, 0.8), 0 0 15px rgba(56, 189, 248, 0.9);
+      box-shadow: 0 0 35px rgba(236, 72, 153, 0.8), 0 0 15px var(--theme-color);
     }
     .rhythm-visualizer.recording .orb-core {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      box-shadow: 0 0 35px rgba(16, 185, 129, 0.9), 0 0 15px rgba(52, 211, 153, 0.8);
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+      box-shadow: 0 0 35px rgba(16, 185, 129, 0.9), 0 0 15px rgba(52, 211, 153, 0.8) !important;
     }
     .rhythm-status-row {
       display: flex;
@@ -175,7 +279,7 @@
       color: var(--text-muted);
     }
     .metrics-bar span b {
-      color: var(--accent);
+      color: var(--theme-color);
     }
     
     /* Multi-turn Chat Bar */
@@ -190,7 +294,7 @@
       align-items: center;
       gap: 6px;
       font-size: 13px;
-      color: #38bdf8;
+      color: var(--theme-color);
     }
     .status-dot {
       width: 8px;
@@ -287,7 +391,7 @@
     }
     .mode-tab.active {
       background: #1e293b;
-      color: #38bdf8;
+      color: var(--theme-color);
       font-weight: 600;
     }
 
@@ -386,10 +490,10 @@
       outline: none;
     }
     input[type="text"]:focus {
-      border-color: var(--accent);
+      border-color: var(--theme-color);
     }
     button.btn-action {
-      background: var(--accent);
+      background: var(--theme-color);
       color: #0f172a;
       font-weight: 600;
       border: none;
@@ -400,7 +504,7 @@
       transition: background 0.15s;
     }
     button.btn-action:hover {
-      background: var(--accent-hover);
+      background: #0284c7;
       color: #fff;
     }
     button.btn-danger {
@@ -416,6 +520,138 @@
       background: #dc2626;
     }
 
+    /* Modal Dialogs */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 520px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header h3 {
+      font-size: 17px;
+      color: #fff;
+    }
+    .btn-close-modal {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    .modal-subtitle {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    .memory-list {
+      max-height: 240px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-right: 4px;
+    }
+    .memory-item {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+    .mem-cat {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      margin-right: 6px;
+    }
+    .btn-del-mem {
+      background: transparent;
+      border: none;
+      color: #ef4444;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 6px;
+    }
+    .memory-add-row {
+      display: flex;
+      gap: 8px;
+    }
+    .memory-add-row input {
+      flex: 1;
+      background: #0f172a;
+      border: 1px solid #334155;
+      padding: 8px 12px;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 13px;
+    }
+    .btn-add-memory {
+      background: #0284c7;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Level-up Modal */
+    .levelup-card {
+      text-align: center;
+      align-items: center;
+      border-color: #f59e0b;
+      box-shadow: 0 0 50px rgba(245, 158, 11, 0.4);
+    }
+    .levelup-icon {
+      font-size: 48px;
+      animation: pulse 1s infinite alternate;
+    }
+    .levelup-title {
+      font-size: 22px;
+      color: #f59e0b;
+    }
+    .levelup-badge {
+      font-size: 15px;
+      font-weight: 700;
+      padding: 6px 16px;
+      border-radius: 20px;
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+      border: 1px solid #f59e0b;
+    }
+    .levelup-desc {
+      font-size: 14px;
+      color: #cbd5e1;
+      line-height: 1.6;
+    }
+
     @keyframes pulse {
       0% { transform: scale(1); }
       50% { transform: scale(1.03); }
@@ -427,10 +663,37 @@
   <div class="container">
     <header>
       <h1>FastAvatar</h1>
-      <p>低时延模块化端到端流式数字人 · 本地大模型优先 · 实时音画口型同步</p>
+      <p>低时延流式数字人 · 陪伴养成系系统 · 实时音画口型同步</p>
     </header>
 
     <div class="avatar-card">
+      <!-- Companion Cultivation Bar -->
+      <div class="companion-bar" id="companionBar">
+        <div class="companion-info">
+          <div class="companion-name-row">
+            <span class="companion-name" id="compName">小夏</span>
+            <span class="companion-badge" id="compBadge">🌱 初识</span>
+            <span class="companion-stage" id="compStage">Lv.1 初识助手</span>
+            <span class="companion-streak" id="compStreak">🔥 1天</span>
+          </div>
+          <div class="companion-mood" id="compMood">😊 元气满满</div>
+        </div>
+
+        <div class="companion-xp-block">
+          <div class="xp-label-row">
+            <span>亲密度: <b id="compCurrentXp">0</b> / <span id="compNextXp">100</span> XP</span>
+            <span id="compProgressPct">0%</span>
+          </div>
+          <div class="xp-progress-track">
+            <div class="xp-progress-fill" id="compProgressFill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <button id="openMemoryBtn" class="btn-memory-vault" title="查看小夏对你的记忆">
+          📖 记忆档案 (<span id="compMemoriesCount">2</span>)
+        </button>
+      </div>
+
       <div id="rhythmVisualizer" class="rhythm-visualizer">
         <canvas id="rhythmCanvas"></canvas>
         <div class="rhythm-center-orb" id="rhythmCenterOrb">
@@ -457,7 +720,7 @@
     <div class="chat-header-bar">
       <div class="chat-mode-tag">
         <span class="status-dot"></span>
-        <span>连续对话模式 (上下文自动保存)</span>
+        <span>连续对话模式 (上下文与记忆自动沉淀)</span>
       </div>
       <button id="clearHistoryBtn" class="btn-clear-chat" title="清空对话记忆，开始全新话题">
         🧹 开启新话题
@@ -465,7 +728,7 @@
     </div>
 
     <div id="chatBox" class="chat-box">
-      <div class="msg assistant">你好！我是你的 FastAvatar 语音助手。你可以按住麦克风说话或打字，随时可以和我连续一直聊天，随时可以打断我哦！</div>
+      <div class="msg assistant">你好！我是你的 FastAvatar 陪伴助手小夏。你可以按住麦克风说话或打字，随时可以和我连续一直聊天，随时可以打断我哦！</div>
     </div>
 
     <!-- Manual Voice & Multi-turn Panel -->
@@ -499,6 +762,35 @@
     </div>
   </div>
 
+  <!-- Memory Vault Modal -->
+  <div id="memoryModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>📖 小夏对你的专属记忆</h3>
+        <button id="closeMemoryBtn" class="btn-close-modal">✕</button>
+      </div>
+      <p class="modal-subtitle">小夏在日常对话中会自动提炼并牢记关于你的事实与偏好：</p>
+      <div id="memoryList" class="memory-list">
+        <!-- Rendered dynamically -->
+      </div>
+      <div class="memory-add-row">
+        <input id="newMemoryInput" type="text" placeholder="教小夏记住新事实（例如：我最喜欢吃芒果冰沙）" />
+        <button id="addMemoryBtn" class="btn-add-memory">+ 存入记忆</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Level Up Modal -->
+  <div id="levelUpModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card levelup-card">
+      <div class="levelup-icon">🎉</div>
+      <h2 class="levelup-title">伴侣关系升阶啦！</h2>
+      <div class="levelup-badge" id="levelupBadge">🌸 知心密友 (Lv.3)</div>
+      <p class="levelup-desc" id="levelupDesc">你们的信任与默契进一步加深！小夏现在对你的态度更加亲切自然啦~</p>
+      <button id="closeLevelupBtn" class="btn-action">太棒啦！继续聊天</button>
+    </div>
+  </div>
+
   <script>
     let ws = null;
     let audioCtx = null;
@@ -507,7 +799,7 @@
 
     // Recording state
     let isRecording = false;
-    let currentRecordingMode = "ptt"; // "ptt" or "click"
+    let currentRecordingMode = "ptt";
     let pcmSampleChunks = [];
     let pcmMediaStream = null;
     let pcmSourceNode = null;
@@ -516,6 +808,10 @@
     let recordTimerInterval = null;
     let isSpaceKeyDown = false;
     let userCancelled = false;
+
+    // Visual theme colors (dynamically evolved)
+    let currentOrbColor = "#38bdf8";
+    let currentGlowColor = "rgba(56, 189, 248, 0.4)";
 
     const chatBox = document.getElementById("chatBox");
     const textInput = document.getElementById("textInput");
@@ -543,6 +839,28 @@
     const clickRecBtn = document.getElementById("clickRecBtn");
     const cancelRecBtn = document.getElementById("cancelRecBtn");
 
+    // Companion elements
+    const compName = document.getElementById("compName");
+    const compBadge = document.getElementById("compBadge");
+    const compStage = document.getElementById("compStage");
+    const compStreak = document.getElementById("compStreak");
+    const compMood = document.getElementById("compMood");
+    const compCurrentXp = document.getElementById("compCurrentXp");
+    const compNextXp = document.getElementById("compNextXp");
+    const compProgressPct = document.getElementById("compProgressPct");
+    const compProgressFill = document.getElementById("compProgressFill");
+    const compMemoriesCount = document.getElementById("compMemoriesCount");
+    const openMemoryBtn = document.getElementById("openMemoryBtn");
+    const closeMemoryBtn = document.getElementById("closeMemoryBtn");
+    const memoryModal = document.getElementById("memoryModal");
+    const memoryList = document.getElementById("memoryList");
+    const newMemoryInput = document.getElementById("newMemoryInput");
+    const addMemoryBtn = document.getElementById("addMemoryBtn");
+    const levelUpModal = document.getElementById("levelUpModal");
+    const levelupBadge = document.getElementById("levelupBadge");
+    const levelupDesc = document.getElementById("levelupDesc");
+    const closeLevelupBtn = document.getElementById("closeLevelupBtn");
+
     function getAudioContext() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
@@ -554,12 +872,129 @@
       const ctx = getAudioContext();
       if (!analyserNode) {
         analyserNode = ctx.createAnalyser();
-        analyserNode.fftSize = 128; // 64 frequency bins
+        analyserNode.fftSize = 128;
         analyserNode.smoothingTimeConstant = 0.8;
         freqDataArray = new Uint8Array(analyserNode.frequencyBinCount);
         analyserNode.connect(ctx.destination);
       }
       return analyserNode;
+    }
+
+    // Update Companion UI
+    function updateCompanionUI(data) {
+      if (!data) return;
+      if (data.name) compName.textContent = data.name;
+      if (data.badge) compBadge.textContent = data.badge;
+      if (data.affinity_stage && data.level) compStage.textContent = `Lv.${data.level} ${data.affinity_stage}`;
+      if (data.consecutive_days) compStreak.textContent = `🔥 ${data.consecutive_days}天`;
+      if (data.mood && data.time_greeting) compMood.textContent = `${data.time_greeting}`;
+      if (data.current_xp !== undefined) compCurrentXp.textContent = data.current_xp;
+      if (data.next_level_xp) compNextXp.textContent = data.next_level_xp;
+      if (data.progress_pct !== undefined) {
+        compProgressPct.textContent = `${data.progress_pct}%`;
+        compProgressFill.style.width = `${data.progress_pct}%`;
+      }
+      if (data.memories_count !== undefined) compMemoriesCount.textContent = data.memories_count;
+
+      if (data.orb_color) {
+        currentOrbColor = data.orb_color;
+        currentGlowColor = data.glow_color || "rgba(56, 189, 248, 0.4)";
+        document.documentElement.style.setProperty("--theme-color", currentOrbColor);
+        document.documentElement.style.setProperty("--theme-glow", currentGlowColor);
+      }
+    }
+
+    async function fetchCompanionProfile() {
+      try {
+        const resp = await fetch("/api/companion");
+        if (resp.ok) {
+          const data = await resp.json();
+          updateCompanionUI(data);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch companion profile:", e);
+      }
+    }
+
+    // Memory Vault Modal handlers
+    openMemoryBtn.addEventListener("click", async () => {
+      await renderMemoryList();
+      memoryModal.style.display = "flex";
+    });
+
+    closeMemoryBtn.addEventListener("click", () => {
+      memoryModal.style.display = "none";
+    });
+
+    closeLevelupBtn.addEventListener("click", () => {
+      levelUpModal.style.display = "none";
+    });
+
+    async function renderMemoryList() {
+      try {
+        const resp = await fetch("/api/companion");
+        if (!resp.ok) return;
+        const data = await resp.json();
+        updateCompanionUI(data);
+
+        memoryList.innerHTML = "";
+        const facts = data.memories || [];
+        if (facts.length === 0) {
+          memoryList.innerHTML = '<div style="color:#94a3b8; font-size:13px; text-align:center; padding:16px;">小夏还没有记住更多事实，和她多聊聊吧！</div>';
+          return;
+        }
+
+        facts.forEach((f) => {
+          const item = document.createElement("div");
+          item.className = "memory-item";
+          const catLabel = f.category === "preference" ? "喜好" : (f.category === "pet" ? "宠物" : (f.category === "work" ? "生活" : "记忆"));
+          item.innerHTML = `
+            <div>
+              <span class="mem-cat">${catLabel}</span>
+              <span>${f.content}</span>
+            </div>
+            <button class="btn-del-mem" title="删除这条记忆" data-id="${f.id}">🗑️</button>
+          `;
+          memoryList.appendChild(item);
+        });
+
+        // Bind delete buttons
+        memoryList.querySelectorAll(".btn-del-mem").forEach((btn) => {
+          btn.addEventListener("click", async (e) => {
+            const factId = e.currentTarget.getAttribute("data-id");
+            if (factId) {
+              await fetch(`/api/companion/fact/${factId}`, { method: "DELETE" });
+              await renderMemoryList();
+            }
+          });
+        });
+      } catch (e) {
+        console.error("Error loading memories:", e);
+      }
+    }
+
+    addMemoryBtn.addEventListener("click", async () => {
+      const content = newMemoryInput.value.trim();
+      if (!content) return;
+      try {
+        const resp = await fetch("/api/companion/fact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: content, category: "preference" }),
+        });
+        if (resp.ok) {
+          newMemoryInput.value = "";
+          await renderMemoryList();
+        }
+      } catch (e) {
+        console.error("Error adding memory:", e);
+      }
+    });
+
+    function showLevelUpCelebration(level, stage, badge) {
+      levelupBadge.textContent = `${badge} (Lv.${level})`;
+      levelupDesc.textContent = `你们的默契度达成新里程碑！小夏解锁了全新的相伴口吻与视觉光环，快来和她聊聊天感受新变化吧！`;
+      levelUpModal.style.display = "flex";
     }
 
     // 16-bit Mono WAV Encoder
@@ -577,13 +1012,13 @@
       view.setUint32(4, 36 + samples.length * 2, true);
       writeString(view, 8, 'WAVE');
       writeString(view, 12, 'fmt ');
-      view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
-      view.setUint16(20, 1, true);  // AudioFormat (1 for PCM)
-      view.setUint16(22, 1, true);  // NumChannels (1 mono)
-      view.setUint32(24, sampleRate, true); // SampleRate
-      view.setUint32(28, sampleRate * 2, true); // ByteRate (sampleRate * 1 * 16 / 8)
-      view.setUint16(32, 2, true);  // BlockAlign (1 * 16 / 8)
-      view.setUint16(34, 16, true); // BitsPerSample
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
       writeString(view, 36, 'data');
       view.setUint32(40, samples.length * 2, true);
 
@@ -639,7 +1074,7 @@
           await ctx.resume();
         }
 
-        stopAllAudio(); // Stop any avatar speech before user talks
+        stopAllAudio();
         userCancelled = false;
         pcmSampleChunks = [];
         pcmMediaStream = await getAudioMediaStream();
@@ -652,7 +1087,6 @@
           const inputData = e.inputBuffer.getChannelData(0);
           pcmSampleChunks.push(new Float32Array(inputData));
 
-          // Calculate energy for visualizer
           let sum = 0;
           for (let i = 0; i < inputData.length; i++) {
             sum += inputData[i] * inputData[i];
@@ -666,7 +1100,6 @@
         isRecording = true;
         recordStartTime = Date.now();
 
-        // UI Updates
         pttBtn.classList.add("recording");
         pttBtn.textContent = "🔴 正在录音... (松开 立即发送)";
         clickRecBtn.classList.add("recording");
@@ -720,7 +1153,6 @@
         pcmMediaStream = null;
       }
 
-      // UI Reset
       pttBtn.classList.remove("recording");
       pttBtn.textContent = "🎙️ 按住 说话 (松开 发送)";
       clickRecBtn.classList.remove("recording");
@@ -744,7 +1176,6 @@
         return;
       }
 
-      // Flatten PCM chunks
       let totalSamples = 0;
       for (const chunk of pcmSampleChunks) {
         totalSamples += chunk.length;
@@ -787,7 +1218,6 @@
       }
     });
 
-    // Touch Support for mobile
     pttBtn.addEventListener("touchstart", (e) => {
       e.preventDefault();
       startVoiceRecording();
@@ -806,7 +1236,6 @@
       }
     });
 
-    // Keyboard Spacebar Hold-to-Talk
     window.addEventListener("keydown", (e) => {
       if (e.code === "Space" && document.activeElement !== textInput && !isSpaceKeyDown) {
         isSpaceKeyDown = true;
@@ -823,7 +1252,6 @@
       }
     });
 
-    // Click-to-record Event Listeners
     clickRecBtn.addEventListener("click", () => {
       if (!isRecording) {
         startVoiceRecording();
@@ -846,6 +1274,7 @@
       ws.onopen = () => {
         statusBadge.textContent = "已连接服务 · 随时聊天";
         statusBadge.classList.add("active");
+        fetchCompanionProfile();
       };
 
       ws.onmessage = async (event) => {
@@ -856,6 +1285,11 @@
           playAudioChunk(msg.data.audio_base64, msg.data.mouth_open);
         } else if (msg.type === "user_transcription") {
           updateLastUserTranscription(msg.data.text);
+        } else if (msg.type === "companion_update") {
+          updateCompanionUI(msg.data);
+          if (msg.data.leveled_up) {
+            showLevelUpCelebration(msg.data.level, msg.data.affinity_stage, msg.data.badge);
+          }
         } else if (msg.type === "metrics") {
           mLatency.textContent = Math.round(msg.data.turn_latency_ms);
           mTTFT.textContent = Math.round(msg.data.ttft_ms);
@@ -865,6 +1299,7 @@
           stopAllAudio();
         } else if (msg.type === "turn_complete") {
           statusBadge.textContent = "已就绪 · 随时说话";
+          fetchCompanionProfile();
         } else if (msg.type === "history_cleared") {
           statusBadge.textContent = "记忆已清空 · 开启新话题";
         }
@@ -905,7 +1340,6 @@
         pendingUserMsgEl.textContent = text;
         pendingUserMsgEl = null;
       } else {
-        // Fallback: update last user msg
         const userMsgs = chatBox.querySelectorAll(".msg.user");
         if (userMsgs.length > 0) {
           const last = userMsgs[userMsgs.length - 1];
@@ -926,13 +1360,12 @@
       chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // Clear history / New Topic
     clearHistoryBtn.addEventListener("click", () => {
       stopAllAudio();
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "clear_history" }));
       }
-      chatBox.innerHTML = '<div class="msg assistant">已清空上一段对话记忆！你可以打字或按住麦克风和我开始新话题聊天。</div>';
+      chatBox.innerHTML = '<div class="msg assistant">已清空上一段对话上下文！小夏依然记得关于你的专属记忆哦，可以随时开始新话题。</div>';
       mLatency.textContent = "-";
       mTTFT.textContent = "-";
       mTTS.textContent = "-";
@@ -955,7 +1388,6 @@
       resetAvatar();
     }
 
-    // Play audio chunk with queue scheduling
     async function playAudioChunk(base64Data, mouthFrames) {
       try {
         const ctx = getAudioContext();
@@ -1009,7 +1441,6 @@
 
         activeAudioSources.push(source);
 
-        // Schedule lip sync
         if (mouthFrames && mouthFrames.length > 0) {
           const frameIntervalMs = (audioBuffer.duration / mouthFrames.length) * 1000;
           const startDelayMs = Math.max(0, (startTime - now) * 1000);
@@ -1073,7 +1504,7 @@
       }
     });
 
-    // Rhythmic Visualizer Engine
+    // Rhythmic Visualizer Engine (Theme-aware)
     const rhythmCtx = rhythmCanvas ? rhythmCanvas.getContext("2d") : null;
     const numBars = 36;
     const barHeights = new Float32Array(numBars);
@@ -1129,7 +1560,6 @@
         rhythmBadge.textContent = "音频律动 · 待机";
       }
 
-      // Center orb pulsation
       const orbScale = 1 + smoothedEnergy * 0.45 + (isSpeaking || isRecording ? Math.sin(animPhase * 3) * 0.05 : Math.sin(animPhase * 0.8) * 0.02);
       const ring1Scale = 1 + smoothedEnergy * 0.7 + (isSpeaking || isRecording ? Math.cos(animPhase * 4) * 0.08 : 0);
       const ring2Scale = 1 + smoothedEnergy * 1.1 + (isSpeaking || isRecording ? Math.sin(animPhase * 2.5) * 0.12 : 0);
@@ -1144,13 +1574,11 @@
         orbRing2.style.transform = `scale(${ring2Scale.toFixed(3)})`;
       }
 
-      // Draw symmetrical circular sound spectrum bars
       const centerX = width / 2;
       const centerY = height / 2;
       const innerRadius = 45;
       const maxBarLen = Math.min(width, height) * 0.28;
 
-      const halfBars = numBars / 2;
       for (let i = 0; i < numBars; i++) {
         let rawVal = 0;
         if (freqDataArray && isSpeaking) {
@@ -1187,12 +1615,12 @@
           grad.addColorStop(0, "rgba(52, 211, 153, 0.4)");
           grad.addColorStop(1, "rgba(16, 185, 129, 0.95)");
         } else if (isSpeaking) {
-          grad.addColorStop(0, "rgba(56, 189, 248, 0.4)");
-          grad.addColorStop(0.5, "rgba(168, 85, 247, 0.8)");
+          grad.addColorStop(0, currentGlowColor);
+          grad.addColorStop(0.5, currentOrbColor);
           grad.addColorStop(1, "rgba(236, 72, 153, 0.95)");
         } else {
-          grad.addColorStop(0, "rgba(56, 189, 248, 0.15)");
-          grad.addColorStop(1, "rgba(56, 189, 248, 0.4)");
+          grad.addColorStop(0, currentGlowColor);
+          grad.addColorStop(1, currentOrbColor);
         }
 
         rhythmCtx.beginPath();

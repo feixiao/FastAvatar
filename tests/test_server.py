@@ -52,3 +52,25 @@ def test_websocket_barge_in():
             pass
 
         assert "interrupted" in received_types or "text_chunk" in received_types
+
+def test_companion_endpoints():
+    client = TestClient(app)
+    # 1. Get summary
+    resp = client.get("/api/companion")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "level" in data
+    assert "affinity_stage" in data
+    assert "memories" in data
+
+    # 2. Add fact
+    add_resp = client.post("/api/companion/fact", json={"content": "最喜欢吃草莓蛋糕", "category": "preference"})
+    assert add_resp.status_code == 200
+    fact_data = add_resp.json()["fact"]
+    fact_id = fact_data["id"]
+    assert fact_data["content"] == "最喜欢吃草莓蛋糕"
+
+    # 3. Delete fact
+    del_resp = client.delete(f"/api/companion/fact/{fact_id}")
+    assert del_resp.status_code == 200
+    assert del_resp.json()["status"] == "ok"

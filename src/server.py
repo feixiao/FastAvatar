@@ -80,6 +80,26 @@ async def chat_http(req: dict):
     return {"events": events}
 
 
+@app.get("/api/companion")
+async def get_companion_profile():
+    return pipeline.companion.get_summary()
+
+
+@app.post("/api/companion/fact")
+async def add_companion_fact(req: dict):
+    content = req.get("content", "").strip()
+    category = req.get("category", "preference")
+    if not content:
+        return JSONResponse(status_code=400, content={"error": "Content cannot be empty"})
+    fact = pipeline.companion.add_fact(content=content, category=category)
+    return {"status": "ok", "fact": fact.model_dump()}
+
+
+@app.delete("/api/companion/fact/{fact_id}")
+async def delete_companion_fact(fact_id: str):
+    success = pipeline.companion.remove_fact(fact_id)
+    return {"status": "ok" if success else "not_found"}
+
 @app.websocket("/ws/chat")
 async def websocket_chat(websocket: WebSocket):
     await websocket.accept()
@@ -103,6 +123,8 @@ async def websocket_chat(websocket: WebSocket):
                     await websocket.send_json({"type": "metrics", "data": event.payload})
                 elif event.event_type == "user_transcription":
                     await websocket.send_json({"type": "user_transcription", "data": event.payload})
+                elif event.event_type == "companion_update":
+                    await websocket.send_json({"type": "companion_update", "data": event.payload})
                 elif event.event_type == "interrupted":
                     await websocket.send_json({"type": "interrupted", "data": event.payload})
             await websocket.send_json({"type": "turn_complete"})

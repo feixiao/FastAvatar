@@ -20,7 +20,7 @@ from src.tts.mock import MockTTS
 from src.tts.mac_say import MacSayTTS
 from src.tts.edge import EdgeTTS
 from src.tts.sherpa import SherpaOnnxTTS
-
+from src.companion import CompanionManager
 
 class PipelineEvent(BaseModel):
     event_type: str  # "text_chunk", "audio_chunk", "viseme", "metrics", "interrupted"
@@ -51,6 +51,7 @@ class VoiceAvatarPipeline:
             max_length=self.config.max_chunk_length,
             split_punctuations=self.config.split_punctuations,
         )
+        self.companion = CompanionManager()
         self.chat_history: List[Dict[str, str]] = []
         self._interrupt_event = asyncio.Event()
     def _create_asr(self) -> BaseASR:
@@ -147,9 +148,10 @@ class VoiceAvatarPipeline:
         async def llm_producer():
             nonlocal first_token_received, full_reply
             try:
+                dyn_system_prompt = self.companion.build_system_prompt(self.config.llm.system_prompt)
                 stream = self.llm.chat_stream(
                     messages=self.chat_history,
-                    system_prompt=self.config.llm.system_prompt,
+                    system_prompt=dyn_system_prompt,
                     temperature=self.config.llm.temperature,
                     max_tokens=self.config.llm.max_tokens,
                 )
@@ -230,6 +232,15 @@ class VoiceAvatarPipeline:
         max_hist = getattr(self.config, "max_history_messages", 20)
         if len(self.chat_history) > max_hist:
             self.chat_history = self.chat_history[-max_hist:]
+
+        # Cultivation progression and asynchronous background memory extraction
+        if full_reply.strip() and not self._interrupt_event.is_set():
+            growth_update = self.companion.add_turn_xp(is_voice=bool(audio_input and not text_input))
+            yield PipelineEvent(
+                event_type="companion_update",
+                payload=growth_update,
+            )
+            asyncio.create_task(self.companion.extract_memory_facts_async(user_text, full_reply))
 
         # Final event: Telemetry metrics
         yield PipelineEvent(
