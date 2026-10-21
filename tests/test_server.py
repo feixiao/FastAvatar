@@ -71,6 +71,13 @@ def test_websocket_voice_turn():
         assert "turn_complete" in received
         assert "user_transcription" in received or "audio_chunk" in received
 
+def test_websocket_clear_history():
+    client = TestClient(app)
+    with client.websocket_connect("/ws/chat") as ws:
+        ws.send_json({"type": "clear_history"})
+        msg = ws.receive_json()
+        assert msg.get("type") == "history_cleared"
+
 
 def test_companion_endpoints():
     client = TestClient(app)
@@ -93,3 +100,10 @@ def test_companion_endpoints():
     del_resp = client.delete(f"/api/companion/fact/{fact_id}")
     assert del_resp.status_code == 200
     assert del_resp.json()["status"] == "ok"
+
+    # 4. Empty content validation and not found deletion
+    empty_resp = client.post("/api/companion/fact", json={"content": "  "})
+    assert empty_resp.status_code == 400
+    del_fail = client.delete("/api/companion/fact/non-existent-id-999")
+    assert del_fail.status_code == 200
+    assert del_fail.json()["status"] == "not_found"
