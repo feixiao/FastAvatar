@@ -1716,7 +1716,7 @@
     function appendUserPendingVoiceMessage() {
       const el = document.createElement("div");
       el.className = "msg user pending";
-      el.textContent = "🎙️ [语音输入] 正在识别...";
+      el.textContent = isContinuousMode ? "🎙️ [连续语音] 正在识别..." : "🎙️ [语音输入] 正在识别...";
       chatBox.appendChild(el);
       chatBox.scrollTop = chatBox.scrollHeight;
       pendingUserMsgEl = el;
