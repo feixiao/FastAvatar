@@ -1,6 +1,7 @@
 """Sherpa-ONNX local offline TTS provider (VITS / Kokoro)."""
 
 from pathlib import Path
+import asyncio
 from typing import Optional
 from src.tts.base import BaseTTS
 
@@ -81,7 +82,7 @@ class SherpaOnnxTTS(BaseTTS):
         self._ensure_tts()
         if self._tts is None:
             return b""
-        audio = self._tts.generate(text, sid=self.speaker_id, speed=self.speed)
+        audio = await asyncio.to_thread(self._tts.generate, text, sid=self.speaker_id, speed=self.speed)
         # Convert float samples (-1..1) to int16 PCM bytes
         import numpy as np
         samples = (np.array(audio.samples) * 32767).clip(-32768, 32767).astype(np.int16)

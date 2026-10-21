@@ -1,6 +1,6 @@
 """Sherpa-ONNX local offline ASR implementation."""
 
-import io
+import asyncio
 import wave
 from pathlib import Path
 from typing import Optional
@@ -83,4 +83,5 @@ class SherpaOnnxASR(BaseASR):
 
         stream = self._recognizer.create_stream()
         stream.accept_waveform(sr, audio)
+        await asyncio.to_thread(self._recognizer.decode_stream, stream)
         return stream.result.text
