@@ -63,7 +63,9 @@ class PipelineConfig(BaseModel):
     
     # Enable barge-in (interruption)
     enable_barge_in: bool = True
-    
+
+    # Multi-turn conversation sliding window (keeps conversation fresh and prevents context overflow)
+    max_history_messages: int = 20
     # Sub-component configs
     llm: LLMConfig = Field(default_factory=LLMConfig)
     asr: ASRConfig = Field(default_factory=ASRConfig)

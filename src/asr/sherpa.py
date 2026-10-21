@@ -69,9 +69,18 @@ class SherpaOnnxASR(BaseASR):
             # Safe fallback if model weights are not yet downloaded locally
             return "本地Sherpa-ONNX模型未加载，请配置模型权重路径。"
 
+        import io
+        import soundfile as sf
         import numpy as np
-        audio = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
+
+        try:
+            audio, sr = sf.read(io.BytesIO(audio_data), dtype="float32")
+            if audio.ndim > 1:
+                audio = audio.mean(axis=1)
+        except Exception:
+            audio = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
+            sr = sample_rate
+
         stream = self._recognizer.create_stream()
-        stream.accept_waveform(sample_rate, audio)
-        self._recognizer.decode_stream(stream)
+        stream.accept_waveform(sr, audio)
         return stream.result.text

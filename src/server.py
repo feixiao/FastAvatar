@@ -101,9 +101,10 @@ async def websocket_chat(websocket: WebSocket):
                     await websocket.send_json({"type": "text_chunk", "data": event.payload})
                 elif event.event_type == "metrics":
                     await websocket.send_json({"type": "metrics", "data": event.payload})
+                elif event.event_type == "user_transcription":
+                    await websocket.send_json({"type": "user_transcription", "data": event.payload})
                 elif event.event_type == "interrupted":
                     await websocket.send_json({"type": "interrupted", "data": event.payload})
-
             await websocket.send_json({"type": "turn_complete"})
         except asyncio.CancelledError:
             pass
@@ -121,6 +122,13 @@ async def websocket_chat(websocket: WebSocket):
                 await websocket.send_json({"type": "interrupted"})
                 continue
 
+            elif msg_type == "clear_history":
+                session_pipeline.clear_history()
+                if current_turn_task and not current_turn_task.done():
+                    session_pipeline.trigger_interrupt()
+                    current_turn_task.cancel()
+                await websocket.send_json({"type": "history_cleared"})
+                continue
             elif msg_type in ("text", "audio"):
                 if current_turn_task and not current_turn_task.done():
                     session_pipeline.trigger_interrupt()

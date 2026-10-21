@@ -57,8 +57,16 @@ class VoiceAvatarPipeline:
         cfg = self.config.asr
         if cfg.provider == ASRProviderType.SHERPA_ONNX:
             return SherpaOnnxASR()
+        # Auto-detect if offline SherpaOnnx model was downloaded
+        from src.asr.sherpa import _find_default_sense_voice
+        m_path, _ = _find_default_sense_voice()
+        if m_path is not None:
+            return SherpaOnnxASR()
         return MockASR()
 
+    def clear_history(self):
+        """Clear conversation history for fresh continuous chatting."""
+        self.chat_history.clear()
     def _create_llm(self) -> BaseLLM:
         cfg = self.config.llm
         if cfg.provider == LLMProviderType.OLLAMA:
@@ -118,7 +126,16 @@ class VoiceAvatarPipeline:
         if not user_text.strip():
             return
 
+        # Emit user transcription event so frontend sees the transcribed voice immediately
+        yield PipelineEvent(
+            event_type="user_transcription",
+            payload={"text": user_text, "asr_latency_ms": metrics.asr_latency_ms},
+        )
+
         self.chat_history.append({"role": "user", "content": user_text})
+        max_hist = getattr(self.config, "max_history_messages", 20)
+        if len(self.chat_history) > max_hist:
+            self.chat_history = self.chat_history[-max_hist:]
 
         full_reply = ""
         first_token_received = False
@@ -210,6 +227,9 @@ class VoiceAvatarPipeline:
                     pass
         metrics.full_text = full_reply
         self.chat_history.append({"role": "assistant", "content": full_reply})
+        max_hist = getattr(self.config, "max_history_messages", 20)
+        if len(self.chat_history) > max_hist:
+            self.chat_history = self.chat_history[-max_hist:]
 
         # Final event: Telemetry metrics
         yield PipelineEvent(
