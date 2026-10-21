@@ -63,10 +63,10 @@ def test_websocket_voice_turn():
     with client.websocket_connect("/ws/chat") as ws:
         ws.send_json({"type": "audio", "audio_base64": b64_audio})
         received = []
-        for _ in range(15):
+        for _ in range(50):
             msg = ws.receive_json()
             received.append(msg.get("type"))
-            if msg.get("type") == "turn_complete":
+            if msg.get("type") in ("turn_complete", "interrupted"):
                 break
         assert "turn_complete" in received
         assert "user_transcription" in received or "audio_chunk" in received

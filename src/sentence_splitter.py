@@ -10,10 +10,25 @@ from typing import AsyncIterator, List, Set
 MARKDOWN_SYMBOLS = set("*_~`#")
 MARKDOWN_CLEAN_RE = re.compile(r"[*_~`#]")
 WHITESPACE_CLEAN_RE = re.compile(r"\s+")
+STAGE_KEYWORDS = ("笑", "看", "递", "叹", "眨", "抱", "摸", "揉", "点", "摇", "拉", "走", "坐", "站", "低头", "转", "歪头", "轻声", "小声", "心想", "脸红", "愣", "思考", "托腮", "嘟嘴", "傲娇")
+PAREN_RE = re.compile(r"[(（][^()（）]{1,15}[)）]")
+
+
+def filter_stage_actions(text: str) -> str:
+    """Filters out stage directions like (微笑), （轻声笑） so TTS doesn't read out parentheses."""
+    if "(" not in text and "（" not in text:
+        return text
+    def repl(m):
+        inner = m.group(0)[1:-1]
+        if any(kw in inner for kw in STAGE_KEYWORDS):
+            return ""
+        return m.group(0)
+    return PAREN_RE.sub(repl, text)
 
 
 def clean_speech_text(text: str) -> str:
-    """Strips markdown asterisks, bold/italic markers, and hashes for clean TTS reading."""
+    """Strips markdown asterisks, bold/italic markers, and stage directions for clean TTS reading."""
+    text = filter_stage_actions(text)
     if MARKDOWN_SYMBOLS.isdisjoint(text):
         return text.strip()
     cleaned = MARKDOWN_CLEAN_RE.sub("", text)

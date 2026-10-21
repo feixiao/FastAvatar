@@ -42,3 +42,18 @@ def test_sentence_splitter_markdown_cleaning():
     assert "*" not in combined
     assert "小夏" in combined
     assert "你好呀！" in combined
+
+def test_sentence_splitter_stage_action_filtering():
+    splitter = SentenceSplitter(min_length=3, max_length=30)
+    tokens = ["你", "好", "呀", "！", "（", "微", "笑", "着", "挥", "手", "）", "今", "天", "过", "得", "好", "吗", "？"]
+    results = []
+    for t in tokens:
+        results.extend(splitter.process_token(t))
+    results.extend(splitter.flush())
+
+    combined = "".join(results)
+    assert "微笑" not in combined
+    assert "（" not in combined
+    assert "）" not in combined
+    assert "你好呀！" in combined
+    assert "今天过得好吗？" in combined
