@@ -1291,10 +1291,10 @@
 
           if (isAvatarPlaying) {
             // Avatar is speaking - higher threshold to prevent speaker bleed, but allow user barge-in
-            const interruptThreshold = 0.045;
+            const interruptThreshold = 0.05;
             if (rms >= interruptThreshold) {
               continuousInterruptCount++;
-              if (continuousInterruptCount >= 2) {
+              if (continuousInterruptCount >= 3) {
                 // Clear user voice while avatar is speaking -> Barge-in!
                 stopAllAudio();
                 if (ws && ws.readyState === WebSocket.OPEN) {
@@ -1312,8 +1312,29 @@
               continuousPreBuffer.push(new Float32Array(inputData));
               if (continuousPreBuffer.length > 3) continuousPreBuffer.shift();
             }
+          } else if (continuousVADState === "waiting_reply") {
+            // Waiting for server response - ignore low ambient noise
+            const interruptThreshold = 0.055;
+            if (rms >= interruptThreshold) {
+              continuousInterruptCount++;
+              if (continuousInterruptCount >= 3) {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({ type: "interrupt" }));
+                }
+                continuousVADState = "speaking";
+                continuousSpeechStartTime = Date.now();
+                continuousSilenceCount = 0;
+                continuousInterruptCount = 0;
+                continuousSpeechFrames = [...continuousPreBuffer, new Float32Array(inputData)];
+                updateContinuousStatus("speaking");
+              }
+            } else {
+              continuousInterruptCount = 0;
+              continuousPreBuffer.push(new Float32Array(inputData));
+              if (continuousPreBuffer.length > 3) continuousPreBuffer.shift();
+            }
           } else {
-            // Avatar is not speaking
+            // Avatar is not speaking and we are ready for user voice
             continuousInterruptCount = 0;
             const speechThreshold = 0.022;
 
@@ -1717,13 +1738,15 @@
             }
             pendingUserMsgEl = null;
           }
-          if (isContinuousMode) {
-            continuousVADState = "idle";
-            continuousSpeechFrames = [];
-            continuousSilenceCount = 0;
-            updateContinuousStatus("listening");
-          } else {
-            statusBadge.textContent = "已就绪 · 随时说话";
+          if (activeAudioSources.length === 0) {
+            if (isContinuousMode) {
+              continuousVADState = "idle";
+              continuousSpeechFrames = [];
+              continuousSilenceCount = 0;
+              updateContinuousStatus("listening");
+            } else {
+              statusBadge.textContent = "已就绪 · 随时说话";
+            }
           }
           fetchCompanionProfile();
         } else if (msg.type === "history_cleared") {
@@ -1908,6 +1931,14 @@
           if (activeAudioSources.length === 0) {
             resetAvatar();
             mouthAnimationTimers = [];
+            if (isContinuousMode) {
+              continuousVADState = "idle";
+              continuousSpeechFrames = [];
+              continuousSilenceCount = 0;
+              updateContinuousStatus("listening");
+            } else {
+              statusBadge.textContent = "已就绪 · 随时说话";
+            }
           }
         };
       } catch (e) {
