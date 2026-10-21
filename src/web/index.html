@@ -1348,11 +1348,15 @@
                     const reader = new FileReader();
                     reader.onloadend = () => {
                       const base64 = reader.result.split(",")[1];
+                      if (!ws || ws.readyState !== WebSocket.OPEN) {
+                        console.warn("WebSocket未就绪，重置倾听状态");
+                        continuousVADState = "idle";
+                        updateContinuousStatus("listening");
+                        return;
+                      }
                       appendUserPendingVoiceMessage();
                       updateContinuousStatus("thinking");
-                      if (ws && ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({ type: "audio", audio_base64: base64 }));
-                      }
+                      ws.send(JSON.stringify({ type: "audio", audio_base64: base64 }));
                     };
                     reader.readAsDataURL(wavBlob);
                   } else {
@@ -1584,11 +1588,14 @@
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64 = reader.result.split(",")[1];
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          statusBadge.textContent = "未连接到服务端，请稍后重试";
+          return;
+        }
         appendUserPendingVoiceMessage();
         statusBadge.textContent = "语音识别与思考中...";
         ws.send(JSON.stringify({ type: "audio", audio_base64: base64 }));
       };
-      reader.readAsDataURL(wavBlob);
     }
 
     // PTT Event Listeners
@@ -1690,6 +1697,10 @@
           mTTS.textContent = Math.round(msg.data.tts_first_chunk_ms);
         } else if (msg.type === "interrupted") {
           currentAssistantMsgEl = null;
+          if (pendingUserMsgEl) {
+            pendingUserMsgEl.classList.remove("pending");
+            pendingUserMsgEl = null;
+          }
           statusBadge.textContent = "已打断数字人";
           stopAllAudio();
           if (isContinuousMode && continuousVADState !== "speaking") {
@@ -1697,6 +1708,13 @@
           }
         } else if (msg.type === "turn_complete") {
           currentAssistantMsgEl = null;
+          if (pendingUserMsgEl) {
+            pendingUserMsgEl.classList.remove("pending");
+            if (pendingUserMsgEl.textContent.includes("正在识别")) {
+              pendingUserMsgEl.textContent = "（语音未检出清晰词句）";
+            }
+            pendingUserMsgEl = null;
+          }
           if (isContinuousMode) {
             continuousVADState = "idle";
             continuousSpeechFrames = [];
@@ -1719,6 +1737,11 @@
       };
 
       ws.onclose = () => {
+        if (pendingUserMsgEl) {
+          pendingUserMsgEl.classList.remove("pending");
+          pendingUserMsgEl.textContent = "（连接断开，请检查服务）";
+          pendingUserMsgEl = null;
+        }
         statusBadge.textContent = "连接断开，正在重试...";
         statusBadge.classList.remove("active");
         setTimeout(initWebSocket, 2000);
@@ -1745,6 +1768,19 @@
       chatBox.scrollTop = chatBox.scrollHeight;
       pendingUserMsgEl = el;
       currentAssistantMsgEl = null;
+
+      // Auto-resolve watchdog after 8 seconds
+      setTimeout(() => {
+        if (pendingUserMsgEl === el) {
+          el.classList.remove("pending");
+          el.textContent = "（语音识别超时，已重置倾听状态）";
+          pendingUserMsgEl = null;
+          if (isContinuousMode) {
+            continuousVADState = "idle";
+            updateContinuousStatus("listening");
+          }
+        }
+      }, 8000);
     }
 
     function updateLastUserTranscription(text) {

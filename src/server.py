@@ -130,7 +130,16 @@ async def websocket_chat(websocket: WebSocket):
             await websocket.send_json({"type": "turn_complete"})
         except asyncio.CancelledError:
             pass
-
+        except Exception as e:
+            print(f"[Server] run_turn unhandled error: {e}")
+            try:
+                await websocket.send_json({
+                    "type": "user_transcription",
+                    "data": {"text": f"（语音处理异常: {e}）"}
+                })
+                await websocket.send_json({"type": "turn_complete"})
+            except Exception:
+                pass
     try:
         while True:
             raw_msg = await websocket.receive_text()

@@ -122,9 +122,18 @@ class VoiceAvatarPipeline:
         user_text = text_input or ""
         turn_start_time = time.perf_counter()
         if audio_input and not user_text:
-            user_text = await self.asr.transcribe(audio_input, sample_rate=self.config.sample_rate)
+            try:
+                user_text = await self.asr.transcribe(audio_input, sample_rate=self.config.sample_rate)
+            except Exception as e:
+                print(f"[VoiceAvatarPipeline] ASR Error: {e}")
+                user_text = ""
             metrics.asr_latency_ms = (time.perf_counter() - turn_start_time) * 1000.0
         if not user_text.strip():
+            if audio_input:
+                yield PipelineEvent(
+                    event_type="user_transcription",
+                    payload={"text": "（未检测到清晰语音，请靠近麦克风重试）", "asr_latency_ms": metrics.asr_latency_ms},
+                )
             return
 
         # Emit user transcription event so frontend sees the transcribed voice immediately
