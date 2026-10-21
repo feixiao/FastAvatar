@@ -1671,12 +1671,14 @@
           mTTFT.textContent = Math.round(msg.data.ttft_ms);
           mTTS.textContent = Math.round(msg.data.tts_first_chunk_ms);
         } else if (msg.type === "interrupted") {
+          currentAssistantMsgEl = null;
           statusBadge.textContent = "已打断数字人";
           stopAllAudio();
           if (isContinuousMode && continuousVADState !== "speaking") {
             updateContinuousStatus("listening");
           }
         } else if (msg.type === "turn_complete") {
+          currentAssistantMsgEl = null;
           if (isContinuousMode) {
             continuousVADState = "idle";
             continuousSpeechFrames = [];
@@ -1687,6 +1689,7 @@
           }
           fetchCompanionProfile();
         } else if (msg.type === "history_cleared") {
+          currentAssistantMsgEl = null;
           statusBadge.textContent = "记忆已清空 · 开启新话题";
         }
       };
