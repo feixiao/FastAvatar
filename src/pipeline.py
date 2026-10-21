@@ -169,6 +169,14 @@ class VoiceAvatarPipeline:
                 if not self._interrupt_event.is_set():
                     for c in splitter.flush():
                         chunk_queue.put_nowait(c)
+            except Exception as exc:
+                print(f"[VoiceAvatarPipeline] LLM Stream error: {exc}")
+                fallback_msg = f"（连接大模型服务失败: {exc}。请检查本地 LM Studio 或 Ollama 服务是否已开启并监听对应端口）"
+                full_reply += fallback_msg
+                for c in splitter.process_token(fallback_msg):
+                    chunk_queue.put_nowait(c)
+                for c in splitter.flush():
+                    chunk_queue.put_nowait(c)
             finally:
                 chunk_queue.put_nowait(None)
 

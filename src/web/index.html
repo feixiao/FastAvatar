@@ -473,6 +473,116 @@
       background: #ef4444;
       color: #fff;
     }
+    /* Continuous Dialogue Container */
+    .continuous-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+    .continuous-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: #0f172a;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 12px;
+      padding: 12px 16px;
+    }
+    .continuous-info {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+    .continuous-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #94a3b8;
+    }
+    .status-indicator-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #64748b;
+      display: inline-block;
+      transition: all 0.2s ease;
+    }
+    .status-indicator-dot.listening {
+      background: #10b981;
+      box-shadow: 0 0 10px #10b981;
+      animation: dot-pulse 1.5s infinite;
+    }
+    .status-indicator-dot.speaking {
+      background: #38bdf8;
+      box-shadow: 0 0 12px #38bdf8;
+      animation: dot-pulse 0.8s infinite;
+    }
+    .status-indicator-dot.replying {
+      background: #a855f7;
+      box-shadow: 0 0 12px #a855f7;
+    }
+    .status-indicator-dot.thinking {
+      background: #f59e0b;
+      box-shadow: 0 0 10px #f59e0b;
+    }
+    @keyframes dot-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.2); }
+    }
+    .continuous-vad-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .continuous-vad-bar {
+      flex: 1;
+      max-width: 180px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .continuous-vad-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #10b981, #38bdf8);
+      border-radius: 3px;
+      transition: width 0.08s ease;
+    }
+    .btn-continuous {
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn-continuous.start {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+    }
+    .btn-continuous.start:hover {
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    }
+    .btn-continuous.stop {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+    }
+    .btn-continuous.stop:hover {
+      background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    }
 
     /* Text & Action Row */
     .controls {
@@ -731,28 +841,50 @@
       <div class="msg assistant">你好！我是你的 FastAvatar 陪伴助手小夏。你可以按住麦克风说话或打字，随时可以和我连续一直聊天，随时可以打断我哦！</div>
     </div>
 
-    <!-- Manual Voice & Multi-turn Panel -->
+    <!-- Voice Dialogue Panel -->
     <div class="voice-panel">
       <div class="tab-row">
-        <span style="font-size: 13px; font-weight: 600; color: #cbd5e1;">🎙️ 手动发送语音</span>
+        <span style="font-size: 13px; font-weight: 600; color: #cbd5e1;">🎙️ 语音交互模式</span>
         <div class="mode-tabs">
-          <button id="tabPtt" class="mode-tab active">按住说话 (推荐)</button>
-          <button id="tabClick" class="mode-tab">点击录制</button>
+          <button id="tabContinuous" class="mode-tab active">🗣️ 连续对话 (免唤醒)</button>
+          <button id="tabPtt" class="mode-tab">🎙️ 按住说话</button>
+          <button id="tabClick" class="mode-tab">🔘 点击录制</button>
         </div>
       </div>
 
+      <!-- Mode 0: Continuous Hands-Free Dialogue -->
+      <div id="continuousContainer" class="continuous-container">
+        <div class="continuous-card">
+          <div class="continuous-info">
+            <div class="continuous-status-badge" id="continuousStatusBadge">
+              <span class="status-indicator-dot" id="continuousDot"></span>
+              <span id="continuousText">连续对话未开启 · 点击右侧开启</span>
+            </div>
+            <div class="continuous-vad-wrapper">
+              <span style="font-size: 11px; color: #94a3b8;">拾音能量:</span>
+              <div class="continuous-vad-bar">
+                <div class="continuous-vad-fill" id="continuousVadFill"></div>
+              </div>
+            </div>
+          </div>
+          <button id="toggleContinuousBtn" class="btn-continuous start">
+            🚀 开启连续对话
+          </button>
+        </div>
+        <div class="ptt-hint">💡 连续对话模式：麦克风保持监听，说话停顿后自动发送并回答，无需按键；随时开口说话即可直接打断！</div>
+      </div>
+
       <!-- Mode 1: Push-To-Talk -->
-      <div id="pttContainer" class="ptt-container">
+      <div id="pttContainer" class="ptt-container" style="display:none;">
         <button id="pttBtn" class="btn-ptt">🎙️ 按住 说话 (松开 发送)</button>
         <div class="ptt-hint">💡 提示：按住说话，松开发送；也可直接按住键盘【空格键】说话，移出按钮松开可取消</div>
       </div>
 
       <!-- Mode 2: Click to Record & Send -->
-      <div id="clickRecContainer" class="click-rec-container">
+      <div id="clickRecContainer" class="click-rec-container" style="display:none;">
         <button id="clickRecBtn" class="btn-click-rec">🎤 点击开始录音</button>
         <button id="cancelRecBtn" class="btn-cancel-rec" style="display:none;">❌ 取消</button>
       </div>
-
       <!-- Text input row -->
       <div class="controls">
         <input id="textInput" type="text" placeholder="输入对话内容，支持随时回车发送..." />
@@ -808,6 +940,17 @@
     let recordTimerInterval = null;
     let isSpaceKeyDown = false;
     let userCancelled = false;
+    // Continuous dialogue state
+    let isContinuousMode = false;
+    let continuousStream = null;
+    let continuousSourceNode = null;
+    let continuousScriptNode = null;
+    let continuousVADState = "idle"; // "idle" | "speaking" | "waiting_reply"
+    let continuousSpeechFrames = [];
+    let continuousPreBuffer = [];
+    let continuousSilenceCount = 0;
+    let continuousInterruptCount = 0;
+    let continuousSpeechStartTime = 0;
 
     // Visual theme colors (dynamically evolved)
     let currentOrbColor = "#38bdf8";
@@ -838,6 +981,13 @@
     const pttBtn = document.getElementById("pttBtn");
     const clickRecBtn = document.getElementById("clickRecBtn");
     const cancelRecBtn = document.getElementById("cancelRecBtn");
+    const tabContinuous = document.getElementById("tabContinuous");
+    const continuousContainer = document.getElementById("continuousContainer");
+    const toggleContinuousBtn = document.getElementById("toggleContinuousBtn");
+    const continuousStatusBadge = document.getElementById("continuousStatusBadge");
+    const continuousDot = document.getElementById("continuousDot");
+    const continuousText = document.getElementById("continuousText");
+    const continuousVadFill = document.getElementById("continuousVadFill");
 
     // Companion elements
     const compName = document.getElementById("compName");
@@ -1032,37 +1182,260 @@
     }
 
     async function getAudioMediaStream() {
+      const audioConstraints = {
+        channelCount: 1,
+        sampleRate: 16000,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      };
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        return await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
+        return await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
       }
       const legacy = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
       if (legacy) {
         return new Promise((resolve, reject) => {
-          legacy.call(navigator, { audio: true }, resolve, reject);
+          legacy.call(navigator, { audio: audioConstraints }, resolve, reject);
         });
       }
       throw new Error("当前环境或浏览器未授予麦克风权限。");
     }
 
+    // Continuous Hands-Free Dialogue State Machine
+    function updateContinuousStatus(state) {
+      if (!continuousDot || !continuousText) return;
+      continuousDot.className = "status-indicator-dot";
+      if (!isContinuousMode) {
+        continuousText.textContent = "连续对话未开启 · 点击右侧开启";
+        continuousStatusBadge.style.color = "#94a3b8";
+        return;
+      }
+      if (state === "listening") {
+        continuousDot.classList.add("listening");
+        continuousText.textContent = "🟢 正在倾听你的声音... (随时开口说话)";
+        continuousStatusBadge.style.color = "#34d399";
+        statusBadge.textContent = "🟢 连续倾听中 · 随时说话";
+        statusBadge.classList.add("active");
+      } else if (state === "speaking") {
+        continuousDot.classList.add("speaking");
+        continuousText.textContent = "🎙️ 正在倾听中... (说完自动发送)";
+        continuousStatusBadge.style.color = "#38bdf8";
+        statusBadge.textContent = "🎙️ 正在输入语音...";
+        statusBadge.classList.add("active");
+      } else if (state === "thinking") {
+        continuousDot.classList.add("thinking");
+        continuousText.textContent = "⚡ 小夏正在思考与生成回复...";
+        continuousStatusBadge.style.color = "#fbbf24";
+        statusBadge.textContent = "⚡ 思考回复中...";
+      } else if (state === "replying") {
+        continuousDot.classList.add("replying");
+        continuousText.textContent = "🎵 小夏正在回答 (随时开口即可直接打断)";
+        continuousStatusBadge.style.color = "#c084fc";
+      }
+    }
+
+    async function startContinuousConversation() {
+      if (isContinuousMode) return;
+      try {
+        const ctx = getAudioContext();
+        if (ctx.state === "suspended") {
+          await ctx.resume();
+        }
+
+        continuousStream = await getAudioMediaStream();
+        continuousSourceNode = ctx.createMediaStreamSource(continuousStream);
+        continuousScriptNode = ctx.createScriptProcessor(2048, 1, 1);
+
+        continuousVADState = "idle";
+        continuousSpeechFrames = [];
+        continuousPreBuffer = [];
+        continuousSilenceCount = 0;
+        continuousInterruptCount = 0;
+
+        continuousScriptNode.onaudioprocess = (e) => {
+          if (!isContinuousMode) return;
+          const inputData = e.inputBuffer.getChannelData(0);
+
+          let sum = 0;
+          for (let i = 0; i < inputData.length; i++) {
+            sum += inputData[i] * inputData[i];
+          }
+          const rms = Math.sqrt(sum / inputData.length);
+          currentInputEnergy = Math.min(1.0, rms * 5.0);
+
+          if (continuousVadFill) {
+            const pct = Math.min(100, Math.round(rms * 400));
+            continuousVadFill.style.width = `${pct}%`;
+          }
+
+          const isAvatarPlaying = activeAudioSources.length > 0;
+
+          if (isAvatarPlaying) {
+            // Avatar is speaking - higher threshold to prevent speaker bleed, but allow user barge-in
+            const interruptThreshold = 0.045;
+            if (rms >= interruptThreshold) {
+              continuousInterruptCount++;
+              if (continuousInterruptCount >= 2) {
+                // Clear user voice while avatar is speaking -> Barge-in!
+                stopAllAudio();
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({ type: "interrupt" }));
+                }
+                continuousVADState = "speaking";
+                continuousSpeechStartTime = Date.now();
+                continuousSilenceCount = 0;
+                continuousInterruptCount = 0;
+                continuousSpeechFrames = [...continuousPreBuffer, new Float32Array(inputData)];
+                updateContinuousStatus("speaking");
+              }
+            } else {
+              continuousInterruptCount = 0;
+              continuousPreBuffer.push(new Float32Array(inputData));
+              if (continuousPreBuffer.length > 3) continuousPreBuffer.shift();
+            }
+          } else {
+            // Avatar is not speaking
+            continuousInterruptCount = 0;
+            const speechThreshold = 0.022;
+
+            if (rms >= speechThreshold) {
+              continuousSilenceCount = 0;
+              if (continuousVADState !== "speaking") {
+                continuousVADState = "speaking";
+                continuousSpeechStartTime = Date.now();
+                continuousSpeechFrames = [...continuousPreBuffer, new Float32Array(inputData)];
+                updateContinuousStatus("speaking");
+              } else {
+                continuousSpeechFrames.push(new Float32Array(inputData));
+              }
+            } else {
+              if (continuousVADState === "speaking") {
+                continuousSpeechFrames.push(new Float32Array(inputData));
+                continuousSilenceCount++;
+                // 2048 samples at 16kHz = 128ms. 6 frames = ~768ms
+                if (continuousSilenceCount >= 6) {
+                  continuousVADState = "waiting_reply";
+                  const speechDuration = Date.now() - continuousSpeechStartTime;
+
+                  if (speechDuration >= 400) {
+                    let totalSamples = 0;
+                    for (const f of continuousSpeechFrames) totalSamples += f.length;
+                    const flat = new Float32Array(totalSamples);
+                    let offset = 0;
+                    for (const f of continuousSpeechFrames) {
+                      flat.set(f, offset);
+                      offset += f.length;
+                    }
+                    const wavBlob = encodeWAV(flat, 16000);
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      const base64 = reader.result.split(",")[1];
+                      appendUserPendingVoiceMessage();
+                      updateContinuousStatus("thinking");
+                      if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: "audio", audio_base64: base64 }));
+                      }
+                    };
+                    reader.readAsDataURL(wavBlob);
+                  } else {
+                    continuousVADState = "idle";
+                    updateContinuousStatus("listening");
+                  }
+                  continuousSpeechFrames = [];
+                  continuousSilenceCount = 0;
+                }
+              } else {
+                continuousPreBuffer.push(new Float32Array(inputData));
+                if (continuousPreBuffer.length > 3) continuousPreBuffer.shift();
+              }
+            }
+          }
+        };
+
+        continuousSourceNode.connect(continuousScriptNode);
+        continuousScriptNode.connect(ctx.destination);
+
+        isContinuousMode = true;
+        toggleContinuousBtn.className = "btn-continuous stop";
+        toggleContinuousBtn.textContent = "⏹️ 停止连续对话";
+        updateContinuousStatus("listening");
+
+      } catch (err) {
+        console.error("启动连续对话异常:", err);
+        alert("开启连续对话失败，请检查浏览器麦克风权限: " + err.message);
+        stopContinuousConversation();
+      }
+    }
+
+    function stopContinuousConversation() {
+      if (!isContinuousMode) return;
+      isContinuousMode = false;
+      continuousVADState = "idle";
+      currentInputEnergy = 0;
+
+      if (continuousScriptNode) {
+        try { continuousScriptNode.disconnect(); } catch (e) {}
+        continuousScriptNode = null;
+      }
+      if (continuousSourceNode) {
+        try { continuousSourceNode.disconnect(); } catch (e) {}
+        continuousSourceNode = null;
+      }
+      if (continuousStream) {
+        continuousStream.getTracks().forEach((track) => track.stop());
+        continuousStream = null;
+      }
+
+      if (continuousVadFill) continuousVadFill.style.width = "0%";
+      toggleContinuousBtn.className = "btn-continuous start";
+      toggleContinuousBtn.textContent = "🚀 开启连续对话";
+      updateContinuousStatus("idle");
+    }
+
+    if (toggleContinuousBtn) {
+      toggleContinuousBtn.addEventListener("click", () => {
+        if (!isContinuousMode) {
+          startContinuousConversation();
+        } else {
+          stopContinuousConversation();
+        }
+      });
+    }
+
     // Tab Switcher
+    tabContinuous.addEventListener("click", () => {
+      tabContinuous.classList.add("active");
+      tabPtt.classList.remove("active");
+      tabClick.classList.remove("active");
+      continuousContainer.style.display = "flex";
+      pttContainer.style.display = "none";
+      clickRecContainer.style.display = "none";
+      if (isRecording) stopVoiceRecording(false);
+    });
+
     tabPtt.addEventListener("click", () => {
       currentRecordingMode = "ptt";
       tabPtt.classList.add("active");
+      tabContinuous.classList.remove("active");
       tabClick.classList.remove("active");
       pttContainer.style.display = "flex";
+      continuousContainer.style.display = "none";
       clickRecContainer.style.display = "none";
+      if (isContinuousMode) stopContinuousConversation();
       if (isRecording) stopVoiceRecording(false);
     });
 
     tabClick.addEventListener("click", () => {
       currentRecordingMode = "click";
       tabClick.classList.add("active");
+      tabContinuous.classList.remove("active");
       tabPtt.classList.remove("active");
+      continuousContainer.style.display = "none";
       pttContainer.style.display = "none";
       clickRecContainer.style.display = "flex";
+      if (isContinuousMode) stopContinuousConversation();
       if (isRecording) stopVoiceRecording(false);
     });
-
     // Recording Engine
     let currentInputEnergy = 0;
 
@@ -1283,6 +1656,9 @@
           appendAssistantText(msg.data.text);
         } else if (msg.type === "audio_chunk") {
           playAudioChunk(msg.data.audio_base64, msg.data.mouth_open);
+          if (isContinuousMode && continuousVADState !== "speaking") {
+            updateContinuousStatus("replying");
+          }
         } else if (msg.type === "user_transcription") {
           updateLastUserTranscription(msg.data.text);
         } else if (msg.type === "companion_update") {
@@ -1297,8 +1673,18 @@
         } else if (msg.type === "interrupted") {
           statusBadge.textContent = "已打断数字人";
           stopAllAudio();
+          if (isContinuousMode && continuousVADState !== "speaking") {
+            updateContinuousStatus("listening");
+          }
         } else if (msg.type === "turn_complete") {
-          statusBadge.textContent = "已就绪 · 随时说话";
+          if (isContinuousMode) {
+            continuousVADState = "idle";
+            continuousSpeechFrames = [];
+            continuousSilenceCount = 0;
+            updateContinuousStatus("listening");
+          } else {
+            statusBadge.textContent = "已就绪 · 随时说话";
+          }
           fetchCompanionProfile();
         } else if (msg.type === "history_cleared") {
           statusBadge.textContent = "记忆已清空 · 开启新话题";
@@ -1535,8 +1921,8 @@
 
       rhythmCtx.clearRect(0, 0, width, height);
 
-      let instantaneousEnergy = 0;
-      if (isRecording) {
+      const isUserVoiceInput = isRecording || (isContinuousMode && continuousVADState === "speaking");
+      if (isUserVoiceInput) {
         instantaneousEnergy = currentInputEnergy;
       } else if (analyserNode && freqDataArray) {
         analyserNode.getByteFrequencyData(freqDataArray);
@@ -1554,15 +1940,24 @@
         rhythmVisualizer.classList.add("speaking");
         rhythmBadge.classList.add("active");
         rhythmBadge.textContent = "🎵 正在律动 · 播报中";
-      } else if (!isRecording) {
+      } else if (isUserVoiceInput) {
+        rhythmVisualizer.classList.add("recording");
+        rhythmBadge.classList.add("recording");
+        rhythmBadge.textContent = "🎙️ 正在倾听语音...";
+      } else if (isContinuousMode) {
+        rhythmVisualizer.classList.remove("speaking");
+        rhythmVisualizer.classList.remove("recording");
+        rhythmBadge.classList.add("active");
+        rhythmBadge.textContent = "🟢 连续免唤醒倾听中";
+      } else {
         rhythmVisualizer.classList.remove("speaking");
         rhythmBadge.classList.remove("active");
         rhythmBadge.textContent = "音频律动 · 待机";
       }
 
-      const orbScale = 1 + smoothedEnergy * 0.45 + (isSpeaking || isRecording ? Math.sin(animPhase * 3) * 0.05 : Math.sin(animPhase * 0.8) * 0.02);
-      const ring1Scale = 1 + smoothedEnergy * 0.7 + (isSpeaking || isRecording ? Math.cos(animPhase * 4) * 0.08 : 0);
-      const ring2Scale = 1 + smoothedEnergy * 1.1 + (isSpeaking || isRecording ? Math.sin(animPhase * 2.5) * 0.12 : 0);
+      const orbScale = 1 + smoothedEnergy * 0.45 + (isSpeaking || isUserVoiceInput ? Math.sin(animPhase * 3) * 0.05 : Math.sin(animPhase * 0.8) * 0.02);
+      const ring1Scale = 1 + smoothedEnergy * 0.7 + (isSpeaking || isUserVoiceInput ? Math.cos(animPhase * 4) * 0.08 : 0);
+      const ring2Scale = 1 + smoothedEnergy * 1.1 + (isSpeaking || isUserVoiceInput ? Math.sin(animPhase * 2.5) * 0.12 : 0);
 
       if (rhythmCenterOrb) {
         rhythmCenterOrb.style.transform = `scale(${orbScale.toFixed(3)})`;
@@ -1584,7 +1979,7 @@
         if (freqDataArray && isSpeaking) {
           const freqIdx = Math.min(Math.floor((i / numBars) * freqDataArray.length * 0.6), freqDataArray.length - 1);
           rawVal = freqDataArray[freqIdx] / 255.0;
-        } else if (isRecording) {
+        } else if (isUserVoiceInput) {
           rawVal = currentInputEnergy * (0.6 + 0.4 * Math.sin(i * 0.5 + animPhase * 2));
         } else {
           rawVal = 0.03 + 0.02 * Math.sin(animPhase + (i / numBars) * Math.PI * 2);
@@ -1611,7 +2006,7 @@
         const y2 = centerY + sin * (innerRadius + barHeights[i]);
 
         const grad = rhythmCtx.createLinearGradient(x1, y1, x2, y2);
-        if (isRecording) {
+        if (isUserVoiceInput) {
           grad.addColorStop(0, "rgba(52, 211, 153, 0.4)");
           grad.addColorStop(1, "rgba(16, 185, 129, 0.95)");
         } else if (isSpeaking) {
