@@ -28,6 +28,13 @@ def test_health_check():
     assert data["status"] == "healthy"
 
 
+def test_index_page():
+    client = TestClient(app)
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "FastAvatar" in resp.text
+    assert "tabContinuous" in resp.text
+
 def test_favicon():
     client = TestClient(app)
     resp = client.get("/favicon.ico")
