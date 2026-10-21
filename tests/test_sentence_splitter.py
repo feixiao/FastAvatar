@@ -27,3 +27,18 @@ def test_sentence_splitter_decimal_protection():
     results.extend(splitter.flush())
 
     assert any("3.14" in r for r in results)
+
+def test_sentence_splitter_markdown_cleaning():
+    splitter = SentenceSplitter(min_length=3, max_length=30)
+    tokens = ["**", "小", "夏", "**", "：", "*", "微", "笑", "*", "你", "好", "呀", "！"]
+    results = []
+    for t in tokens:
+        results.extend(splitter.process_token(t))
+    results.extend(splitter.flush())
+
+    assert len(results) >= 1
+    combined = "".join(results)
+    assert "**" not in combined
+    assert "*" not in combined
+    assert "小夏" in combined
+    assert "你好呀！" in combined

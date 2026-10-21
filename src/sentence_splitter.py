@@ -4,8 +4,21 @@ Divides incoming token stream into speakable clauses as soon as punctuation
 boundaries are met, minimizing Time to First Audio (TTFA).
 """
 
+import re
 from typing import AsyncIterator, List, Set
 
+MARKDOWN_SYMBOLS = set("*_~`#")
+MARKDOWN_CLEAN_RE = re.compile(r"[*_~`#]")
+WHITESPACE_CLEAN_RE = re.compile(r"\s+")
+
+
+def clean_speech_text(text: str) -> str:
+    """Strips markdown asterisks, bold/italic markers, and hashes for clean TTS reading."""
+    if MARKDOWN_SYMBOLS.isdisjoint(text):
+        return text.strip()
+    cleaned = MARKDOWN_CLEAN_RE.sub("", text)
+    cleaned = WHITESPACE_CLEAN_RE.sub(" ", cleaned).strip()
+    return cleaned
 
 class SentenceSplitter:
     """Buffers incoming tokens and emits speakable text chunks based on punctuation and length."""
@@ -63,8 +76,9 @@ class SentenceSplitter:
                 split_idx = self.max_length - 1
 
             if split_idx != -1:
-                chunk = self.buffer[: split_idx + 1].strip()
+                raw_chunk = self.buffer[: split_idx + 1].strip()
                 self.buffer = self.buffer[split_idx + 1 :].lstrip()
+                chunk = clean_speech_text(raw_chunk)
                 if chunk:
                     emitted.append(chunk)
             else:
@@ -74,7 +88,7 @@ class SentenceSplitter:
 
     def flush(self) -> List[str]:
         """Flush remaining buffer at the end of LLM stream."""
-        remaining = self.buffer.strip()
+        remaining = clean_speech_text(self.buffer)
         self.buffer = ""
         if remaining:
             return [remaining]
