@@ -1,7 +1,35 @@
 """Sherpa-ONNX local offline TTS provider (VITS / Kokoro)."""
 
+from pathlib import Path
 from typing import Optional
 from src.tts.base import BaseTTS
+
+
+def _find_default_vits() -> tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+    candidate_roots = [
+        Path("models"),
+        Path(__file__).resolve().parent.parent.parent / "models",
+    ]
+    for root in candidate_roots:
+        if not root.exists():
+            continue
+        for candidate in [
+            root / "vits-zh-aishell3",
+            root / "vits",
+        ]:
+            if candidate.is_dir():
+                model = candidate / "vits-aishell3.onnx"
+                tokens = candidate / "tokens.txt"
+                lexicon = candidate / "lexicon.txt"
+                data_dir = candidate / "espeak-ng-data"
+                if model.exists() and tokens.exists():
+                    return (
+                        str(model),
+                        str(lexicon) if lexicon.exists() else None,
+                        str(tokens),
+                        str(data_dir) if data_dir.exists() else None,
+                    )
+    return None, None, None, None
 
 
 class SherpaOnnxTTS(BaseTTS):
@@ -27,16 +55,28 @@ class SherpaOnnxTTS(BaseTTS):
     def _ensure_tts(self):
         if self._tts is not None:
             return
+        if not self.vits_model:
+            model, lexicon, tokens, data_dir = _find_default_vits()
+            if model:
+                self.vits_model = model
+                self.vits_lexicon = self.vits_lexicon or lexicon
+                self.vits_tokens = self.vits_tokens or tokens
+                self.vits_data_dir = self.vits_data_dir or data_dir
+
         if self.vits_model:
             import sherpa_onnx
-            self._tts = sherpa_onnx.OfflineTts(
-                vits_model=self.vits_model,
-                vits_lexicon=self.vits_lexicon or "",
-                vits_tokens=self.vits_tokens or "",
-                vits_data_dir=self.vits_data_dir or "",
+            vits_config = sherpa_onnx.OfflineTtsVitsModelConfig(
+                model=self.vits_model,
+                lexicon=self.vits_lexicon or "",
+                tokens=self.vits_tokens or "",
+                data_dir=self.vits_data_dir or "",
+            )
+            model_config = sherpa_onnx.OfflineTtsModelConfig(
+                vits=vits_config,
                 num_threads=2,
             )
-
+            tts_config = sherpa_onnx.OfflineTtsConfig(model=model_config)
+            self._tts = sherpa_onnx.OfflineTts(tts_config)
     async def synthesize(self, text: str) -> bytes:
         self._ensure_tts()
         if self._tts is None:

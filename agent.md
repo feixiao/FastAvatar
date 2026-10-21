@@ -65,19 +65,22 @@ FastAvatar/
 # 1. 安装/同步依赖
 uv sync
 
-# 2. 运行全部单元测试
-uv run pytest
+# 2. 一键下载离线模型 (ASR/TTS/LLM)
+./download_models.sh
 
-# 3. 运行单个测试文件
-uv run pytest tests/test_sentence_splitter.py
-uv run pytest tests/test_pipeline.py
+# 3. 运行全部单元测试
+uv run --extra dev pytest
 
-# 4. 运行确定性延迟基准测试 (Autoresearch)
+# 4. 运行单个测试文件
+uv run --extra dev pytest tests/test_sentence_splitter.py
+uv run --extra dev pytest tests/test_pipeline.py
+
+# 5. 运行确定性延迟基准测试 (Autoresearch)
 ./autoresearch.sh
 # 或直接运行评测脚本：
 uv run python benchmarks/run_benchmark.py
 
-# 5. 启动本地服务 (默认监听 http://0.0.0.0:8000)
+# 6. 启动本地服务 (默认监听 http://0.0.0.0:8000)
 uv run python -m src.server
 ```
 

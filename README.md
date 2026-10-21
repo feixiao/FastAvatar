@@ -168,10 +168,24 @@ uv run python -m src.server
 
 打开浏览器访问 `http://localhost:8000`，即可进入网页端进行文本与麦克风实时语音交互！
 
-### 5.3 模型下载与运行（纯命令行 CLI）
+### 5.3 一键模型下载与准备 (One-Click Setup)
 
-所有模型均支持通过命令行一键拉取与部署，无需任何图形界面点击：
+项目内置自动化下载脚本 `download_models.sh`，支持交互式菜单与一键参数调用，自动下载解压离线 ASR、TTS 权重并自动完成模型路径绑定：
 
+```bash
+# 1. 运行一键脚本（提供交互式数字菜单，推荐）
+./download_models.sh
+
+# 或直接一键下载全部推荐模型
+./download_models.sh all
+
+# 或按需单独下载对应模块：
+./download_models.sh asr   # 离线语音识别 SenseVoice-Small (~200MB)
+./download_models.sh tts   # 离线语音合成 VITS Aishell3 (~50MB)
+./download_models.sh llm   # 检查并拉取 Ollama / LM Studio Qwen2.5 模型
+```
+
+*(也可使用下方手动 CLI 步骤单独操作)*
 #### 1. LLM 对话模型下载与加载
 
 **方式 A：LM Studio CLI (`lms`)（推荐默认）**

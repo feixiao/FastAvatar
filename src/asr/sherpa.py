@@ -2,8 +2,31 @@
 
 import io
 import wave
+from pathlib import Path
 from typing import Optional
 from src.asr.base import BaseASR
+
+
+def _find_default_sense_voice() -> tuple[Optional[str], Optional[str]]:
+    candidate_roots = [
+        Path("models"),
+        Path(__file__).resolve().parent.parent.parent / "models",
+    ]
+    for root in candidate_roots:
+        if not root.exists():
+            continue
+        for candidate in [
+            root / "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17",
+            root / "sense-voice",
+        ]:
+            if candidate.is_dir():
+                model = candidate / "model.int8.onnx"
+                if not model.exists():
+                    model = candidate / "model.onnx"
+                tokens = candidate / "tokens.txt"
+                if model.exists() and tokens.exists():
+                    return str(model), str(tokens)
+    return None, None
 
 
 class SherpaOnnxASR(BaseASR):
@@ -23,8 +46,14 @@ class SherpaOnnxASR(BaseASR):
     def _ensure_recognizer(self):
         if self._recognizer is not None:
             return
-        import sherpa_onnx
+        if not (self.tokens and self.model):
+            auto_model, auto_tokens = _find_default_sense_voice()
+            if auto_model and auto_tokens:
+                self.model = auto_model
+                self.tokens = auto_tokens
+
         if self.tokens and self.model:
+            import sherpa_onnx
             self._recognizer = sherpa_onnx.OfflineRecognizer.from_sense_voice(
                 model=self.model,
                 tokens=self.tokens,
@@ -32,7 +61,6 @@ class SherpaOnnxASR(BaseASR):
                 use_itn=True,
             )
         else:
-            # Fallback or placeholder when paths not configured
             self._recognizer = None
 
     async def transcribe(self, audio_data: bytes, sample_rate: int = 16000) -> str:
