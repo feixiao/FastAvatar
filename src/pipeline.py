@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from typing import AsyncIterator, Dict, Any, List, Optional
+from typing import AsyncIterator, Dict, Any, List, Optional, Tuple
 from pydantic import BaseModel
 
 from src.config import PipelineConfig, LLMProviderType, ASRProviderType, TTSProviderType
@@ -143,7 +143,19 @@ class VoiceAvatarPipeline:
         first_audio_produced = False
         tts_first_chunk_start = 0.0
 
-        chunk_queue: asyncio.Queue[Optional[str]] = asyncio.Queue()
+        chunk_queue: asyncio.Queue[Optional[Tuple[str, asyncio.Task[bytes]]]] = asyncio.Queue()
+        pending_tts_tasks: List[asyncio.Task] = []
+
+        def dispatch_chunk(text: str):
+            nonlocal tts_first_chunk_start
+            clean_t = text.strip()
+            if not clean_t or self._interrupt_event.is_set():
+                return
+            if tts_first_chunk_start == 0.0:
+                tts_first_chunk_start = time.perf_counter()
+            tts_task = asyncio.create_task(self.tts.synthesize(text))
+            pending_tts_tasks.append(tts_task)
+            chunk_queue.put_nowait((text, tts_task))
 
         async def llm_producer():
             nonlocal first_token_received, full_reply
@@ -164,19 +176,19 @@ class VoiceAvatarPipeline:
                     full_reply += token
                     chunks = splitter.process_token(token)
                     for c in chunks:
-                        chunk_queue.put_nowait(c)
+                        dispatch_chunk(c)
 
                 if not self._interrupt_event.is_set():
                     for c in splitter.flush():
-                        chunk_queue.put_nowait(c)
+                        dispatch_chunk(c)
             except Exception as exc:
                 print(f"[VoiceAvatarPipeline] LLM Stream error: {exc}")
                 fallback_msg = f"（连接大模型服务失败: {exc}。请检查本地 LM Studio 或 Ollama 服务是否已开启并监听对应端口）"
                 full_reply += fallback_msg
                 for c in splitter.process_token(fallback_msg):
-                    chunk_queue.put_nowait(c)
+                    dispatch_chunk(c)
                 for c in splitter.flush():
-                    chunk_queue.put_nowait(c)
+                    dispatch_chunk(c)
             finally:
                 chunk_queue.put_nowait(None)
 
@@ -188,14 +200,11 @@ class VoiceAvatarPipeline:
                     yield PipelineEvent(event_type="interrupted", payload={"reason": "user_barge_in"})
                     break
 
-                sentence_chunk = await chunk_queue.get()
-                if sentence_chunk is None:
+                item = await chunk_queue.get()
+                if item is None:
                     break
 
-                if not first_audio_produced:
-                    tts_first_chunk_start = time.perf_counter()
-
-                tts_task = asyncio.create_task(self.tts.synthesize(sentence_chunk))
+                sentence_chunk, tts_task = item
 
                 metrics.chunks_count += 1
                 yield PipelineEvent(
@@ -229,6 +238,9 @@ class VoiceAvatarPipeline:
                     },
                 )
         finally:
+            for t_task in pending_tts_tasks:
+                if not t_task.done():
+                    t_task.cancel()
             if not producer_task.done():
                 producer_task.cancel()
                 try:
