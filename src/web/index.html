@@ -1140,6 +1140,16 @@
         console.error("Error adding memory:", e);
       }
     });
+    newMemoryInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") addMemoryBtn.click();
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        if (memoryModal.style.display !== "none") memoryModal.style.display = "none";
+        if (levelUpModal.style.display !== "none") levelUpModal.style.display = "none";
+      }
+    });
 
     function showLevelUpCelebration(level, stage, badge) {
       levelupBadge.textContent = `${badge} (Lv.${level})`;
