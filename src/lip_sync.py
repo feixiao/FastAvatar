@@ -8,6 +8,8 @@ the core audio pipeline.
 from typing import Dict, List, Tuple
 import numpy as np
 
+SILENT_VISEME: Dict[str, float] = {"A": 0.0, "I": 0.0, "U": 0.0, "E": 0.0, "O": 0.0}
+
 
 class LipSyncExtractor:
     """Extracts mouth movement parameters (amplitude, viseme classification) from PCM audio."""
@@ -40,7 +42,7 @@ class LipSyncExtractor:
             rms_frames.append(round(normalized, 3))
 
             if rms < 0.01:
-                viseme_frames.append({"A": 0.0, "I": 0.0, "U": 0.0, "E": 0.0, "O": 0.0})
+                viseme_frames.append(SILENT_VISEME.copy())
             else:
                 spectrum = np.abs(np.fft.rfft(frame * self.hanning))
                 low_energy = float(np.sum(spectrum[self.low_mask]))
