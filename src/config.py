@@ -26,7 +26,7 @@ class TTSProviderType(str, Enum):
 
 class LLMConfig(BaseModel):
     provider: LLMProviderType = LLMProviderType.LM_STUDIO
-    model: str = "qwen2.5-1.5b-instruct"
+    model: str = "qwen2.5-7b-instruct"
     base_url: str = "http://localhost:1234/v1"
     api_key: Optional[str] = "lm-studio"
     system_prompt: str = (

@@ -20,7 +20,29 @@ class OpenAICompatibleLLM(BaseLLM):
         self.api_key = api_key or "no-key-required"
         self.model = model
         self.timeout = timeout
+        self._resolved_model: Optional[str] = None
 
+    async def _get_active_model(self, client: httpx.AsyncClient) -> str:
+        """Auto-detect active loaded model from local server if configured model not found."""
+        if self._resolved_model:
+            return self._resolved_model
+        if "localhost" in self.base_url or "127.0.0.1" in self.base_url:
+            try:
+                resp = await client.get(f"{self.base_url}/models", timeout=2.0)
+                if resp.status_code == 200:
+                    data = resp.json().get("data", [])
+                    all_ids = [m["id"] for m in data if "id" in m]
+                    chat_models = [m_id for m_id in all_ids if "embed" not in m_id.lower()]
+                    if self.model in all_ids:
+                        self._resolved_model = self.model
+                        return self._resolved_model
+                    if chat_models:
+                        self._resolved_model = chat_models[0]
+                        return self._resolved_model
+            except Exception:
+                pass
+        self._resolved_model = self.model
+        return self._resolved_model
     async def chat_stream(
         self,
         messages: List[Dict[str, str]],
@@ -47,6 +69,8 @@ class OpenAICompatibleLLM(BaseLLM):
         }
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
+            active_model = await self._get_active_model(client)
+            payload["model"] = active_model
             async with client.stream(
                 "POST",
                 f"{self.base_url}/chat/completions",
