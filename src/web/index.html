@@ -1973,7 +1973,20 @@
       const centerY = height / 2;
       const innerRadius = 45;
       const maxBarLen = Math.min(width, height) * 0.28;
+      const grad = rhythmCtx.createRadialGradient(centerX, centerY, innerRadius, centerX, centerY, innerRadius + maxBarLen);
+      if (isUserVoiceInput) {
+        grad.addColorStop(0, "rgba(52, 211, 153, 0.4)");
+        grad.addColorStop(1, "rgba(16, 185, 129, 0.95)");
+      } else if (isSpeaking) {
+        grad.addColorStop(0, currentGlowColor);
+        grad.addColorStop(0.5, currentOrbColor);
+        grad.addColorStop(1, "rgba(236, 72, 153, 0.95)");
+      } else {
+        grad.addColorStop(0, currentGlowColor);
+        grad.addColorStop(1, currentOrbColor);
+      }
 
+      rhythmCtx.beginPath();
       for (let i = 0; i < numBars; i++) {
         let rawVal = 0;
         if (freqDataArray && isSpeaking) {
@@ -2005,27 +2018,13 @@
         const x2 = centerX + cos * (innerRadius + barHeights[i]);
         const y2 = centerY + sin * (innerRadius + barHeights[i]);
 
-        const grad = rhythmCtx.createLinearGradient(x1, y1, x2, y2);
-        if (isUserVoiceInput) {
-          grad.addColorStop(0, "rgba(52, 211, 153, 0.4)");
-          grad.addColorStop(1, "rgba(16, 185, 129, 0.95)");
-        } else if (isSpeaking) {
-          grad.addColorStop(0, currentGlowColor);
-          grad.addColorStop(0.5, currentOrbColor);
-          grad.addColorStop(1, "rgba(236, 72, 153, 0.95)");
-        } else {
-          grad.addColorStop(0, currentGlowColor);
-          grad.addColorStop(1, currentOrbColor);
-        }
-
-        rhythmCtx.beginPath();
         rhythmCtx.moveTo(x1, y1);
         rhythmCtx.lineTo(x2, y2);
-        rhythmCtx.strokeStyle = grad;
-        rhythmCtx.lineWidth = 3.5;
-        rhythmCtx.lineCap = "round";
-        rhythmCtx.stroke();
       }
+      rhythmCtx.strokeStyle = grad;
+      rhythmCtx.lineWidth = 3.5;
+      rhythmCtx.lineCap = "round";
+      rhythmCtx.stroke();
     }
 
     window.addEventListener("resize", resizeCanvas);
