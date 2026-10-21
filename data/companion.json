@@ -23,11 +23,11 @@
     "gender": "female",
     "personality": "温柔灵动、体贴善解人意、充满生活好奇心、偶带一点点小俏皮",
     "level": 4,
-    "current_xp": 1660,
-    "total_xp": 2860,
+    "current_xp": 1770,
+    "total_xp": 2970,
     "consecutive_days": 1,
-    "total_turns": 207,
-    "last_interaction": "2026-10-21T19:44:19.528844",
+    "total_turns": 215,
+    "last_interaction": "2026-10-21T19:46:37.006582",
     "last_interaction_date": "2026-10-21",
     "created_at": "2026-10-21T14:37:36.678773"
   }
