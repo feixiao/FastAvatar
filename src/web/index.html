@@ -1273,6 +1273,7 @@
         continuousScriptNode.onaudioprocess = (e) => {
           if (!isContinuousMode) return;
           const inputData = e.inputBuffer.getChannelData(0);
+          try { e.outputBuffer.getChannelData(0).fill(0); } catch (err) {}
 
           let sum = 0;
           for (let i = 0; i < inputData.length; i++) {
@@ -1480,6 +1481,7 @@
         pcmScriptNode.onaudioprocess = (e) => {
           if (!isRecording) return;
           const inputData = e.inputBuffer.getChannelData(0);
+          try { e.outputBuffer.getChannelData(0).fill(0); } catch (err) {}
           pcmSampleChunks.push(new Float32Array(inputData));
 
           let sum = 0;
