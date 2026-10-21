@@ -1842,6 +1842,7 @@
           activeAudioSources = activeAudioSources.filter((s) => s !== source);
           if (activeAudioSources.length === 0) {
             resetAvatar();
+            mouthAnimationTimers = [];
           }
         };
       } catch (e) {
