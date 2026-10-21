@@ -9,6 +9,7 @@ def test_vad_silence_detection():
     silence = np.zeros(320, dtype=np.int16).tobytes()
     assert not vad.is_speech_frame(silence)
     assert not vad.is_speech_frame(b"")
+    assert not vad.is_speech_frame(b"12")
 
 
 def test_vad_speech_detection():
