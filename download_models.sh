@@ -12,6 +12,9 @@ RED='\033[0;31m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
+# 自动确保 LM Studio CLI 在 PATH 中
+export PATH="$HOME/.lmstudio/bin:$HOME/.cache/lm-studio/bin:$PATH"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 MODELS_DIR="$SCRIPT_DIR/models"
@@ -103,47 +106,139 @@ setup_tts() {
   download_tar_bz2 "VITS 中文 Aishell3 TTS (~50MB)" "$tts_url" "$tts_dir" "vits-aishell3.onnx"
 }
 
+setup_lmstudio() {
+  echo ""
+  echo -e "${BOLD}=== 配置 LM Studio 本地大模型 (推荐) ===${NC}"
+
+  local lms_bin=""
+  if command -v lms >/dev/null 2>&1; then
+    lms_bin="lms"
+  elif [ -x "$HOME/.lmstudio/bin/lms" ]; then
+    lms_bin="$HOME/.lmstudio/bin/lms"
+  elif [ -x "$HOME/.cache/lm-studio/bin/lms" ]; then
+    lms_bin="$HOME/.cache/lm-studio/bin/lms"
+  else
+    log_warn "未检测到 LM Studio CLI (lms)。"
+    echo -e "若已安装 LM Studio 客户端，请在设置中启用 CLI，或运行: ${GREEN}npx @lmstudio/cli install-cli${NC}"
+    echo -e "下载地址: ${BOLD}https://lmstudio.ai${NC}"
+    return 1
+  fi
+
+  log_success "已检测到 LM Studio CLI: $lms_bin"
+
+  # 1. 检查已下载模型
+  echo ""
+  log_info "当前 LM Studio 本地已下载模型列表："
+  "$lms_bin" ls || true
+
+  # 2. 拉取推荐模型
+  echo ""
+  local target_model="qwen2.5-7b-instruct"
+  echo -e "FastAvatar 推荐模型为: ${GREEN}${target_model}${NC}"
+  echo -e "（Apple Silicon M系列统一内存推荐 7B；显存较小设备可选 3B 或 1.5B）"
+
+  read -p "是否通过 lms 拉取该模型? [Y/n] (输入 3b 或 1.5b 可换更小模型): " -r lms_opt || true
+  lms_opt="${lms_opt:-Y}"
+  case "$lms_opt" in
+    [yY][eE][sS]|[yY])
+      log_info "正在通过 lms 拉取 $target_model ..."
+      "$lms_bin" get "$target_model" -y
+      log_success "$target_model 下载完成！"
+      ;;
+    3b|3B)
+      target_model="qwen2.5-3b-instruct"
+      log_info "正在通过 lms 拉取 $target_model ..."
+      "$lms_bin" get "$target_model" -y
+      log_success "$target_model 下载完成！"
+      ;;
+    1.5b|1.5B)
+      target_model="qwen2.5-1.5b-instruct"
+      log_info "正在通过 lms 拉取 $target_model ..."
+      "$lms_bin" get "$target_model" -y
+      log_success "$target_model 下载完成！"
+      ;;
+    *)
+      log_info "跳过模型拉取。"
+      ;;
+  esac
+
+  # 3. 检查服务与启动
+  echo ""
+  log_info "检查 LM Studio Local Server 状态..."
+  local s_status
+  s_status="$("$lms_bin" status 2>&1 || true)"
+  if echo "$s_status" | grep -qi "OFF"; then
+    log_warn "LM Studio Local Server 当前处于关闭状态 (OFF)。"
+    read -p "是否现在启动 LM Studio 本地服务端 (监听 1234 端口)? [Y/n]: " -r start_srv || true
+    start_srv="${start_srv:-Y}"
+    if [[ "$start_srv" =~ ^[Yy]$ ]]; then
+      "$lms_bin" server start
+      log_success "LM Studio 本地服务端已启动 (http://localhost:1234)！"
+    else
+      echo -e "可在稍后通过命令手动启动: ${GREEN}lms server start${NC}"
+    fi
+  else
+    log_success "LM Studio Local Server 已在运行中！"
+  fi
+
+  # 4. 加载到显存
+  echo ""
+  read -p "是否将 $target_model 加载到 GPU/统一内存中? [Y/n]: " -r load_opt || true
+  load_opt="${load_opt:-Y}"
+  if [[ "$load_opt" =~ ^[Yy]$ ]]; then
+    log_info "正在将 $target_model 加载至 GPU (MAX Offload)..."
+    "$lms_bin" load "$target_model" --gpu max -y || true
+    log_success "模型已加载就绪！"
+  else
+    echo -e "可在稍后通过命令加载: ${GREEN}lms load $target_model --gpu max -y${NC}"
+  fi
+}
+
+setup_ollama() {
+  echo ""
+  echo -e "${BOLD}=== 配置 Ollama 本地大模型 ===${NC}"
+  if ! command -v ollama >/dev/null 2>&1; then
+    log_warn "未安装 Ollama CLI。"
+    echo -e "安装命令: ${GREEN}brew install ollama${NC} 或访问 https://ollama.com"
+    return 1
+  fi
+
+  log_info "检测到已安装 Ollama CLI！"
+  echo -e "准备拉取推荐模型 ${GREEN}qwen2.5:7b${NC}..."
+  read -p "是否立即拉取该模型? [Y/n] (输入 3b 或 1.5b 可拉取更小版本): " -r llm_choice || true
+  llm_choice="${llm_choice:-Y}"
+  case "$llm_choice" in
+    [yY][eE][sS]|[yY])
+      ollama pull qwen2.5:7b
+      log_success "Qwen2.5 7B 模型拉取完成！"
+      ;;
+    3b|3B)
+      ollama pull qwen2.5:3b
+      log_success "Qwen2.5 3B 模型拉取完成！"
+      ;;
+    1.5b|1.5B)
+      ollama pull qwen2.5:1.5b
+      log_success "Qwen2.5 1.5B 模型拉取完成！"
+      ;;
+    *)
+      log_info "跳过 Ollama 模型拉取。"
+      ;;
+  esac
+}
+
 setup_llm() {
   echo ""
   echo -e "${BOLD}=== [3/3] 本地大语言模型 LLM ===${NC}"
   
-  if command -v ollama >/dev/null 2>&1; then
-    log_info "检测到已安装 Ollama CLI！"
-    echo -e "准备拉取推荐的通义千问模型 ${GREEN}qwen2.5:7b${NC}（推荐 8G/16G 显存/统一内存）..."
-    read -p "是否立即拉取该模型? [Y/n] (输入 3b 或 1.5b 可拉取更小版本): " -r llm_choice || true
-    llm_choice="${llm_choice:-Y}"
-    case "$llm_choice" in
-      [yY][eE][sS]|[yY])
-        ollama pull qwen2.5:7b
-        log_success "Qwen2.5 7B 模型拉取完成！"
-        ;;
-      3b|3B)
-        ollama pull qwen2.5:3b
-        log_success "Qwen2.5 3B 模型拉取完成！"
-        ;;
-      1.5b|1.5B)
-        ollama pull qwen2.5:1.5b
-        log_success "Qwen2.5 1.5B 模型拉取完成！"
-        ;;
-      *)
-        log_info "跳过 Ollama 模型拉取。"
-        ;;
-    esac
-  elif command -v lms >/dev/null 2>&1; then
-    log_info "检测到已安装 LM Studio CLI (lms)！"
-    read -p "是否使用 lms 拉取 qwen2.5-7b-instruct? [Y/n]: " -r lms_choice || true
-    lms_choice="${lms_choice:-Y}"
-    if [[ "$lms_choice" =~ ^[Yy]$ ]]; then
-      lms get qwen2.5-7b-instruct
-      log_success "LM Studio 模型拉取完成！"
-    else
-      log_info "跳过 LM Studio 模型拉取。"
-    fi
+  if command -v lms >/dev/null 2>&1 || [ -x "$HOME/.lmstudio/bin/lms" ]; then
+    setup_lmstudio
+  elif command -v ollama >/dev/null 2>&1; then
+    setup_ollama
   else
-    log_warn "未在当前系统 PATH 中检测到 Ollama 或 LM Studio。"
+    log_warn "未在当前系统 PATH 中检测到 LM Studio 或 Ollama。"
     echo -e "建议根据需求选择安装其一："
-    echo -e "  - ${BOLD}Ollama (推荐终端极简)${NC}: https://ollama.com 或运行 ${GREEN}brew install ollama${NC}"
-    echo -e "  - ${BOLD}LM Studio (推荐图形界面+高吞吐)${NC}: https://lmstudio.ai"
+    echo -e "  - ${BOLD}LM Studio (推荐图形界面+高吞吐，FastAvatar 默认支持)${NC}: https://lmstudio.ai"
+    echo -e "  - ${BOLD}Ollama (终端极简)${NC}: https://ollama.com 或运行 ${GREEN}brew install ollama${NC}"
   fi
 }
 
@@ -166,8 +261,9 @@ print_summary() {
   fi
   echo ""
   echo -e "后续启动方式："
-  echo -e "  1. 启动服务: ${GREEN}uv run python -m src.server${NC}"
-  echo -e "  2. 浏览器访问: ${GREEN}http://localhost:8000${NC}"
+  echo -e "  1. 确认 LM Studio 服务处于开启状态: ${GREEN}lms status${NC} (或 ${GREEN}lms server start${NC})"
+  echo -e "  2. 启动 FastAvatar 服务: ${GREEN}uv run python -m src.server${NC}"
+  echo -e "  3. 浏览器访问: ${GREEN}http://localhost:8000${NC}"
   echo ""
 }
 
@@ -180,19 +276,20 @@ case "$ACTION" in
   all|"")
     if [ -t 0 ] && [ -z "$ACTION" ]; then
       echo "请选择要执行的操作："
-      echo "  1) 一键下载全部推荐模型 (ASR + TTS + 检查 LLM) [推荐]"
+      echo "  1) 一键下载全部推荐模型 (SenseVoice ASR + VITS TTS + LM Studio LLM) [推荐]"
       echo "  2) 仅下载 SenseVoice ASR 离线语音识别模型 (~200MB)"
       echo "  3) 仅下载 VITS 中文 TTS 离线语音合成模型 (~50MB)"
-      echo "  4) 仅拉取本地 LLM (Ollama / LM Studio)"
+      echo "  4) 配置 LM Studio 本地大模型 (Qwen2.5) [推荐默认]"
+      echo "  5) 配置 Ollama 本地大模型"
       echo "  0) 退出"
-      read -p "请输入选项 [1-4, 默认 1]: " -r menu_opt || true
+      read -p "请输入选项 [1-5, 默认 1]: " -r menu_opt || true
       menu_opt="${menu_opt:-1}"
       case "$menu_opt" in
         1)
           install_python_deps
           setup_asr
           setup_tts
-          setup_llm
+          setup_lmstudio
           print_summary
           ;;
         2)
@@ -204,7 +301,10 @@ case "$ACTION" in
           setup_tts
           ;;
         4)
-          setup_llm
+          setup_lmstudio
+          ;;
+        5)
+          setup_ollama
           ;;
         0)
           echo "已取消。"
@@ -232,11 +332,17 @@ case "$ACTION" in
     install_python_deps
     setup_tts
     ;;
+  lms|lmstudio)
+    setup_lmstudio
+    ;;
+  ollama)
+    setup_ollama
+    ;;
   llm)
     setup_llm
     ;;
   *)
-    echo "用法: $0 [all|asr|tts|llm]"
+    echo "用法: $0 [all|asr|tts|lms|lmstudio|ollama|llm]"
     exit 1
     ;;
 esac
