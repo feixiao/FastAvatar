@@ -25,8 +25,14 @@ def test_sentence_splitter_decimal_protection():
     for t in tokens:
         results.extend(splitter.process_token(t))
     results.extend(splitter.flush())
-
     assert any("3.14" in r for r in results)
+
+    tokens2 = ["这", "部", "手", "机", "是", "6", ",", "9", "9", "9", "元", "。"]
+    results2 = []
+    for t in tokens2:
+        results2.extend(splitter.process_token(t))
+    results2.extend(splitter.flush())
+    assert any("6,999" in r for r in results2)
 
 def test_sentence_splitter_markdown_cleaning():
     splitter = SentenceSplitter(min_length=3, max_length=30)

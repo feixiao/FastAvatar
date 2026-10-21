@@ -74,15 +74,10 @@ class SentenceSplitter:
                     split_idx = idx
                     break
                 elif ch in self.split_chars and (idx + 1) >= self.min_length:
-                    # Decimal protection (e.g., 3.14)
-                    if (
-                        ch == "."
-                        and idx > 0
-                        and idx < buf_len - 1
-                        and self.buffer[idx - 1].isdigit()
-                        and self.buffer[idx + 1].isdigit()
-                    ):
-                        continue
+                    # Decimal and thousand-separator protection (e.g. 3.14, 6,999)
+                    if ch in (".", ",") and idx > 0 and self.buffer[idx - 1].isdigit():
+                        if idx == buf_len - 1 or self.buffer[idx + 1].isdigit():
+                            continue
                     split_idx = idx
                     break
 
