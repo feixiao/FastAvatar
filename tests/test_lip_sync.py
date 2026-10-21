@@ -27,3 +27,16 @@ def test_lip_sync_visemes():
     for v in visemes:
         assert all(k in v for k in ["A", "I", "U", "E", "O"])
         assert all(0.0 <= v[k] <= 1.0 for k in ["A", "I", "U", "E", "O"])
+
+def test_lip_sync_silent_and_empty():
+    extractor = LipSyncExtractor(sample_rate=16000, frame_size_ms=20)
+    assert extractor.extract_lip_sync(b"") == ([], [])
+    assert extractor.compute_rms_envelope(b"") == []
+    assert extractor.compute_visemes(b"") == []
+
+    # 40ms of silence
+    silent_pcm = np.zeros(640, dtype=np.int16).tobytes()
+    rms, vis = extractor.extract_lip_sync(silent_pcm)
+    assert len(rms) == 2
+    assert all(r == 0.0 for r in rms)
+    assert all(v["A"] == 0.0 and v["O"] == 0.0 for v in vis)
