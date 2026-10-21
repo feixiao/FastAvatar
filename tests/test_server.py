@@ -4,6 +4,21 @@ import pytest
 from fastapi.testclient import TestClient
 from src.server import app
 
+@pytest.fixture(autouse=True)
+def mock_server_pipeline():
+    from src.config import LLMProviderType, ASRProviderType, TTSProviderType
+    from src import server
+    orig_llm = server.config.pipeline.llm.provider
+    orig_asr = server.config.pipeline.asr.provider
+    orig_tts = server.config.pipeline.tts.provider
+    server.config.pipeline.llm.provider = LLMProviderType.MOCK
+    server.config.pipeline.asr.provider = ASRProviderType.MOCK
+    server.config.pipeline.tts.provider = TTSProviderType.MOCK
+    yield
+    server.config.pipeline.llm.provider = orig_llm
+    server.config.pipeline.asr.provider = orig_asr
+    server.config.pipeline.tts.provider = orig_tts
+
 
 def test_health_check():
     client = TestClient(app)
