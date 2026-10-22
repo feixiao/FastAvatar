@@ -10,13 +10,6 @@
         "confidence": 1.0
       },
       {
-        "id": "30450047",
-        "category": "pet",
-        "content": "家里有一只可爱的猫猫叫布丁",
-        "created_at": "2026-10-21T14:37:36.678822",
-        "confidence": 1.0
-      },
-      {
         "id": "bb3a7c84",
         "category": "preference",
         "content": "名字叫银月",
@@ -44,13 +37,22 @@
     "gender": "female",
     "personality": "温柔灵动、体贴善解人意、充满生活好奇心、偶带一点点小俏皮",
     "level": 5,
-    "current_xp": 4900,
-    "total_xp": 8100,
+    "current_xp": 4890,
+    "total_xp": 8090,
     "consecutive_days": 2,
-    "total_turns": 596,
-    "last_interaction": "2026-10-22T10:17:45.277534",
+    "total_turns": 595,
+    "last_interaction": "2026-10-22T10:19:03.324212",
     "last_interaction_date": "2026-10-22",
     "created_at": "2026-10-21T14:37:36.678773"
   },
-  "recent_chat_history": []
+  "recent_chat_history": [
+    {
+      "role": "user",
+      "content": "你好呀，很高兴认识你。"
+    },
+    {
+      "role": "assistant",
+      "content": "银月啊，早上好呀～能遇到你是我的幸运呢，今天感觉怎么样？天气宜人，适合和布丁出去溜达一圈哦。"
+    }
+  ]
 }
