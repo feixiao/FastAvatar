@@ -1165,6 +1165,30 @@
       levelUpModal.style.display = "flex";
     }
 
+    // Resample Float32 audio buffer to target sample rate (e.g. 48kHz / 44.1kHz -> 16kHz)
+    function downsampleBuffer(buffer, inputSampleRate, outputSampleRate = 16000) {
+      if (!inputSampleRate || inputSampleRate === outputSampleRate) {
+        return buffer;
+      }
+      const ratio = inputSampleRate / outputSampleRate;
+      const newLength = Math.round(buffer.length / ratio);
+      const result = new Float32Array(newLength);
+      let offsetResult = 0;
+      let offsetBuffer = 0;
+      while (offsetResult < result.length) {
+        const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio);
+        let accum = 0, count = 0;
+        for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+          accum += buffer[i];
+          count++;
+        }
+        result[offsetResult] = count > 0 ? accum / count : buffer[Math.floor(offsetBuffer)];
+        offsetResult++;
+        offsetBuffer = nextOffsetBuffer;
+      }
+      return result;
+    }
+
     // 16-bit Mono WAV Encoder
     function encodeWAV(samples, sampleRate = 16000) {
       const buffer = new ArrayBuffer(44 + samples.length * 2);
@@ -1336,7 +1360,7 @@
           } else {
             // Avatar is not speaking and we are ready for user voice
             continuousInterruptCount = 0;
-            const speechThreshold = 0.022;
+            const speechThreshold = 0.015;
 
             if (rms >= speechThreshold) {
               continuousSilenceCount = 0;
@@ -1352,8 +1376,9 @@
               if (continuousVADState === "speaking") {
                 continuousSpeechFrames.push(new Float32Array(inputData));
                 continuousSilenceCount++;
-                // 2048 samples at 16kHz = 128ms. 6 frames = ~768ms
-                if (continuousSilenceCount >= 6) {
+                // Adapt silence frames threshold dynamically to ctx.sampleRate (~750ms silence window)
+                const silenceFramesNeeded = Math.max(6, Math.round((ctx.sampleRate || 16000) * 0.75 / 2048));
+                if (continuousSilenceCount >= silenceFramesNeeded) {
                   continuousVADState = "waiting_reply";
                   const speechDuration = Date.now() - continuousSpeechStartTime;
 
@@ -1366,7 +1391,8 @@
                       flat.set(f, offset);
                       offset += f.length;
                     }
-                    const wavBlob = encodeWAV(flat, 16000);
+                    const downsampled = downsampleBuffer(flat, ctx.sampleRate, 16000);
+                    const wavBlob = encodeWAV(downsampled, 16000);
                     const reader = new FileReader();
                     reader.onloadend = () => {
                       const base64 = reader.result.split(",")[1];
@@ -1607,7 +1633,8 @@
         offset += chunk.length;
       }
 
-      const wavBlob = encodeWAV(flatSamples, 16000);
+      const downsampled = downsampleBuffer(flatSamples, ctx.sampleRate, 16000);
+      const wavBlob = encodeWAV(downsampled, 16000);
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64 = reader.result.split(",")[1];
@@ -2017,6 +2044,7 @@
 
       rhythmCtx.clearRect(0, 0, width, height);
 
+      let instantaneousEnergy = 0;
       const isUserVoiceInput = isRecording || (isContinuousMode && continuousVADState === "speaking");
       if (isUserVoiceInput) {
         instantaneousEnergy = currentInputEnergy;
@@ -2125,9 +2153,9 @@
 
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();
-    renderVisualizer();
-    fetchCompanionProfile();
-    initWebSocket();
+    try { initWebSocket(); } catch (e) { console.error("WebSocket init error:", e); }
+    try { fetchCompanionProfile(); } catch (e) { console.error("Companion profile error:", e); }
+    try { renderVisualizer(); } catch (e) { console.error("Visualizer error:", e); }
   </script>
 </body>
 </html>
