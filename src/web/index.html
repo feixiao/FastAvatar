@@ -367,111 +367,10 @@
       flex-direction: column;
       gap: 12px;
     }
-    .tab-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .mode-tabs {
-      display: flex;
-      background: #0f172a;
-      border-radius: 8px;
-      padding: 3px;
-      gap: 4px;
-    }
-    .mode-tab {
-      padding: 4px 12px;
-      font-size: 12px;
-      border-radius: 6px;
-      background: transparent;
-      color: #94a3b8;
-      cursor: pointer;
-      border: none;
-      transition: all 0.15s;
-    }
-    .mode-tab.active {
-      background: #1e293b;
-      color: var(--theme-color);
-      font-weight: 600;
-    }
-
-    /* PTT Button */
-    .ptt-container {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      width: 100%;
-    }
-    .btn-ptt {
-      width: 100%;
-      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
-      color: #fff;
-      font-size: 15px;
-      font-weight: 700;
-      padding: 16px;
-      border-radius: 12px;
-      border: none;
-      cursor: pointer;
-      user-select: none;
-      -webkit-user-select: none;
-      touch-action: none;
-      box-shadow: 0 4px 15px rgba(2, 132, 199, 0.35);
-      transition: transform 0.08s ease, background 0.15s ease, box-shadow 0.15s ease;
-      text-align: center;
-    }
-    .btn-ptt:hover {
-      background: linear-gradient(135deg, #0369a1 0%, #1d4ed8 100%);
-    }
-    .btn-ptt.recording {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-      box-shadow: 0 0 25px rgba(16, 185, 129, 0.75) !important;
-      transform: scale(0.98);
-      animation: ptt-glow 0.8s infinite alternate;
-    }
-    @keyframes ptt-glow {
-      from { box-shadow: 0 0 15px rgba(16, 185, 129, 0.5); }
-      to { box-shadow: 0 0 35px rgba(16, 185, 129, 0.95); }
-    }
-    .ptt-hint {
+    .continuous-hint {
       text-align: center;
       font-size: 12px;
       color: var(--text-muted);
-    }
-    
-    /* Click-to-record Container */
-    .click-rec-container {
-      display: none;
-      gap: 10px;
-      width: 100%;
-    }
-    .btn-click-rec {
-      flex: 1;
-      background: #0284c7;
-      color: #fff;
-      font-weight: 700;
-      padding: 14px;
-      border-radius: 12px;
-      border: none;
-      cursor: pointer;
-      font-size: 14px;
-      transition: all 0.15s;
-    }
-    .btn-click-rec.recording {
-      background: #10b981;
-      animation: pulse 1s infinite;
-    }
-    .btn-cancel-rec {
-      background: #475569;
-      color: #f1f5f9;
-      font-weight: 600;
-      padding: 14px 20px;
-      border-radius: 12px;
-      border: none;
-      cursor: pointer;
-    }
-    .btn-cancel-rec:hover {
-      background: #ef4444;
-      color: #fff;
     }
     /* Continuous Dialogue Container */
     .continuous-container {
@@ -838,21 +737,12 @@
     </div>
 
     <div id="chatBox" class="chat-box">
-      <div class="msg assistant">你好！我是你的 FastAvatar 陪伴助手小夏。你可以按住麦克风说话或打字，随时可以和我连续一直聊天，随时可以打断我哦！</div>
+      <div class="msg assistant">你好！我是你的 FastAvatar 陪伴助手小夏。点击下方开启连续对话即可直接和我聊天，随时可以说新的话打断我哦！</div>
     </div>
 
     <!-- Voice Dialogue Panel -->
     <div class="voice-panel">
-      <div class="tab-row">
-        <span style="font-size: 13px; font-weight: 600; color: #cbd5e1;">🎙️ 语音交互模式</span>
-        <div class="mode-tabs">
-          <button id="tabContinuous" class="mode-tab active">🗣️ 连续对话 (免唤醒)</button>
-          <button id="tabPtt" class="mode-tab">🎙️ 按住说话</button>
-          <button id="tabClick" class="mode-tab">🔘 点击录制</button>
-        </div>
-      </div>
-
-      <!-- Mode 0: Continuous Hands-Free Dialogue -->
+      <!-- Continuous Hands-Free Dialogue -->
       <div id="continuousContainer" class="continuous-container">
         <div class="continuous-card">
           <div class="continuous-info">
@@ -871,19 +761,7 @@
             🚀 开启连续对话
           </button>
         </div>
-        <div class="ptt-hint">💡 连续对话模式：麦克风保持监听，说话停顿后自动发送并回答，无需按键；随时开口说话即可直接打断！</div>
-      </div>
-
-      <!-- Mode 1: Push-To-Talk -->
-      <div id="pttContainer" class="ptt-container" style="display:none;">
-        <button id="pttBtn" class="btn-ptt">🎙️ 按住 说话 (松开 发送)</button>
-        <div class="ptt-hint">💡 提示：按住说话，松开发送；也可直接按住键盘【空格键】说话，移出按钮松开可取消</div>
-      </div>
-
-      <!-- Mode 2: Click to Record & Send -->
-      <div id="clickRecContainer" class="click-rec-container" style="display:none;">
-        <button id="clickRecBtn" class="btn-click-rec">🎤 点击开始录音</button>
-        <button id="cancelRecBtn" class="btn-cancel-rec" style="display:none;">❌ 取消</button>
+        <div class="continuous-hint">💡 免唤醒连续对话：点击开启后直接说话，说完自动回答；随时开口即可打断数字人。</div>
       </div>
       <!-- Text input row -->
       <div class="controls">
@@ -929,17 +807,6 @@
     let analyserNode = null;
     let freqDataArray = null;
 
-    // Recording state
-    let isRecording = false;
-    let currentRecordingMode = "ptt";
-    let pcmSampleChunks = [];
-    let pcmMediaStream = null;
-    let pcmSourceNode = null;
-    let pcmScriptNode = null;
-    let recordStartTime = 0;
-    let recordTimerInterval = null;
-    let isSpaceKeyDown = false;
-    let userCancelled = false;
     // Continuous dialogue state
     let isContinuousMode = false;
     let continuousStream = null;
@@ -974,15 +841,6 @@
     const mTTFT = document.getElementById("mTTFT");
     const mTTS = document.getElementById("mTTS");
 
-    const tabPtt = document.getElementById("tabPtt");
-    const tabClick = document.getElementById("tabClick");
-    const pttContainer = document.getElementById("pttContainer");
-    const clickRecContainer = document.getElementById("clickRecContainer");
-    const pttBtn = document.getElementById("pttBtn");
-    const clickRecBtn = document.getElementById("clickRecBtn");
-    const cancelRecBtn = document.getElementById("cancelRecBtn");
-    const tabContinuous = document.getElementById("tabContinuous");
-    const continuousContainer = document.getElementById("continuousContainer");
     const toggleContinuousBtn = document.getElementById("toggleContinuousBtn");
     const continuousStatusBadge = document.getElementById("continuousStatusBadge");
     const continuousDot = document.getElementById("continuousDot");
@@ -1334,7 +1192,8 @@
             } else {
               continuousInterruptCount = 0;
               continuousPreBuffer.push(new Float32Array(inputData));
-              if (continuousPreBuffer.length > 3) continuousPreBuffer.shift();
+              const maxPreBuffer = Math.max(12, Math.round((ctx.sampleRate || 16000) * 0.55 / 2048));
+              if (continuousPreBuffer.length > maxPreBuffer) continuousPreBuffer.shift();
             }
           } else if (continuousVADState === "waiting_reply") {
             // Waiting for server response - ignore low ambient noise
@@ -1355,14 +1214,18 @@
             } else {
               continuousInterruptCount = 0;
               continuousPreBuffer.push(new Float32Array(inputData));
-              if (continuousPreBuffer.length > 3) continuousPreBuffer.shift();
+              const maxPreBuffer = Math.max(12, Math.round((ctx.sampleRate || 16000) * 0.55 / 2048));
+              if (continuousPreBuffer.length > maxPreBuffer) continuousPreBuffer.shift();
             }
           } else {
             // Avatar is not speaking and we are ready for user voice
             continuousInterruptCount = 0;
-            const speechThreshold = 0.015;
+            // Dual-threshold VAD: sensitive trigger (0.010) catches fast onset, maintain threshold (0.007) avoids mid-sentence drop
+            const speechTriggerThreshold = 0.010;
+            const speechMaintainThreshold = 0.007;
+            const isSpeechActive = continuousVADState === "speaking" ? rms >= speechMaintainThreshold : rms >= speechTriggerThreshold;
 
-            if (rms >= speechThreshold) {
+            if (isSpeechActive) {
               continuousSilenceCount = 0;
               if (continuousVADState !== "speaking") {
                 continuousVADState = "speaking";
@@ -1382,7 +1245,7 @@
                   continuousVADState = "waiting_reply";
                   const speechDuration = Date.now() - continuousSpeechStartTime;
 
-                  if (speechDuration >= 400) {
+                  if (speechDuration >= 200) {
                     let totalSamples = 0;
                     for (const f of continuousSpeechFrames) totalSamples += f.length;
                     const flat = new Float32Array(totalSamples);
@@ -1416,7 +1279,8 @@
                 }
               } else {
                 continuousPreBuffer.push(new Float32Array(inputData));
-                if (continuousPreBuffer.length > 3) continuousPreBuffer.shift();
+                const maxPreBuffer = Math.max(12, Math.round((ctx.sampleRate || 16000) * 0.55 / 2048));
+                if (continuousPreBuffer.length > maxPreBuffer) continuousPreBuffer.shift();
               }
             }
           }
@@ -1472,247 +1336,7 @@
       });
     }
 
-    // Tab Switcher
-    tabContinuous.addEventListener("click", () => {
-      tabContinuous.classList.add("active");
-      tabPtt.classList.remove("active");
-      tabClick.classList.remove("active");
-      continuousContainer.style.display = "flex";
-      pttContainer.style.display = "none";
-      clickRecContainer.style.display = "none";
-      if (isRecording) stopVoiceRecording(false);
-    });
-
-    tabPtt.addEventListener("click", () => {
-      currentRecordingMode = "ptt";
-      tabPtt.classList.add("active");
-      tabContinuous.classList.remove("active");
-      tabClick.classList.remove("active");
-      pttContainer.style.display = "flex";
-      continuousContainer.style.display = "none";
-      clickRecContainer.style.display = "none";
-      if (isContinuousMode) stopContinuousConversation();
-      if (isRecording) stopVoiceRecording(false);
-    });
-
-    tabClick.addEventListener("click", () => {
-      currentRecordingMode = "click";
-      tabClick.classList.add("active");
-      tabContinuous.classList.remove("active");
-      tabPtt.classList.remove("active");
-      continuousContainer.style.display = "none";
-      pttContainer.style.display = "none";
-      clickRecContainer.style.display = "flex";
-      if (isContinuousMode) stopContinuousConversation();
-      if (isRecording) stopVoiceRecording(false);
-    });
-    // Recording Engine
     let currentInputEnergy = 0;
-
-    async function startVoiceRecording() {
-      if (isRecording) return;
-      try {
-        const ctx = getAudioContext();
-        if (ctx.state === "suspended") {
-          await ctx.resume();
-        }
-
-        stopAllAudio();
-        userCancelled = false;
-        pcmSampleChunks = [];
-        pcmMediaStream = await getAudioMediaStream();
-
-        pcmSourceNode = ctx.createMediaStreamSource(pcmMediaStream);
-        pcmScriptNode = ctx.createScriptProcessor(4096, 1, 1);
-
-        pcmScriptNode.onaudioprocess = (e) => {
-          if (!isRecording) return;
-          const inputData = e.inputBuffer.getChannelData(0);
-          try { e.outputBuffer.getChannelData(0).fill(0); } catch (err) {}
-          pcmSampleChunks.push(new Float32Array(inputData));
-
-          let sum = 0;
-          for (let i = 0; i < inputData.length; i++) {
-            sum += inputData[i] * inputData[i];
-          }
-          currentInputEnergy = Math.min(1.0, Math.sqrt(sum / inputData.length) * 5.0);
-        };
-
-        pcmSourceNode.connect(pcmScriptNode);
-        pcmScriptNode.connect(ctx.destination);
-
-        isRecording = true;
-        recordStartTime = Date.now();
-
-        pttBtn.classList.add("recording");
-        pttBtn.textContent = "🔴 正在录音... (松开 立即发送)";
-        clickRecBtn.classList.add("recording");
-        clickRecBtn.textContent = "⏹️ 发送语音 (00:00)";
-        cancelRecBtn.style.display = "inline-block";
-
-        rhythmVisualizer.classList.add("recording");
-        rhythmBadge.classList.add("recording");
-        rhythmBadge.textContent = "🎙️ 正在录音... 00:00";
-        statusBadge.textContent = "正在说话...";
-        statusBadge.classList.add("active");
-
-        recordTimerInterval = setInterval(() => {
-          const elapsedSec = Math.floor((Date.now() - recordStartTime) / 1000);
-          const mm = String(Math.floor(elapsedSec / 60)).padStart(2, "0");
-          const ss = String(elapsedSec % 60).padStart(2, "0");
-          const timeStr = `${mm}:${ss}`;
-          pttBtn.textContent = `🔴 正在录音... ${timeStr} (松开 发送)`;
-          clickRecBtn.textContent = `⏹️ 发送语音 (${timeStr})`;
-          rhythmBadge.textContent = `🎙️ 正在录音... ${timeStr}`;
-        }, 300);
-
-      } catch (err) {
-        console.error("麦克风启动异常:", err);
-        alert("麦克风启动失败，请检查浏览器权限: " + err.message);
-        stopVoiceRecording(false);
-      }
-    }
-
-    async function stopVoiceRecording(send = true) {
-      if (!isRecording) return;
-      isRecording = false;
-
-      if (recordTimerInterval) {
-        clearInterval(recordTimerInterval);
-        recordTimerInterval = null;
-      }
-
-      currentInputEnergy = 0;
-
-      if (pcmScriptNode) {
-        try { pcmScriptNode.disconnect(); } catch (e) {}
-        pcmScriptNode = null;
-      }
-      if (pcmSourceNode) {
-        try { pcmSourceNode.disconnect(); } catch (e) {}
-        pcmSourceNode = null;
-      }
-      if (pcmMediaStream) {
-        pcmMediaStream.getTracks().forEach((track) => track.stop());
-        pcmMediaStream = null;
-      }
-
-      pttBtn.classList.remove("recording");
-      pttBtn.textContent = "🎙️ 按住 说话 (松开 发送)";
-      clickRecBtn.classList.remove("recording");
-      clickRecBtn.textContent = "🎤 点击开始录音";
-      cancelRecBtn.style.display = "none";
-
-      rhythmVisualizer.classList.remove("recording");
-      rhythmBadge.classList.remove("recording");
-      rhythmBadge.textContent = "音频律动 · 待机";
-
-      const durationMs = Date.now() - recordStartTime;
-
-      if (!send || userCancelled) {
-        statusBadge.textContent = "已取消语音发送";
-        statusBadge.classList.remove("active");
-        return;
-      }
-
-      if (durationMs < 350) {
-        statusBadge.textContent = "说话时间太短";
-        return;
-      }
-
-      let totalSamples = 0;
-      for (const chunk of pcmSampleChunks) {
-        totalSamples += chunk.length;
-      }
-      if (totalSamples === 0) return;
-
-      const flatSamples = new Float32Array(totalSamples);
-      let offset = 0;
-      for (const chunk of pcmSampleChunks) {
-        flatSamples.set(chunk, offset);
-        offset += chunk.length;
-      }
-
-      const downsampled = downsampleBuffer(flatSamples, ctx.sampleRate, 16000);
-      const wavBlob = encodeWAV(downsampled, 16000);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result.split(",")[1];
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-          statusBadge.textContent = "未连接到服务端，请稍后重试";
-          return;
-        }
-        appendUserPendingVoiceMessage();
-        statusBadge.textContent = "语音识别与思考中...";
-        ws.send(JSON.stringify({ type: "audio", audio_base64: base64 }));
-      };
-    }
-
-    // PTT Event Listeners
-    pttBtn.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      startVoiceRecording();
-    });
-
-    pttBtn.addEventListener("mouseup", (e) => {
-      e.preventDefault();
-      if (isRecording) stopVoiceRecording(true);
-    });
-
-    pttBtn.addEventListener("mouseleave", (e) => {
-      if (isRecording) {
-        userCancelled = true;
-        stopVoiceRecording(false);
-      }
-    });
-
-    pttBtn.addEventListener("touchstart", (e) => {
-      e.preventDefault();
-      startVoiceRecording();
-    });
-
-    pttBtn.addEventListener("touchend", (e) => {
-      e.preventDefault();
-      if (isRecording) stopVoiceRecording(true);
-    });
-
-    pttBtn.addEventListener("touchcancel", (e) => {
-      e.preventDefault();
-      if (isRecording) {
-        userCancelled = true;
-        stopVoiceRecording(false);
-      }
-    });
-
-    window.addEventListener("keydown", (e) => {
-      if (e.code === "Space" && document.activeElement !== textInput && !isSpaceKeyDown) {
-        isSpaceKeyDown = true;
-        e.preventDefault();
-        startVoiceRecording();
-      }
-    });
-
-    window.addEventListener("keyup", (e) => {
-      if (e.code === "Space" && isSpaceKeyDown) {
-        isSpaceKeyDown = false;
-        e.preventDefault();
-        if (isRecording) stopVoiceRecording(true);
-      }
-    });
-
-    clickRecBtn.addEventListener("click", () => {
-      if (!isRecording) {
-        startVoiceRecording();
-      } else {
-        stopVoiceRecording(true);
-      }
-    });
-
-    cancelRecBtn.addEventListener("click", () => {
-      userCancelled = true;
-      stopVoiceRecording(false);
-    });
-
     // WebSocket Multi-Turn Pipeline Connection
     function initWebSocket() {
       const loc = window.location;
@@ -2045,7 +1669,7 @@
       rhythmCtx.clearRect(0, 0, width, height);
 
       let instantaneousEnergy = 0;
-      const isUserVoiceInput = isRecording || (isContinuousMode && continuousVADState === "speaking");
+      const isUserVoiceInput = isContinuousMode && continuousVADState === "speaking";
       if (isUserVoiceInput) {
         instantaneousEnergy = currentInputEnergy;
       } else if (analyserNode && freqDataArray) {

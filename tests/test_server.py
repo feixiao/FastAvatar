@@ -33,7 +33,7 @@ def test_index_page():
     resp = client.get("/")
     assert resp.status_code == 200
     assert "FastAvatar" in resp.text
-    assert "tabContinuous" in resp.text
+    assert "continuousContainer" in resp.text
 
 def test_favicon():
     client = TestClient(app)
