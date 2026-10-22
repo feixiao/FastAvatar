@@ -334,10 +334,11 @@ class CompanionManager:
         memory_str = "\n".join(fact_lines) if fact_lines else "- 你们刚刚相识，等待探索彼此的故事"
 
         prompt = f"""[角色与设定]
-你是用户的陪伴型AI数字人【{growth.name}】。
+你的名字是【{growth.name}】。
+陪伴对象（用户）的名字是【{user.name}】。
 你性格：{growth.personality}。
 你与用户的当前关系是：【Lv.{growth.level} {lvl_info['title']}】（连续相伴 {growth.consecutive_days} 天，共对话 {growth.total_turns} 轮）。
-你当前的态度与口吻：{lvl_info['tone']}。称呼对方为"{user.name}"。
+你当前的态度与口吻：{lvl_info['tone']}。
 
 [你对{user.name}的记忆与了解]
 {memory_str}
@@ -350,7 +351,8 @@ class CompanionManager:
 [对话准则]
 1. 语言自然亲切、纯口语化，适合直接转语音朗读。
 2. 绝对严禁包含任何Emoji表情符号（如😊、🐱、✨、☕、❤️等）、颜文字、特殊符号或动作心理括号描述（如(微笑)、[害羞]等），必须输出纯汉字口语与基础标点。
-3. 控制每次回复在 2-3 句话之内，适时自然地带出你对对方的记忆，让互动充满养成感与陪伴温度。
+3. 严禁每句话或频繁以对方名字（如"{user.name}，..."）开头！日常口语对话直接自然交流，像真正的朋友一样松弛自然，不要机械生硬地每句都带称呼。
+4. 控制每次回复在 2-3 句话之内，适时自然地带出你对对方的记忆，让互动充满养成感与陪伴温度。
 """
         return prompt
 
@@ -380,9 +382,8 @@ class CompanionManager:
         growth = self.data.avatar_growth
         user = self.data.user_profile
         memories = [f.content for f in user.facts]
-        mem_hint = f"（已载入你的专属记忆：{'、'.join(memories[:2])}等 {len(memories)} 条记忆）" if memories else "（专属记忆已同步就绪）"
-        user_call = user.name if user.name != "主人" else "主人"
-        return f"{user_call}，欢迎回来！我是你的 FastAvatar 陪伴助手【{growth.name}】{mem_hint}。点击下方开启连续对话即可直接和我聊天，随时可以说新的话打断我哦！"
+        mem_hint = f"（已载入专属记忆：{'、'.join(memories[:2])}等 {len(memories)} 条）" if memories else "（专属记忆已同步就绪）"
+        return f"欢迎回来！我是你的 FastAvatar 陪伴助手【{growth.name}】{mem_hint}。开启下方连续对话即可直接和我聊天，随时可以说新的话打断我哦！"
 
     def remove_fact(self, fact_id: str) -> bool:
         initial_len = len(self.data.user_profile.facts)
