@@ -79,6 +79,16 @@ async def chat_http(req: dict):
 
     return {"events": events}
 
+active_websockets: set[WebSocket] = set()
+
+async def broadcast_companion_update():
+    summary = pipeline.companion.get_summary()
+    for ws in list(active_websockets):
+        try:
+            await ws.send_json({"type": "companion_update", "data": summary})
+        except Exception:
+            pass
+
 
 @app.get("/api/companion")
 async def get_companion_profile():
@@ -92,18 +102,23 @@ async def add_companion_fact(req: dict):
     if not content:
         return JSONResponse(status_code=400, content={"error": "Content cannot be empty"})
     fact = pipeline.companion.add_fact(content=content, category=category)
+    await broadcast_companion_update()
     return {"status": "ok", "fact": fact.model_dump()}
 
 
 @app.delete("/api/companion/fact/{fact_id}")
 async def delete_companion_fact(fact_id: str):
     success = pipeline.companion.remove_fact(fact_id)
+    if success:
+        await broadcast_companion_update()
     return {"status": "ok" if success else "not_found"}
+
 
 @app.websocket("/ws/chat")
 async def websocket_chat(websocket: WebSocket):
     await websocket.accept()
-    session_pipeline = VoiceAvatarPipeline(config=config.pipeline)
+    active_websockets.add(websocket)
+    session_pipeline = VoiceAvatarPipeline(config=config.pipeline, companion=pipeline.companion)
     current_turn_task: Optional[asyncio.Task] = None
 
     async def run_turn(audio_bytes: Optional[bytes], user_text: Optional[str]):
@@ -173,9 +188,11 @@ async def websocket_chat(websocket: WebSocket):
                 current_turn_task = asyncio.create_task(run_turn(audio_bytes, user_text))
 
     except WebSocketDisconnect:
+        pass
+    finally:
+        active_websockets.discard(websocket)
         if current_turn_task and not current_turn_task.done():
             current_turn_task.cancel()
-
 
 def run():
     import uvicorn

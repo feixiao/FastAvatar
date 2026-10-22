@@ -40,7 +40,11 @@ class PipelineMetrics(BaseModel):
 class VoiceAvatarPipeline:
     """Orchestrates streaming ASR -> LLM -> SentenceSplitter -> TTS -> LipSync."""
 
-    def __init__(self, config: Optional[PipelineConfig] = None):
+    def __init__(
+        self,
+        config: Optional[PipelineConfig] = None,
+        companion: Optional[CompanionManager] = None,
+    ):
         self.config = config or PipelineConfig()
         self.asr = self._create_asr()
         self.llm = self._create_llm()
@@ -51,8 +55,8 @@ class VoiceAvatarPipeline:
             max_length=self.config.max_chunk_length,
             split_punctuations=self.config.split_punctuations,
         )
-        self.companion = CompanionManager()
-        self.chat_history: List[Dict[str, str]] = []
+        self.companion = companion or CompanionManager()
+        self.chat_history: List[Dict[str, str]] = list(getattr(self.companion.data, "recent_chat_history", []))
         self._interrupt_event = asyncio.Event()
     def _create_asr(self) -> BaseASR:
         cfg = self.config.asr
@@ -68,6 +72,9 @@ class VoiceAvatarPipeline:
     def clear_history(self):
         """Clear conversation history for fresh continuous chatting."""
         self.chat_history.clear()
+        if hasattr(self.companion.data, "recent_chat_history"):
+            self.companion.data.recent_chat_history.clear()
+            self.companion.save()
     def _create_llm(self) -> BaseLLM:
         cfg = self.config.llm
         if cfg.provider == LLMProviderType.OLLAMA:
@@ -265,6 +272,9 @@ class VoiceAvatarPipeline:
         # Cultivation progression and asynchronous background memory extraction
         if full_reply.strip() and not self._interrupt_event.is_set():
             growth_update = self.companion.add_turn_xp(is_voice=bool(audio_input and not text_input))
+            if hasattr(self.companion.data, "recent_chat_history"):
+                self.companion.data.recent_chat_history = list(self.chat_history[-10:])
+                self.companion.save()
             yield PipelineEvent(
                 event_type="companion_update",
                 payload=growth_update,

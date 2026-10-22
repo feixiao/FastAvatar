@@ -98,7 +98,7 @@ class AvatarGrowth(BaseModel):
 class CompanionData(BaseModel):
     user_profile: UserProfile = Field(default_factory=UserProfile)
     avatar_growth: AvatarGrowth = Field(default_factory=AvatarGrowth)
-
+    recent_chat_history: List[Dict[str, str]] = Field(default_factory=list)
 
 class CompanionManager:
     """Manages the full lifecycle of the AI companion's cultivation and memory."""
@@ -120,7 +120,16 @@ class CompanionManager:
             try:
                 raw_text = self.data_file.read_text(encoding="utf-8")
                 raw_dict = json.loads(raw_text)
-                return CompanionData.model_validate(raw_dict)
+                loaded = CompanionData.model_validate(raw_dict)
+                if loaded.user_profile.name in ("主人", "你", "", "什么名字吗"):
+                    for f in loaded.user_profile.facts:
+                        m = re.search(r"(?:名字(?:叫|是)|用户称谓定为：)([^，。！？\n?？]{1,10})", f.content)
+                        if m:
+                            cand = m.group(1).strip()
+                            if not any(q in cand for q in ("什么", "啥", "哪", "谁", "吗")):
+                                loaded.user_profile.name = cand
+                                break
+                return loaded
             except Exception as e:
                 print(f"[CompanionManager] Warning: failed to parse {self.data_file}: {e}, using default.")
         
@@ -325,9 +334,25 @@ class CompanionManager:
                 return f
         new_fact = MemoryFact(category=category, content=content)
         self.data.user_profile.facts.append(new_fact)
+
+        m_name = re.search(r"(?:我(?:的)?(?:名字|姓名)?(?:叫|是)|你可以叫我|叫我|名字(?:叫|是)|称呼我为?|用户称谓定为：)([^，。！？\n?？]{1,10})", content)
+        if m_name:
+            new_name = m_name.group(1).strip()
+            if not any(q in new_name for q in ("什么", "啥", "哪", "谁", "吗", "怎", "不知", "几")):
+                if 1 < len(new_name) <= 6:
+                    self.data.user_profile.name = new_name
+
         if save:
             self.save()
         return new_fact
+
+    def get_welcome_greeting(self) -> str:
+        growth = self.data.avatar_growth
+        user = self.data.user_profile
+        memories = [f.content for f in user.facts]
+        mem_hint = f"（已载入你的专属记忆：{'、'.join(memories[:2])}等 {len(memories)} 条记忆）" if memories else "（专属记忆已同步就绪）"
+        user_call = user.name if user.name != "主人" else "主人"
+        return f"{user_call}，欢迎回来！我是你的 FastAvatar 陪伴助手【{growth.name}】{mem_hint}。点击下方开启连续对话即可直接和我聊天，随时可以说新的话打断我哦！"
 
     def remove_fact(self, fact_id: str) -> bool:
         initial_len = len(self.data.user_profile.facts)
@@ -363,8 +388,9 @@ class CompanionManager:
             "time_greeting": ctx["time_greeting"],
             "memories_count": len(user.facts),
             "memories": [f.model_dump() for f in user.facts],
+            "welcome_greeting": self.get_welcome_greeting(),
+            "recent_chat_history": self.data.recent_chat_history,
         }
-
     async def extract_memory_facts_async(self, user_text: str, assistant_reply: str) -> List[MemoryFact]:
         """Fast heuristic + asynchronous fact extraction from user conversations (Zero-latency background task)."""
         if not user_text or len(user_text.strip()) < 3:
@@ -394,13 +420,14 @@ class CompanionManager:
             has_changes = True
 
         # Rule 4: Name/Identity
-        m_name = re.search(r"(?:我(?:的名字|叫)|你可以叫我)([^，。！？\n]{1,10})", text)
+        m_name = re.search(r"(?:我(?:的)?(?:名字|姓名)?(?:叫|是)|你可以叫我|叫我|名字(?:叫|是))([^，。！？\n?？]{1,10})", text)
         if m_name:
             new_name = m_name.group(1).strip()
-            if 1 < len(new_name) <= 6:
-                self.data.user_profile.name = new_name
-                extracted_facts.append(self.add_fact(f"用户称谓定为：{new_name}", category="special", save=False))
-                has_changes = True
+            if not any(q in new_name for q in ("什么", "啥", "哪", "谁", "吗", "怎", "不知", "几")):
+                if 1 < len(new_name) <= 6:
+                    self.data.user_profile.name = new_name
+                    extracted_facts.append(self.add_fact(f"用户称谓定为：{new_name}", category="special", save=False))
+                    has_changes = True
 
         if has_changes:
             await asyncio.to_thread(self.save)

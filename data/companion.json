@@ -1,6 +1,6 @@
 {
   "user_profile": {
-    "name": "主人",
+    "name": "银月",
     "facts": [
       {
         "id": "4ac301dd",
@@ -15,6 +15,27 @@
         "content": "家里有一只可爱的猫猫叫布丁",
         "created_at": "2026-10-21T14:37:36.678822",
         "confidence": 1.0
+      },
+      {
+        "id": "bb3a7c84",
+        "category": "preference",
+        "content": "名字叫银月",
+        "created_at": "2026-10-22T10:06:49.691746",
+        "confidence": 1.0
+      },
+      {
+        "id": "d22faf4f",
+        "category": "preference",
+        "content": "最喜欢的季节是深秋金陵",
+        "created_at": "2026-10-22T10:16:56.049156",
+        "confidence": 1.0
+      },
+      {
+        "id": "fc3611f1",
+        "category": "preference",
+        "content": "提到偏好：我最喜欢什么季节吗",
+        "created_at": "2026-10-22T10:17:01.406720",
+        "confidence": 1.0
       }
     ]
   },
@@ -23,12 +44,13 @@
     "gender": "female",
     "personality": "温柔灵动、体贴善解人意、充满生活好奇心、偶带一点点小俏皮",
     "level": 5,
-    "current_xp": 4730,
-    "total_xp": 7930,
+    "current_xp": 4900,
+    "total_xp": 8100,
     "consecutive_days": 2,
-    "total_turns": 583,
-    "last_interaction": "2026-10-22T10:03:16.625026",
+    "total_turns": 596,
+    "last_interaction": "2026-10-22T10:17:45.277534",
     "last_interaction_date": "2026-10-22",
     "created_at": "2026-10-21T14:37:36.678773"
-  }
+  },
+  "recent_chat_history": []
 }

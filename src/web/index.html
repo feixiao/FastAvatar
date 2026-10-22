@@ -904,6 +904,34 @@
       }
       if (data.memories_count !== undefined) compMemoriesCount.textContent = data.memories_count;
 
+      if (data.welcome_greeting) {
+        const welcomeEl = chatBox.querySelector(".msg.assistant:first-child");
+        if (welcomeEl && (!chatBox.dataset.loadedHistory || chatBox.dataset.loadedHistory === "false")) {
+          welcomeEl.textContent = data.welcome_greeting;
+        }
+      }
+
+      if (data.recent_chat_history && data.recent_chat_history.length > 0 && !chatBox.dataset.loadedHistory) {
+        chatBox.dataset.loadedHistory = "true";
+        chatBox.innerHTML = "";
+        const welcomeDiv = document.createElement("div");
+        welcomeDiv.className = "msg assistant";
+        welcomeDiv.textContent = data.welcome_greeting || `你好！我是小夏（已同步 ${data.memories_count || 0} 条专属记忆）。点击开启连续对话即可直接聊天。`;
+        chatBox.appendChild(welcomeDiv);
+
+        data.recent_chat_history.forEach((m) => {
+          const el = document.createElement("div");
+          el.className = `msg ${m.role}`;
+          el.textContent = m.content;
+          chatBox.appendChild(el);
+        });
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      if (memoryModal && memoryModal.style.display !== "none") {
+        renderMemoryList();
+      }
+
       if (data.orb_color) {
         currentOrbColor = data.orb_color;
         currentGlowColor = data.glow_color || "rgba(56, 189, 248, 0.4)";
