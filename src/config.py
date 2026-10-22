@@ -38,7 +38,7 @@ class LLMConfig(BaseModel):
 
 
 class ASRConfig(BaseModel):
-    provider: ASRProviderType = ASRProviderType.MOCK
+    provider: ASRProviderType = ASRProviderType.SHERPA_ONNX
     model_name: str = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue"
     sample_rate: int = 16000
     language: str = "zh"
