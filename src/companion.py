@@ -68,6 +68,29 @@ LEVEL_CONFIG = {
 }
 
 
+AVATAR_NAME_RE = re.compile(
+    r"(?:"
+    r"(?:以后|从现在开始|从现在起)?(?:我就|我想)?叫你"
+    r"|(?:以后|从现在开始|从现在起)?(?:你的名字|你名字|你)(?:改叫|改成|定为|叫|是)"
+    r"|给你(?:起个?|改个?|取个?)?(?:名字|名)?(?:改叫|叫|是|定为)"
+    r"|(?:助手|数字人)名字(?:改叫|改成|叫|是|定为：?)"
+    r"|把你的?名字改成"
+    r")"
+    r"([^，。！？\n?？\s]{1,10})"
+)
+
+
+def extract_avatar_name(text: str) -> Optional[str]:
+    is_q = any(q in text for q in ("什么", "啥", "哪", "谁", "吗", "怎", "不知", "几", "？", "?"))
+    if is_q:
+        return None
+    m = AVATAR_NAME_RE.search(text)
+    if m:
+        cand = m.group(1).strip().rstrip("吧呀呢啊了")
+        if 1 < len(cand) <= 6 and not any(q in cand for q in ("什么", "啥", "哪", "谁", "吗")):
+            return cand
+    return None
+
 class MemoryFact(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
     category: str = "preference"  # preference | life | work | pet | special
@@ -129,6 +152,11 @@ class CompanionManager:
                             if not any(q in cand for q in ("什么", "啥", "哪", "谁", "吗")):
                                 loaded.user_profile.name = cand
                                 break
+                for f in loaded.user_profile.facts:
+                    av_cand = extract_avatar_name(f.content)
+                    if av_cand:
+                        loaded.avatar_growth.name = av_cand
+                        break
                 return loaded
             except Exception as e:
                 print(f"[CompanionManager] Warning: failed to parse {self.data_file}: {e}, using default.")
@@ -334,14 +362,16 @@ class CompanionManager:
                 return f
         new_fact = MemoryFact(category=category, content=content)
         self.data.user_profile.facts.append(new_fact)
+        av_name = extract_avatar_name(content)
+        if av_name:
+            self.data.avatar_growth.name = av_name
 
         m_name = re.search(r"(?:我(?:的)?(?:名字|姓名)?(?:叫|是)|你可以叫我|叫我|名字(?:叫|是)|称呼我为?|用户称谓定为：)([^，。！？\n?？]{1,10})", content)
-        if m_name:
+        if m_name and not av_name:
             new_name = m_name.group(1).strip()
             if not any(q in new_name for q in ("什么", "啥", "哪", "谁", "吗", "怎", "不知", "几")):
                 if 1 < len(new_name) <= 6:
                     self.data.user_profile.name = new_name
-
         if save:
             self.save()
         return new_fact
@@ -358,10 +388,16 @@ class CompanionManager:
         initial_len = len(self.data.user_profile.facts)
         self.data.user_profile.facts = [f for f in self.data.user_profile.facts if f.id != fact_id]
         if len(self.data.user_profile.facts) != initial_len:
+            av_name = None
+            for f in self.data.user_profile.facts:
+                cand = extract_avatar_name(f.content)
+                if cand:
+                    av_name = cand
+                    break
+            self.data.avatar_growth.name = av_name or "小夏"
             self.save()
             return True
         return False
-
     def get_summary(self) -> Dict[str, Any]:
         """Provides full structured companion status for REST API and WebSocket events."""
         growth = self.data.avatar_growth
@@ -400,9 +436,10 @@ class CompanionManager:
         text = user_text.strip()
         has_changes = False
 
-        # Rule 1: Preference patterns
-        m_pref = re.search(r"(?:我(?:很|特别|平时|最)?(?:喜欢|偏爱|爱吃|爱喝|超爱|中意)|我讨厌|我不喜欢)([^，。！？\n]{2,20})", text)
-        if m_pref:
+        # Rule 1: Preference patterns (ignore questions)
+        is_question = any(q in text for q in ("吗", "？", "?", "什么", "啥", "哪", "谁", "是否"))
+        m_pref = re.search(r"(?:我(?:很|特别|平时|最)?(?:喜欢|偏爱|爱吃|爱喝|超爱|中意)|我讨厌|我不喜欢)([^，。！？\n?？]{2,20})", text)
+        if not is_question and m_pref:
             fact_str = f"提到偏好：{m_pref.group(0)}"
             extracted_facts.append(self.add_fact(fact_str, category="preference", save=False))
             has_changes = True
@@ -429,7 +466,13 @@ class CompanionManager:
                     extracted_facts.append(self.add_fact(f"用户称谓定为：{new_name}", category="special", save=False))
                     has_changes = True
 
+        # Rule 5: Avatar/Companion Name modification
+        new_av = extract_avatar_name(text)
+        if new_av:
+            self.data.avatar_growth.name = new_av
+            extracted_facts.append(self.add_fact(f"助手名字定为：{new_av}", category="special", save=False))
+            has_changes = True
+
         if has_changes:
             await asyncio.to_thread(self.save)
-
         return extracted_facts

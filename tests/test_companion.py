@@ -77,3 +77,28 @@ async def test_memory_extraction(tmp_path: Path):
     # Name extraction
     extracted2 = await mgr.extract_memory_facts_async("你可以叫我阿哲", "好的阿哲！")
     assert mgr.data.user_profile.name == "阿哲"
+
+
+def test_avatar_name_modification(tmp_path: Path):
+    data_file = tmp_path / "companion.json"
+    mgr = CompanionManager(data_file=data_file)
+    assert mgr.data.avatar_growth.name == "小夏"
+
+    # 1. Modify companion name via add_fact
+    fact = mgr.add_fact("以后你的名字叫露娜", category="special")
+    assert mgr.data.avatar_growth.name == "露娜"
+    assert mgr.get_summary()["name"] == "露娜"
+    assert "【露娜】" in mgr.build_system_prompt()
+    assert "【露娜】" in mgr.get_welcome_greeting()
+
+    # 2. Deleting fact reverts to default
+    mgr.remove_fact(fact.id)
+    assert mgr.data.avatar_growth.name == "小夏"
+
+
+@pytest.mark.asyncio
+async def test_avatar_name_extraction(tmp_path: Path):
+    data_file = tmp_path / "companion.json"
+    mgr = CompanionManager(data_file=data_file)
+    await mgr.extract_memory_facts_async("给你起个名字叫雪儿", "哇，雪儿这个名字真好听！")
+    assert mgr.data.avatar_growth.name == "雪儿"
