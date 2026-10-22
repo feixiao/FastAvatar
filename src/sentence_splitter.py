@@ -10,13 +10,27 @@ from typing import AsyncIterator, List, Set
 MARKDOWN_SYMBOLS = set("*_~`#")
 MARKDOWN_CLEAN_RE = re.compile(r"[*_~`#]")
 WHITESPACE_CLEAN_RE = re.compile(r"\s+")
-STAGE_KEYWORDS = ("笑", "看", "递", "叹", "眨", "抱", "摸", "揉", "点", "摇", "拉", "走", "坐", "站", "低头", "转", "歪头", "轻声", "小声", "心想", "脸红", "愣", "思考", "托腮", "嘟嘴", "傲娇")
-PAREN_RE = re.compile(r"[(（][^()（）]{1,15}[)）]")
+STAGE_KEYWORDS = (
+    "笑", "看", "递", "叹", "眨", "抱", "摸", "揉", "点", "摇", "拉", "走", "坐", "站",
+    "低头", "转", "歪头", "轻声", "小声", "心想", "脸红", "愣", "思考", "托腮", "嘟嘴", "傲娇",
+    "开心", "期待", "温柔", "害羞", "高兴", "难过", "哭", "挥手", "点头", "摇头", "得意", "惊讶", "兴奋",
+    "叹气", "轻笑", "微笑"
+)
+PAREN_RE = re.compile(r"[(（\[【][^()（）\[\]【】]{1,20}[)）\]】]")
+EMOJI_RE = re.compile(
+    r"[\U00010000-\U0010ffff]"
+    r"|[\u2600-\u27bf]"
+    r"|[\u2300-\u23ff]"
+    r"|[\u2b00-\u2bff]"
+    r"|[\ufe00-\ufe0f]"
+    r"|[\u200d]"
+    r"|[\u3030\u303d]"
+)
 
 
 def filter_stage_actions(text: str) -> str:
-    """Filters out stage directions like (微笑), （轻声笑） so TTS doesn't read out parentheses."""
-    if "(" not in text and "（" not in text:
+    """Filters out stage directions like (微笑), （轻声笑）, [害羞] so TTS doesn't read out parentheses."""
+    if not any(b in text for b in ("(", "（", "[", "【")):
         return text
     def repl(m):
         inner = m.group(0)[1:-1]
@@ -27,13 +41,15 @@ def filter_stage_actions(text: str) -> str:
 
 
 def clean_speech_text(text: str) -> str:
-    """Strips markdown asterisks, bold/italic markers, and stage directions for clean TTS reading."""
+    """Strips emojis, stage directions, markdown markers, and redundant punctuation for clean TTS reading."""
+    text = EMOJI_RE.sub("", text)
     text = filter_stage_actions(text)
-    if MARKDOWN_SYMBOLS.isdisjoint(text):
-        return text.strip()
-    cleaned = MARKDOWN_CLEAN_RE.sub("", text)
-    cleaned = WHITESPACE_CLEAN_RE.sub(" ", cleaned).strip()
-    return cleaned
+    if not MARKDOWN_SYMBOLS.isdisjoint(text):
+        text = MARKDOWN_CLEAN_RE.sub("", text)
+    text = re.sub(r"\s+([，。！？；、,.!?;:])", r"\1", text)
+    text = re.sub(r"([，、,])\1+", r"\1", text)
+    text = WHITESPACE_CLEAN_RE.sub(" ", text).strip()
+    return text
 
 class SentenceSplitter:
     """Buffers incoming tokens and emits speakable text chunks based on punctuation and length."""

@@ -30,7 +30,8 @@ class LLMConfig(BaseModel):
     base_url: str = "http://localhost:1234/v1"
     api_key: Optional[str] = "lm-studio"
     system_prompt: str = (
-        "你是可爱的AI数字人助手。你的回答需要口语化、亲切自然、简洁，适合直接转成语音播报。"
+        "你是可爱的AI数字人助手。你的回答需要纯口语化、亲切自然、简洁，适合直接转成语音播报。"
+        "绝对严禁包含任何Emoji表情符号（如😊、🐱等）、颜文字、特殊符号或动作描述括号（如(笑)、[思考]等）。"
         "避免使用复杂的表格、列表符号，单次回复控制在2-3句话以内。"
     )
     temperature: float = 0.7

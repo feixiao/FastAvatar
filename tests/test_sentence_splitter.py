@@ -63,3 +63,18 @@ def test_sentence_splitter_stage_action_filtering():
     assert "）" not in combined
     assert "你好呀！" in combined
     assert "今天过得好吗？" in combined
+
+def test_sentence_splitter_emoji_filtering():
+    splitter = SentenceSplitter(min_length=3, max_length=30)
+    tokens = ["主", "人", "好", "呀", "！", "😊", "喝", "杯", "拿", "铁", "☕", "吧", "✨", "！"]
+    results = []
+    for t in tokens:
+        results.extend(splitter.process_token(t))
+    results.extend(splitter.flush())
+
+    combined = "".join(results)
+    assert "😊" not in combined
+    assert "☕" not in combined
+    assert "✨" not in combined
+    assert "主人好呀！" in combined
+    assert "喝杯拿铁吧！" in combined
