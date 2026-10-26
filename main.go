@@ -21,7 +21,7 @@ func main() {
 	err := wails.Run(&options.App{
 		Title:         "Avatar",
 		Width:         360,
-		Height:        96,
+		Height:        80,
 		Frameless:     true,
 		AlwaysOnTop:   true,
 		DisableResize: true,
