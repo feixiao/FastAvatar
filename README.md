@@ -41,6 +41,7 @@ Avatar/
 ├── app.go                  # Wails 应用绑定胶水层
 ├── main.go                 # 桌面应用生命周期入口
 ├── package_mac.sh          # 一键构建 macOS .app 打包脚本
+├── Makefile                # 快捷构建、调试与管理指令
 ├── go.mod
 └── README.md
 ```
@@ -49,18 +50,42 @@ Avatar/
 
 ## 三、 快速开始
 
-### 3.1 运行单元测试
+### 3.1 Make 快捷指令
+
+项目提供了标准 `Makefile` 封装日常操作：
+
+| 指令 | 作用 |
+| :--- | :--- |
+| `make run`（或 `make dev`） | 直接运行应用（开发调试） |
+| `make start` | 一键打包并立即启动 macOS 原生 App |
+| `make package` | 编译并打包为 macOS 原生应用（生成 `build/bin/Avatar.app`） |
+| `make build` | 仅编译可执行二进制文件（`build/bin/Avatar`） |
+| `make test` | 运行所有单元测试 |
+| `make clean` | 清理构建产物及临时文件 |
+| `make help` | 显示 Makefile 指令说明 |
+
+### 3.2 极速启动与打包
+
 ```bash
-go test -v ./...
+# 开发调试：直接启动胶囊
+make run
+
+# 生产打包并直接启动应用
+make start
+
+# 运行单元测试
+make test
 ```
 
-### 3.2 编译与一键打包
-```bash
-./package_mac.sh
-```
-编译产物位于 `build/bin/Avatar.app`，直接双击即可运行！
+> 亦可手动执行 `./package_mac.sh` 进行打包，产物位于 `build/bin/Avatar.app`。
 
-### 3.3 交互说明
+### 3.3 大模型与接口配置
+应用首次运行会自动生成配置文件：`~/.avatar/config.json`。可根据需要配置本地或云端大模型：
+- **本地 Ollama**：将 `llm.base_url` 设为 `http://127.0.0.1:11434/v1`，`model` 设为对应模型名称（如 `qwen2.5:1.5b`）。
+- **云端 API（DeepSeek / 兼容 OpenAI）**：配置 `base_url`、`api_key` 及 `model` 即可。
+- **语音合成（TTS）**：macOS 原生内置免依赖合成（默认 `Ting-Ting` 音色），开箱即用。
+
+### 3.4 交互说明
 - **免唤醒畅聊**：直接对电脑说话，伴侣自动感知并流式语音回复；在伴侣说话期间随时开口即可插话打断。
 - **模式切换**：点击胶囊上的「免唤醒」按钮可切换为「快捷键」模式。
 - **文字输入**：点击胶囊上的 `💬` 按钮可弹出极简文字框进行键入提问。
