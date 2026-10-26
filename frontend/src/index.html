@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avatar Capsule</title>
+  <link rel="stylesheet" href="./main.css">
+</head>
+<body>
+  <div class="capsule" id="capsule">
+    <!-- 拖拽把手区 -->
+    <div class="drag-handle" style="--wails-draggable:drag"></div>
+
+    <!-- 左侧状态律动球/声波 -->
+    <div class="orb-container" id="orbContainer" title="点击打断/重置">
+      <div class="orb-core" id="orbCore"></div>
+      <div class="orb-ring" id="orbRing"></div>
+      <canvas class="wave-canvas" id="waveCanvas" width="32" height="32"></canvas>
+    </div>
+
+    <!-- 中间状态与副标题文字 -->
+    <div class="info-container" id="infoContainer">
+      <div class="status-row">
+        <span class="status-indicator" id="statusIndicator"></span>
+        <span class="status-text" id="statusText">待命 (Idle)</span>
+        <button class="mode-badge" id="modeBadge" title="切换交互模式">免唤醒</button>
+      </div>
+      <div class="subtitle-text" id="subtitleText">随时开口与我畅聊...</div>
+    </div>
+
+    <!-- 右侧快捷操作区 -->
+    <div class="action-container">
+      <button class="icon-btn" id="btnInput" title="文字输入">💬</button>
+      <button class="icon-btn" id="btnInterrupt" title="立即打断 (Barge-in)">⏹</button>
+    </div>
+  </div>
+
+  <!-- 极简文字输入弹出层 -->
+  <div class="input-drawer" id="inputDrawer">
+    <input type="text" id="textInput" placeholder="输入对话并按回车..." autofocus />
+  </div>
+
+  <script src="./main.js"></script>
+</body>
+</html>

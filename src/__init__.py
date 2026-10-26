@@ -1,1 +1,0 @@
-"""FastAvatar package."""

@@ -1,0 +1,237 @@
+:root {
+  --bg-capsule: rgba(15, 23, 42, 0.85);
+  --border-capsule: rgba(255, 255, 255, 0.12);
+  --glow-idle: #38bdf8;
+  --glow-listening: #10b981;
+  --glow-thinking: #a855f7;
+  --glow-speaking: #f59e0b;
+  --text-primary: #f8fafc;
+  --text-muted: #94a3b8;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body {
+  background: transparent;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 悬浮胶囊主体 */
+.capsule {
+  position: relative;
+  width: 340px;
+  height: 68px;
+  background: var(--bg-capsule);
+  border: 1px solid var(--border-capsule);
+  border-radius: 34px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(56, 189, 248, 0.15);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.capsule:hover {
+  box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.6), 0 0 20px rgba(56, 189, 248, 0.25);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* 隐藏的整体拖拽手柄 */
+.drag-handle {
+  position: absolute;
+  inset: 0;
+  border-radius: 34px;
+  z-index: 1;
+}
+
+/* 律动球 */
+.orb-container {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  cursor: pointer;
+}
+
+.orb-core {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--glow-idle);
+  box-shadow: 0 0 12px var(--glow-idle);
+  transition: all 0.3s ease;
+}
+
+.orb-ring {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1.5px solid var(--glow-idle);
+  opacity: 0.4;
+  animation: pulse-ring 2s infinite ease-out;
+  pointer-events: none;
+}
+
+.wave-canvas {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* 状态与文本 */
+.info-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--glow-idle);
+  box-shadow: 0 0 6px var(--glow-idle);
+}
+
+.status-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mode-badge {
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--glow-idle);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-badge:hover {
+  background: rgba(56, 189, 248, 0.3);
+}
+
+.subtitle-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+/* 右侧图标 */
+.action-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 2;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* 输入框抽出层 */
+.input-drawer {
+  position: absolute;
+  bottom: 4px;
+  width: 320px;
+  display: none;
+  z-index: 10;
+}
+
+.input-drawer.open {
+  display: block;
+}
+
+.input-drawer input {
+  width: 100%;
+  padding: 6px 12px;
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 14px;
+  color: #fff;
+  font-size: 12px;
+  outline: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* 动效 */
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(1.3); opacity: 0; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 状态主题 */
+.state-idle .orb-core { background: var(--glow-idle); box-shadow: 0 0 12px var(--glow-idle); }
+.state-idle .status-indicator { background: var(--glow-idle); box-shadow: 0 0 6px var(--glow-idle); }
+
+.state-listening .orb-core { background: var(--glow-listening); box-shadow: 0 0 16px var(--glow-listening); }
+.state-listening .status-indicator { background: var(--glow-listening); box-shadow: 0 0 6px var(--glow-listening); }
+.state-listening .wave-canvas { opacity: 1; }
+
+.state-thinking .orb-core { background: var(--glow-thinking); box-shadow: 0 0 16px var(--glow-thinking); animation: pulse-ring 1s infinite alternate; }
+.state-thinking .status-indicator { background: var(--glow-thinking); box-shadow: 0 0 6px var(--glow-thinking); }
+
+.state-speaking .orb-core { background: var(--glow-speaking); box-shadow: 0 0 18px var(--glow-speaking); }
+.state-speaking .status-indicator { background: var(--glow-speaking); box-shadow: 0 0 6px var(--glow-speaking); }
