@@ -13,7 +13,7 @@ RESOURCES_DIR="${CONTENTS_DIR}/Resources"
 mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}"
 
 echo "1. Compiling Go binary..."
-go build -ldflags="-w -s" -o "${MACOS_DIR}/${APP_NAME}" .
+go build -tags production -ldflags="-w -s" -o "${MACOS_DIR}/${APP_NAME}" .
 
 echo "2. Generating Info.plist..."
 sed \
