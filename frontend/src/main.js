@@ -219,6 +219,22 @@ function resetSleepTimer() {
   }, 45000);
 }
 
+// 桌宠气泡默认隐藏，只在有实际内容（识别文本/回复/提示）时短暂浮现
+let bubbleHideTimer = null;
+function showBubble(text, holdMs = 4000) {
+  petBubbleText.textContent = text;
+  petBubble.classList.add("visible");
+  clearTimeout(bubbleHideTimer);
+  bubbleHideTimer = setTimeout(hideBubble, holdMs);
+}
+
+function hideBubble() {
+  clearTimeout(bubbleHideTimer);
+  petBubble.classList.remove("visible");
+}
+petBubble.addEventListener("click", hideBubble);
+
+
 function applyState(state) {
   currentState = state;
   const label = stateLabels[state] || state;
@@ -229,29 +245,28 @@ function applyState(state) {
   statusText.textContent = label;
 
   // 2. 更新桌宠 UI
+  desktopPet.dataset.state = state;
   petRenderer.setState(state);
   petStatusText.textContent = label.split(" ")[0];
   petStatusDot.style.background = color;
   petStatusDot.style.boxShadow = `0 0 8px ${color}`;
 
   if (state === "idle") {
-    const cur = petBubbleText.textContent || "";
-    if (!cur || cur.startsWith("👂") || cur.startsWith("💭") || cur.startsWith("正在思考")) {
-      const defaultText =
-        currentMode === "hands_free"
-          ? "随时开口或摸摸我畅聊..."
-          : "按住空格说话...";
-      subtitleText.textContent = defaultText;
-      petBubbleText.textContent = defaultText;
+    const cur = subtitleText.textContent || "";
+    if (!cur || cur.startsWith("正在") || cur.startsWith("倾听") || cur.startsWith("🎙️")) {
+      subtitleText.textContent =
+        currentMode === "hands_free" ? "随时开口或摸摸我畅聊..." : "按住空格说话...";
+    }
+    if (petBubble.classList.contains("visible")) {
+      clearTimeout(bubbleHideTimer);
+      bubbleHideTimer = setTimeout(hideBubble, 3000);
     }
   } else if (state === "thinking") {
     subtitleText.textContent = "正在思考并组织回答...";
-    petBubbleText.textContent = "💭 思考中，请稍候片刻...";
   } else if (state === "listening") {
     subtitleText.textContent = "倾听中...";
-    petBubbleText.textContent = "👂 正在听你说话...";
   } else if (state === "sleep") {
-    petBubbleText.textContent = "💤 Zzz... 正在小憩打盹中 (摸摸唤醒)";
+    hideBubble();
   }
 
   resetSleepTimer();
@@ -326,7 +341,7 @@ function handlePetAction(action) {
       }
 
       if (res.message) {
-        petBubbleText.textContent = res.message;
+        showBubble(res.message);
       }
     });
   }
@@ -354,7 +369,7 @@ btnPetStop.addEventListener("click", (e) => {
     window.go.main.App.Interrupt();
   }
   applyState("idle");
-  petBubbleText.textContent = "已打断发音，随时开口~";
+  showBubble("已打断发音，随时开口~", 2500);
 });
 
 btnPetMic.addEventListener("click", (e) => {
@@ -399,7 +414,7 @@ function submitPetText() {
   const val = petTextInput.value.trim();
   if (val && window.go && window.go.main && window.go.main.App) {
     window.go.main.App.SendTextMessage(val);
-    petBubbleText.textContent = "你说: " + val;
+    showBubble("你说: " + val, 30000);
     petTextInput.value = "";
     petInputBar.classList.remove("open");
     applyState("thinking");
@@ -759,7 +774,7 @@ function initPTTKeyboard() {
         }
         applyState("listening");
         subtitleText.textContent = "🎙️ 正在倾听，松开空格发送...";
-        petBubbleText.textContent = "👂 正在听，松开发送...";
+        hideBubble();
       }
     }
   });
@@ -773,12 +788,11 @@ function initPTTKeyboard() {
         window.go.main.App.StopPTT();
       }
       subtitleText.textContent = "正在识别并组织回答...";
-      petBubbleText.textContent = "💭 正在识别...";
 
       clearTimeout(pttWatchdogTimer);
       pttWatchdogTimer = setTimeout(() => {
-        if (petBubbleText.textContent.includes("正在识别")) {
-          petBubbleText.textContent = "👂 刚才好像没听清，请按住空格再说一次哦~";
+        if (subtitleText.textContent.includes("正在识别")) {
+          showBubble("👂 刚才好像没听清，请按住空格再说一次哦~", 3000);
           subtitleText.textContent = "按住空格说话...";
           applyState("idle");
         }
@@ -797,14 +811,14 @@ if (window.runtime) {
   window.runtime.EventsOn("avatar:speech_partial", (text) => {
     resetSleepTimer();
     subtitleText.textContent = "正在听: " + text;
-    petBubbleText.textContent = "👂 " + text;
+    showBubble("👂 " + text, 3000);
     applyState("listening");
   });
   window.runtime.EventsOn("avatar:speech_final", (text) => {
     clearTimeout(pttWatchdogTimer);
     resetSleepTimer();
     subtitleText.textContent = "你说: " + text;
-    petBubbleText.textContent = "你说: " + text;
+    showBubble("你说: " + text, 30000);
     applyState("thinking");
   });
   window.runtime.EventsOn("avatar:mic_energy", (energy) => {
@@ -815,11 +829,11 @@ if (window.runtime) {
   window.runtime.EventsOn("avatar:speech", (sentence) => {
     resetSleepTimer();
     subtitleText.textContent = sentence;
-    petBubbleText.textContent = sentence;
+    showBubble(sentence, Math.max(4000, sentence.length * 300));
   });
   window.runtime.EventsOn("avatar:error", (err) => {
     subtitleText.textContent = "❌ " + err;
-    petBubbleText.textContent = "❌ " + err;
+    showBubble("❌ " + err, 6000);
     applyState("error");
   });
   window.runtime.EventsOn("avatar:display_form", (f) => {
@@ -832,7 +846,7 @@ if (window.runtime) {
     currentMode = m;
     modeBadge.textContent = m === "hands_free" ? "免唤醒" : "快捷键";
     const desc = m === "hands_free" ? "免唤醒模式 (随时开口)" : "按住空格说话模式";
-    petBubbleText.textContent = `🎙️ ${desc}`;
+    showBubble(`🎙️ ${desc}`, 2500);
     if (currentState === "idle") {
       const defaultText =
         m === "hands_free" ? "随时开口与我畅聊..." : "按住空格说话...";
@@ -866,9 +880,7 @@ window.addEventListener("DOMContentLoaded", () => {
       currentMode = m;
       modeBadge.textContent = m === "hands_free" ? "免唤醒" : "快捷键";
       if (currentState === "idle") {
-        const defaultText = m === "hands_free" ? "随时开口与我畅聊..." : "按住空格说话...";
-        subtitleText.textContent = defaultText;
-        petBubbleText.textContent = defaultText;
+        subtitleText.textContent = m === "hands_free" ? "随时开口与我畅聊..." : "按住空格说话...";
       }
     });
   } else {
