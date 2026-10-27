@@ -2,15 +2,18 @@ package interaction
 
 import (
 	"context"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 
+	"avatar/internal/cloud"
 	"avatar/internal/memory"
 	"avatar/internal/mockvehicle"
 	"avatar/internal/orchestrator"
 	"avatar/internal/persona"
+	"avatar/server"
 )
 
 type testTrackingSynth struct {
@@ -243,5 +246,82 @@ func TestFastPathLocalOnlyAndOfflineHandling(t *testing.T) {
 	}
 	if runner.called {
 		t.Fatal("expected offline turn to be handled by fast-path with offline prompt")
+	}
+}
+
+func TestEdgeCloudCoordination_Interruption(t *testing.T) {
+	// 1. 启动轻量云端实时服务
+	tokenSvc := server.NewTokenService(server.TokenConfig{
+		APIKey:     "testkey",
+		APISecret:  "secretsecretsecret123456789012345",
+		LiveKitURL: "ws://localhost:7880",
+	})
+	cloudSrv := server.NewCloudServer(tokenSvc)
+	ts := httptest.NewServer(cloudSrv.Routes())
+	defer ts.Close()
+
+	// 2. 客户端完成握手进入 Connected 态
+	cloudClient := cloud.NewClient(ts.URL, "user_mac", "mac_client_01", "mac")
+	ctx := context.Background()
+	_, err := cloudClient.AcquireSessionToken(ctx, true)
+	if err != nil {
+		t.Fatalf("failed to acquire cloud session token: %v", err)
+	}
+
+	// 3. 构造 Mac 端主管编排器
+	mockTTS := &testTrackingSynth{}
+	coord := orchestrator.NewCoordinator("edge-cloud-sess")
+	fp := NewFastPathHandler(nil, nil)
+	player := NewSpeechPlayer(mockTTS)
+	runner := &mockTaskRunner{}
+	manager := NewManager(coord, fp, player, runner)
+
+	// 绑定云端实时客户端
+	manager.SetCloudClient(cloudClient)
+
+	// 4. 提交开放式对话回合（开放媒体门禁推流）
+	inputOpen := orchestrator.UserInput{
+		InputType: orchestrator.InputTypeText,
+		Text:      "你能跟我聊聊量子力学吗？",
+		Stability: orchestrator.StabilityFinal,
+	}
+	turnID, err := manager.Submit(ctx, inputOpen)
+	if err != nil {
+		t.Fatalf("Submit error: %v", err)
+	}
+
+	if !runner.called {
+		t.Fatal("expected task runner to be called for open-ended dialog")
+	}
+
+	// 5. 模拟用户突然发声插话 (Barge-in: Swift 原生 VAD 检测到有效能量)
+	coord.SetState(orchestrator.StateSpeaking)
+	err = manager.Interrupt(ctx, coord.SessionID(), turnID)
+	if err != nil {
+		t.Fatalf("Interrupt failed: %v", err)
+	}
+
+	// 验证双重解耦：
+	// 断言 1: 端侧声学层本地播放器立即物理停止 (≤ 80ms)
+	if !mockTTS.stopped {
+		t.Fatal("local speaker must be stopped immediately upon barge-in")
+	}
+
+	// 断言 2: 端侧推流媒体门禁立即重新关闭，停止向云端推流
+	if !cloudClient.IsAudioMuted() {
+		t.Fatal("cloud client audio track must be muted immediately upon barge-in")
+	}
+
+	// 断言 3: 云端实时服务成功接收 turn.interrupt 并记录 cloud_turn_cancelled 事件
+	telemetry := cloudSrv.GetTelemetryEvents()
+	var foundCancelled bool
+	for _, ev := range telemetry {
+		if ev.EventName == "cloud_turn_cancelled" && ev.TurnID == string(turnID) {
+			foundCancelled = true
+			break
+		}
+	}
+	if !foundCancelled {
+		t.Fatalf("cloud server must record cloud_turn_cancelled event for turn %s, events: %+v", turnID, telemetry)
 	}
 }

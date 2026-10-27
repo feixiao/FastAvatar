@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"avatar/internal/cloud"
 	"avatar/internal/orchestrator"
 	"avatar/internal/persona"
 )
@@ -15,6 +16,7 @@ type Manager struct {
 	fastPath      *FastPathHandler
 	player        orchestrator.SpeechOutput
 	runner        orchestrator.TaskRunner
+	cloudClient   *cloud.Client
 	mu            sync.RWMutex
 	onSpeechChunk func(string)
 	onPersonaSync func(persona.PersonaSlot)
@@ -33,6 +35,13 @@ func NewManager(
 		player:   player,
 		runner:   runner,
 	}
+}
+
+// SetCloudClient binds the cloud realtime client for edge-cloud synchronization.
+func (m *Manager) SetCloudClient(client *cloud.Client) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.cloudClient = client
 }
 
 // SetSpeechChunkCallback registers callback for speech playback chunks.
@@ -101,25 +110,48 @@ func (m *Manager) Submit(ctx context.Context, input orchestrator.UserInput) (orc
 		}
 	}
 
-	// 5. 非快路径：交由 TaskRunner 执行
+	// 5. 非快路径：交由云端 / TaskRunner 执行
 	if m.runner == nil {
 		taskCancel()
 		return turn.TurnID, fmt.Errorf("no task runner configured")
 	}
 
+	m.mu.RLock()
+	cloudCli := m.cloudClient
+	m.mu.RUnlock()
+	if cloudCli != nil {
+		_ = cloudCli.StartTurn(string(turn.TurnID))
+	}
+
 	err := m.runner.Run(taskCtx, *task, func(event orchestrator.TaskEvent) {
 		m.coord.DispatchEvent(event)
+		if event.State == orchestrator.TaskStateCompleted || event.State == orchestrator.TaskStateFailed {
+			if cloudCli != nil {
+				cloudCli.FinishTurn(string(turn.TurnID))
+			}
+		}
 	})
 
 	return turn.TurnID, err
 }
 
-// Interrupt terminates ongoing speech and active task.
+// Interrupt terminates ongoing speech, active task, and active cloud turn.
 func (m *Manager) Interrupt(ctx context.Context, sessionID orchestrator.SessionID, turnID orchestrator.TurnID) error {
 	m.coord.CancelActive("user interrupted")
+
+	// 端侧声学层打断：立即物理停止本地发音 (≤ 80ms)
 	if m.player != nil {
 		_ = m.player.Stop(ctx)
 	}
+
+	// 云端协同打断：立即向云端投递取消信令，废弃推流与后续数据
+	m.mu.RLock()
+	cloudCli := m.cloudClient
+	m.mu.RUnlock()
+	if cloudCli != nil {
+		_ = cloudCli.InterruptActiveTurn(ctx, string(turnID), "LOCAL_VAD_BARGE_IN")
+	}
+
 	m.coord.SetState(orchestrator.StateIdle)
 	return nil
 }

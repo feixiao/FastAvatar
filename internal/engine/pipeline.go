@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 
+	"avatar/internal/cloud"
 	"avatar/internal/config"
 	"avatar/internal/interaction"
 	"avatar/internal/llm"
@@ -133,4 +134,9 @@ func (p *Pipeline) Tools() *tools.Registry {
 // FastPath returns the fast path handler.
 func (p *Pipeline) FastPath() *interaction.FastPathHandler {
 	return p.fastPath
+}
+
+// SetCloudClient configures cloud realtime client for edge-cloud synchronization.
+func (p *Pipeline) SetCloudClient(client *cloud.Client) {
+	p.interaction.SetCloudClient(client)
 }
