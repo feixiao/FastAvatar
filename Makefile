@@ -1,4 +1,4 @@
-.PHONY: help run dev build package start test clean asr
+.PHONY: help run dev build package start test test-e2e server clean asr android-test android-build
 
 # 配置变量
 TAGS ?= production
@@ -24,6 +24,12 @@ test: ## 运行所有单元测试
 
 test-e2e: ## 运行端云协同端到端集成对接与打断贯通测试
 	go run ./cmd/e2e-test/main.go
+
+android-test: ## 运行 Android 客户端单元测试
+	cd android && ./gradlew test
+
+android-build: ## 构建 Android 客户端 Debug APK
+	cd android && ./gradlew assembleDebug
 
 server: ## 启动本地轻量云端实时网关服务 (8088 端口)
 	go run ./server/cmd/main.go
