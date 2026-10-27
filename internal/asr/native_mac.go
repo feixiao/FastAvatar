@@ -27,6 +27,7 @@ type NativeMacEngine struct {
 	onFinal   func(string)
 	onVAD     func(bool, float64)
 	onError   func(string)
+	onState   func(string)
 }
 
 // NewNativeMacEngine creates a new macOS native ASR engine instance.
@@ -180,6 +181,14 @@ func (e *NativeMacEngine) readLoop(stdout io.Reader) {
 			if cb != nil {
 				cb(speaking, energy)
 			}
+		case "state":
+			st, _ := payload["state"].(string)
+			e.mu.Lock()
+			cb := e.onState
+			e.mu.Unlock()
+			if cb != nil && st != "" {
+				cb(st)
+			}
 		case "error":
 			msg, _ := payload["message"].(string)
 			e.mu.Lock()
@@ -284,4 +293,10 @@ func (e *NativeMacEngine) SetCallbacks(
 	e.onFinal = onFinal
 	e.onVAD = onVAD
 	e.onError = onError
+}
+
+func (e *NativeMacEngine) SetStateCallback(onState func(string)) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.onState = onState
 }

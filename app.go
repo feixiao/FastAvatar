@@ -168,6 +168,11 @@ func (a *App) startup(ctx context.Context) {
 			fmt.Printf("[ASR 异常] %s\n", errMsg)
 			a.emitEvent("avatar:error", errMsg)
 		})
+		a.asrEngine.SetStateCallback(func(s string) {
+			if a.pipeline.State() == engine.StateListening || a.pipeline.State() == engine.StateIdle {
+				a.emitEvent("avatar:state", s)
+			}
+		})
 
 		go func() {
 			if err := a.asrEngine.Start(ctx); err != nil {

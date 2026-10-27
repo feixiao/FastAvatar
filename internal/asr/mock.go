@@ -15,6 +15,7 @@ type MockEngine struct {
 	onFinal   func(string)
 	onVAD     func(bool, float64)
 	onError   func(string)
+	onState   func(string)
 }
 
 func NewMockEngine() *MockEngine {
@@ -71,6 +72,12 @@ func (m *MockEngine) SetCallbacks(
 	m.onFinal = onFinal
 	m.onVAD = onVAD
 	m.onError = onError
+}
+
+func (m *MockEngine) SetStateCallback(onState func(string)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.onState = onState
 }
 
 // SimulateSpeech triggers callbacks as if the user spoke.

@@ -741,7 +741,7 @@ textInput.addEventListener("keydown", (e) => {
 // ==================== 11. 按住空格说话 (PTT 快捷键交互) ====================
 
 let isSpaceHeld = false;
-
+let pttWatchdogTimer = null;
 function initPTTKeyboard() {
   window.addEventListener("keydown", (e) => {
     const active = document.activeElement;
@@ -774,6 +774,15 @@ function initPTTKeyboard() {
       }
       subtitleText.textContent = "正在识别并组织回答...";
       petBubbleText.textContent = "💭 正在识别...";
+
+      clearTimeout(pttWatchdogTimer);
+      pttWatchdogTimer = setTimeout(() => {
+        if (petBubbleText.textContent.includes("正在识别")) {
+          petBubbleText.textContent = "👂 刚才好像没听清，请按住空格再说一次哦~";
+          subtitleText.textContent = "按住空格说话...";
+          applyState("idle");
+        }
+      }, 3000);
     }
   });
 }
@@ -781,7 +790,10 @@ function initPTTKeyboard() {
 // ==================== 12. Wails 后端事件广播绑定 ====================
 
 if (window.runtime) {
-  window.runtime.EventsOn("avatar:state", (s) => applyState(s));
+  window.runtime.EventsOn("avatar:state", (s) => {
+    clearTimeout(pttWatchdogTimer);
+    applyState(s);
+  });
   window.runtime.EventsOn("avatar:speech_partial", (text) => {
     resetSleepTimer();
     subtitleText.textContent = "正在听: " + text;
@@ -789,6 +801,7 @@ if (window.runtime) {
     applyState("listening");
   });
   window.runtime.EventsOn("avatar:speech_final", (text) => {
+    clearTimeout(pttWatchdogTimer);
     resetSleepTimer();
     subtitleText.textContent = "你说: " + text;
     petBubbleText.textContent = "你说: " + text;

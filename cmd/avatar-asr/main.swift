@@ -123,8 +123,11 @@ class SpeechManager: NSObject {
                 }
 
                 if result.isFinal {
-                    if !text.isEmpty {
-                        self.sendJSON(["event": "final", "text": text])
+                    let finalText = !text.isEmpty ? text : self.lastText
+                    if !finalText.isEmpty {
+                        self.sendJSON(["event": "final", "text": finalText])
+                    } else {
+                        self.sendJSON(["event": "state", "state": "idle"])
                     }
                     self.lastText = ""
                     self.hasSpeech = false
@@ -138,18 +141,22 @@ class SpeechManager: NSObject {
             }
 
             if let error = error as NSError? {
-                // Code 203 (silence/timeout) or 216 (cancelled) are expected flow terminations
-                if (error.code == 203 || error.code == 216) && self.mode == "hands_free" && self.isListening {
-                    if !self.lastText.isEmpty && !self.isFinalizing {
-                        self.sendJSON(["event": "final", "text": self.lastText])
-                        self.lastText = ""
-                    }
+                if !self.lastText.isEmpty {
+                    self.sendJSON(["event": "final", "text": self.lastText])
+                    self.lastText = ""
+                } else {
+                    self.sendJSON(["event": "state", "state": "idle"])
+                }
+                self.hasSpeech = false
+                self.isFinalizing = false
+
+                if self.mode == "hands_free" && self.isListening {
                     DispatchQueue.main.async {
                         self.startRecognitionSession()
                     }
                 }
             }
-        }
+    }
     }
 
     private func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {
@@ -231,6 +238,19 @@ class SpeechManager: NSObject {
     func pttStop() {
         isPttActive = false
         recognitionRequest?.endAudio()
+
+        // Watchdog: ensure UI and pipeline resume if no speech was detected
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            guard let self = self else { return }
+            if self.mode == "ptt" {
+                if !self.lastText.isEmpty {
+                    self.sendJSON(["event": "final", "text": self.lastText])
+                    self.lastText = ""
+                } else {
+                    self.sendJSON(["event": "state", "state": "idle"])
+                }
+            }
+        }
     }
 
     func setAvatarSpeaking(_ speaking: Bool) {

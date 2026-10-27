@@ -29,4 +29,7 @@ type Engine interface {
 		onVAD func(speaking bool, energy float64),
 		onError func(err string),
 	)
+
+	// SetStateCallback registers handler for engine state changes (e.g. "idle", "listening").
+	SetStateCallback(onState func(state string))
 }
