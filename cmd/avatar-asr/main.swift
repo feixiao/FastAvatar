@@ -23,9 +23,10 @@ class SpeechManager: NSObject {
     private let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
     private var audioConverter: AVAudioConverter?
 
-    init(localeId: String = "zh-CN") {
+    init(localeId: String = "zh-CN", mode: String = "hands_free") {
         super.init()
         self.localeId = localeId
+        self.mode = mode
         setupRecognizer(localeId: localeId)
     }
 
@@ -61,7 +62,7 @@ class SpeechManager: NSObject {
                 "locale": localeId,
                 "on_device": speechRecognizer?.supportsOnDeviceRecognition ?? false
             ])
-            sendJSON(["event": "state", "state": "listening"])
+            sendJSON(["event": "state", "state": mode == "hands_free" ? "listening" : "idle"])
         } catch {
             fputs("[avatar-asr] Failed to start audio engine: \(error.localizedDescription)\n", stderr)
             sendJSON(["event": "error", "message": "Failed to start audio engine: \(error.localizedDescription)"])
@@ -288,14 +289,18 @@ class SpeechManager: NSObject {
 // ==================== CLI Entry Point ====================
 
 var selectedLocale = "zh-CN"
+var selectedMode = "hands_free"
 let args = CommandLine.arguments
 for i in 0..<args.count {
     if args[i] == "--locale" && i + 1 < args.count {
         selectedLocale = args[i + 1]
     }
+    if args[i] == "--mode" && i + 1 < args.count {
+        selectedMode = args[i + 1]
+    }
 }
 
-let manager = SpeechManager(localeId: selectedLocale)
+let manager = SpeechManager(localeId: selectedLocale, mode: selectedMode)
 
 // Read commands from stdin line-by-line
 DispatchQueue.global(qos: .userInteractive).async {

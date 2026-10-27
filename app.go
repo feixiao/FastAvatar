@@ -252,6 +252,13 @@ func (a *App) GetState() string {
 	return string(a.pipeline.State())
 }
 
+// GetMode 获取当前交互模式 ("hands_free" 或 "ptt")
+func (a *App) GetMode() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return string(a.cfg.Mode)
+}
+
 // ToggleMode 切换连续畅聊与快捷键触发模式
 func (a *App) ToggleMode() string {
 	a.mu.Lock()

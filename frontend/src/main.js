@@ -862,6 +862,15 @@ window.addEventListener("DOMContentLoaded", () => {
   if (window.go && window.go.main && window.go.main.App) {
     window.go.main.App.GetDisplayForm().then((form) => applyDisplayForm(form));
     window.go.main.App.GetPetSkin().then((skin) => applySkin(skin));
+    window.go.main.App.GetMode().then((m) => {
+      currentMode = m;
+      modeBadge.textContent = m === "hands_free" ? "免唤醒" : "快捷键";
+      if (currentState === "idle") {
+        const defaultText = m === "hands_free" ? "随时开口与我畅聊..." : "按住空格说话...";
+        subtitleText.textContent = defaultText;
+        petBubbleText.textContent = defaultText;
+      }
+    });
   } else {
     applyDisplayForm("pet");
     applySkin("cat");

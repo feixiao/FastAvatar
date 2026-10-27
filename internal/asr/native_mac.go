@@ -105,7 +105,7 @@ func (e *NativeMacEngine) Start(ctx context.Context) error {
 		return err
 	}
 
-	cmd := exec.CommandContext(ctx, bin, "--locale", e.locale)
+	cmd := exec.CommandContext(ctx, bin, "--locale", e.locale, "--mode", e.mode)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		e.mu.Unlock()
@@ -129,9 +129,6 @@ func (e *NativeMacEngine) Start(ctx context.Context) error {
 	e.stdin = stdin
 	e.running = true
 	e.mu.Unlock()
-
-	// Initial mode configuration
-	_ = e.SetMode(e.mode)
 
 	// Background reader for stdout JSON stream
 	go e.readLoop(stdout)
