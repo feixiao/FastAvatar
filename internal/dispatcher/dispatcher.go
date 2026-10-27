@@ -48,14 +48,6 @@ func (d *FastDispatcher) Evaluate(text string, isCloudConsented bool, isOnline b
 		Confidence:  1.0,
 	}
 
-	// P0/P1: Check local persona switch oral command
-	if isPersonaSwitchCommand(clean) {
-		res.Target = RouteLocalPersona
-		res.IntentName = "persona.switch"
-		res.Latency = time.Since(start)
-		return res
-	}
-
 	// P1: Check local memory oral command
 	if isMemoryCommand(clean) {
 		res.Target = RouteLocalMemory
@@ -64,7 +56,7 @@ func (d *FastDispatcher) Evaluate(text string, isCloudConsented bool, isOnline b
 		return res
 	}
 
-	// P2: Check mock vehicle intent
+	// P2: Check mock vehicle intent (空调 / 车窗 / 驾驶模式等设备控制)
 	if intent, slots, matched := mockvehicle.ParseIntentFromText(clean); matched {
 		res.Target = RouteMockVehicle
 		res.IntentName = intent
@@ -73,7 +65,15 @@ func (d *FastDispatcher) Evaluate(text string, isCloudConsented bool, isOnline b
 		return res
 	}
 
-	// P3: Open-ended conversational query (Cloud candidate)
+	// P3: Check local persona switch oral command
+	if isPersonaSwitchCommand(clean) {
+		res.Target = RouteLocalPersona
+		res.IntentName = "persona.switch"
+		res.Latency = time.Since(start)
+		return res
+	}
+
+	// P4: Open-ended conversational query (Cloud candidate)
 	res.IntentName = "dialog.open_ended"
 
 	if !isCloudConsented {
@@ -94,6 +94,9 @@ func (d *FastDispatcher) Evaluate(text string, isCloudConsented bool, isOnline b
 }
 
 func isPersonaSwitchCommand(text string) bool {
+	if strings.Contains(text, "驾驶") || strings.Contains(text, "漂移") || strings.Contains(text, "赛道") || strings.Contains(text, "省油") {
+		return false
+	}
 	return strings.HasPrefix(text, "切换成") ||
 		strings.HasPrefix(text, "切换为") ||
 		strings.HasPrefix(text, "变成") ||

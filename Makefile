@@ -22,6 +22,12 @@ dev: run ## run 的别名
 test: ## 运行所有单元测试
 	go test -v ./...
 
+test-e2e: ## 运行端云协同端到端集成对接与打断贯通测试
+	go run ./cmd/e2e-test/main.go
+
+server: ## 启动本地轻量云端实时网关服务 (8088 端口)
+	go run ./server/cmd/main.go
+
 build: asr ## 编译可执行二进制文件
 	@mkdir -p build/bin
 	go build -tags $(TAGS) -ldflags="$(LDFLAGS)" -o build/bin/Avatar .
