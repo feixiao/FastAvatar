@@ -68,3 +68,26 @@ func TestAppVoiceIntegration(t *testing.T) {
 	defer cancel()
 	app.shutdown(ctx)
 }
+
+func TestLiveLLMConversation(t *testing.T) {
+	app := NewApp()
+	var spoken []string
+	app.pipeline.SetCallbacks(func(s engine.State) {
+		t.Logf("State -> %s", s)
+	}, func(speech string) {
+		t.Logf("Speech -> %s", speech)
+		spoken = append(spoken, speech)
+	}, nil, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	err := app.pipeline.Chat(ctx, "你好，请回答一句话：你是谁？")
+	if err != nil {
+		t.Fatalf("Live Chat error: %v", err)
+	}
+	t.Logf("Spoken count: %d, chunks: %v", len(spoken), spoken)
+	if len(spoken) == 0 {
+		t.Fatal("expected at least one speech chunk")
+	}
+}

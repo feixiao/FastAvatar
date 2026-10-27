@@ -120,11 +120,13 @@ func (a *App) startup(ctx context.Context) {
 
 	// 注册 Pipeline 事件广播
 	a.pipeline.SetCallbacks(func(s engine.State) {
+		fmt.Printf("[状态流转] -> %s\n", s)
 		if a.asrEngine != nil {
 			_ = a.asrEngine.SetSpeaking(s == engine.StateSpeaking)
 		}
 		a.emitEvent("avatar:state", string(s))
 	}, func(speech string) {
+		fmt.Printf("[伴侣播报] %s\n", speech)
 		a.emitEvent("avatar:speech", speech)
 	}, func(slot persona.PersonaSlot) {
 		a.emitEvent("avatar:persona", slot)
@@ -135,17 +137,20 @@ func (a *App) startup(ctx context.Context) {
 	// 注册 ASR 语音识别回调并异步启动
 	if a.asrEngine != nil {
 		a.asrEngine.SetCallbacks(func(partial string) {
+			fmt.Printf("[正在倾听] %s\n", partial)
 			if a.pipeline.State() == engine.StateSpeaking {
 				a.pipeline.Interrupt()
 			}
 			a.emitEvent("avatar:speech_partial", partial)
 			a.emitEvent("avatar:state", "listening")
 		}, func(final string) {
+			fmt.Printf("[听到输入] %s\n", final)
 			a.emitEvent("avatar:speech_final", final)
 			a.emitEvent("avatar:state", "thinking")
 			go func() {
 				err := a.pipeline.Chat(context.Background(), final)
 				if err != nil {
+					fmt.Printf("[对聊失败] %v\n", err)
 					a.emitEvent("avatar:error", fmt.Sprintf("Chat error: %v", err))
 				}
 			}()
@@ -160,6 +165,7 @@ func (a *App) startup(ctx context.Context) {
 				}
 			}
 		}, func(errMsg string) {
+			fmt.Printf("[ASR 异常] %s\n", errMsg)
 			a.emitEvent("avatar:error", errMsg)
 		})
 

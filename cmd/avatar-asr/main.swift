@@ -18,6 +18,8 @@ class SpeechManager: NSObject {
     private var isFinalizing: Bool = false
     private var isListening: Bool = false
     private var isPttActive: Bool = false
+    private let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
+    private var audioConverter: AVAudioConverter?
     private var tapInstalled: Bool = false
     init(localeId: String = "zh-CN") {
         super.init()
@@ -40,10 +42,11 @@ class SpeechManager: NSObject {
         } catch {
             // Some virtual devices may not support voice processing, continue gracefully
         }
+        let inputFormat = inputNode.outputFormat(forBus: 0)
+        audioConverter = AVAudioConverter(from: inputFormat, to: targetFormat)
 
         if !tapInstalled {
-            let format = inputNode.outputFormat(forBus: 0)
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, time in
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, time in
                 self?.processAudioBuffer(buffer)
             }
             tapInstalled = true
@@ -160,15 +163,36 @@ class SpeechManager: NSObject {
             sum += s * s
         }
         let rms = sqrt(sum / Float(frames))
-
-        // Feed audio buffer while listening and not currently finalizing
-        if (mode == "hands_free" && isListening && !isFinalizing) || (mode == "ptt" && isPttActive) {
-            recognitionRequest?.append(buffer)
-        }
-
-        // Report energy for UI soundwave/pet animations
         if rms > 0.0005 {
             sendJSON(["event": "vad", "speaking": hasSpeech, "energy": rms])
+        }
+
+        // Convert hardware input buffer (e.g. 9ch / 3ch) to 16kHz mono buffer
+        let inputFormat = buffer.format
+        let ratio = 16000.0 / inputFormat.sampleRate
+        let cap = AVAudioFrameCount(Double(buffer.frameLength) * ratio)
+        if let outBuffer = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: max(cap, 1024)),
+           let converter = audioConverter {
+            var consumed = false
+            var error: NSError?
+            let status = converter.convert(to: outBuffer, error: &error) { _, outStatus in
+                if consumed {
+                    outStatus.pointee = .noDataNow
+                    return nil
+                }
+                consumed = true
+                outStatus.pointee = .haveData
+                return buffer
+            }
+            if status != .error && outBuffer.frameLength > 0 {
+                if (mode == "hands_free" && isListening && !isFinalizing) || (mode == "ptt" && isPttActive) {
+                    recognitionRequest?.append(outBuffer)
+                }
+            }
+        } else {
+            if (mode == "hands_free" && isListening && !isFinalizing) || (mode == "ptt" && isPttActive) {
+                recognitionRequest?.append(buffer)
+            }
         }
 
         let now = Date()
@@ -176,7 +200,7 @@ class SpeechManager: NSObject {
         // Hands-free utterance finalization based on recognizer transcription silence
         if mode == "hands_free" && hasSpeech && !lastText.isEmpty && !isFinalizing {
             let silenceDuration = now.timeIntervalSince(lastTranscriptionTime)
-            if silenceDuration >= 0.75 { // 750ms of silence after transcription
+            if silenceDuration >= 0.70 { // 700ms of silence after transcription
                 isFinalizing = true
                 hasSpeech = false
                 DispatchQueue.main.async {

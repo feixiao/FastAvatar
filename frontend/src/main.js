@@ -235,12 +235,15 @@ function applyState(state) {
   petStatusDot.style.boxShadow = `0 0 8px ${color}`;
 
   if (state === "idle") {
-    const defaultText =
-      currentMode === "hands_free"
-        ? "随时开口或摸摸我畅聊..."
-        : "按住空格说话...";
-    subtitleText.textContent = defaultText;
-    petBubbleText.textContent = defaultText;
+    const cur = petBubbleText.textContent || "";
+    if (!cur || cur.startsWith("👂") || cur.startsWith("💭") || cur.startsWith("正在思考")) {
+      const defaultText =
+        currentMode === "hands_free"
+          ? "随时开口或摸摸我畅聊..."
+          : "按住空格说话...";
+      subtitleText.textContent = defaultText;
+      petBubbleText.textContent = defaultText;
+    }
   } else if (state === "thinking") {
     subtitleText.textContent = "正在思考并组织回答...";
     petBubbleText.textContent = "💭 思考中，请稍候片刻...";
