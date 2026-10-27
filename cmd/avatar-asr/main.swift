@@ -18,9 +18,11 @@ class SpeechManager: NSObject {
     private var isFinalizing: Bool = false
     private var isListening: Bool = false
     private var isPttActive: Bool = false
+    private var tapInstalled: Bool = false
+
     private let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
     private var audioConverter: AVAudioConverter?
-    private var tapInstalled: Bool = false
+
     init(localeId: String = "zh-CN") {
         super.init()
         self.localeId = localeId
@@ -37,11 +39,6 @@ class SpeechManager: NSObject {
         guard !isListening else { return }
 
         let inputNode = audioEngine.inputNode
-        do {
-            try inputNode.setVoiceProcessingEnabled(true)
-        } catch {
-            // Some virtual devices may not support voice processing, continue gracefully
-        }
         let inputFormat = inputNode.outputFormat(forBus: 0)
         audioConverter = AVAudioConverter(from: inputFormat, to: targetFormat)
 
@@ -58,6 +55,7 @@ class SpeechManager: NSObject {
             if mode == "hands_free" {
                 startRecognitionSession()
             }
+            fputs("[avatar-asr] Audio engine started. Format: \(inputFormat)\n", stderr)
             sendJSON([
                 "event": "ready",
                 "locale": localeId,
@@ -65,6 +63,7 @@ class SpeechManager: NSObject {
             ])
             sendJSON(["event": "state", "state": "listening"])
         } catch {
+            fputs("[avatar-asr] Failed to start audio engine: \(error.localizedDescription)\n", stderr)
             sendJSON(["event": "error", "message": "Failed to start audio engine: \(error.localizedDescription)"])
         }
     }
@@ -102,6 +101,7 @@ class SpeechManager: NSObject {
         self.recognitionRequest = request
 
         guard let recognizer = speechRecognizer, recognizer.isAvailable else {
+            fputs("[avatar-asr] Speech recognizer unavailable for \(localeId)\n", stderr)
             sendJSON(["event": "error", "message": "Speech recognizer unavailable for locale \(localeId)"])
             return
         }
@@ -125,6 +125,7 @@ class SpeechManager: NSObject {
                 if result.isFinal {
                     let finalText = !text.isEmpty ? text : self.lastText
                     if !finalText.isEmpty {
+                        fputs("[avatar-asr] Finalized: \(finalText)\n", stderr)
                         self.sendJSON(["event": "final", "text": finalText])
                     } else {
                         self.sendJSON(["event": "state", "state": "idle"])
@@ -140,11 +141,12 @@ class SpeechManager: NSObject {
                 }
             }
 
-            if let error = error as NSError? {
-                if !self.lastText.isEmpty {
+            if let err = error as NSError? {
+                if !self.lastText.isEmpty && !self.isFinalizing {
+                    fputs("[avatar-asr] Finalized on task end: \(self.lastText)\n", stderr)
                     self.sendJSON(["event": "final", "text": self.lastText])
                     self.lastText = ""
-                } else {
+                } else if self.mode == "ptt" {
                     self.sendJSON(["event": "state", "state": "idle"])
                 }
                 self.hasSpeech = false
@@ -156,7 +158,7 @@ class SpeechManager: NSObject {
                     }
                 }
             }
-    }
+        }
     }
 
     private func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {
@@ -164,6 +166,7 @@ class SpeechManager: NSObject {
         let frames = Int(buffer.frameLength)
         if frames <= 0 { return }
 
+        // 1. Calculate RMS energy
         var sum: Float = 0
         for i in 0..<frames {
             let s = channelData[i]
@@ -174,7 +177,15 @@ class SpeechManager: NSObject {
             sendJSON(["event": "vad", "speaking": hasSpeech, "energy": rms])
         }
 
-        // Convert hardware input buffer (e.g. 9ch / 3ch) to 16kHz mono buffer
+        // 2. Software echo cancellation: if avatar is speaking, ignore mic unless loud barge-in
+        if isAvatarSpeaking {
+            if rms > 0.035 {
+                sendJSON(["event": "barge_in", "text": ""])
+            }
+            return
+        }
+
+        // 3. Convert input buffer to 16kHz mono buffer
         let inputFormat = buffer.format
         let ratio = 16000.0 / inputFormat.sampleRate
         let cap = AVAudioFrameCount(Double(buffer.frameLength) * ratio)
@@ -204,10 +215,10 @@ class SpeechManager: NSObject {
 
         let now = Date()
 
-        // Hands-free utterance finalization based on recognizer transcription silence
+        // 4. Hands-free utterance finalization on 750ms silence after speech
         if mode == "hands_free" && hasSpeech && !lastText.isEmpty && !isFinalizing {
             let silenceDuration = now.timeIntervalSince(lastTranscriptionTime)
-            if silenceDuration >= 0.70 { // 700ms of silence after transcription
+            if silenceDuration >= 0.75 {
                 isFinalizing = true
                 hasSpeech = false
                 DispatchQueue.main.async {
@@ -216,7 +227,7 @@ class SpeechManager: NSObject {
             }
         }
 
-        // Refresh recognition session periodically if idle for > 25s to avoid Apple 60s timeout
+        // 5. Periodic session keep-alive to avoid 60s timeout
         if mode == "hands_free" && !hasSpeech && !isFinalizing && now.timeIntervalSince(sessionStartTime) > 25.0 {
             sessionStartTime = now
             DispatchQueue.main.async {
@@ -239,7 +250,7 @@ class SpeechManager: NSObject {
         isPttActive = false
         recognitionRequest?.endAudio()
 
-        // Watchdog: ensure UI and pipeline resume if no speech was detected
+        // Watchdog: finalize within 600ms if isFinal/error didn't fire
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
             guard let self = self else { return }
             if self.mode == "ptt" {
