@@ -8,6 +8,7 @@ import (
 	"avatar/internal/asr"
 	"avatar/internal/config"
 	"avatar/internal/engine"
+	"avatar/internal/llm"
 	"avatar/internal/memory"
 	"avatar/internal/persona"
 	"avatar/internal/tts"
@@ -71,6 +72,14 @@ func TestAppVoiceIntegration(t *testing.T) {
 
 func TestLiveLLMConversation(t *testing.T) {
 	app := NewApp()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	if !llm.ProbeEndpoint(ctx, app.cfg.LLM.BaseURL, app.cfg.LLM.APIKey) {
+		t.Skipf("skipping live test, no active LLM endpoint found at %s", app.cfg.LLM.BaseURL)
+	}
+
 	var spoken []string
 	app.pipeline.SetCallbacks(func(s engine.State) {
 		t.Logf("State -> %s", s)
@@ -79,9 +88,6 @@ func TestLiveLLMConversation(t *testing.T) {
 		spoken = append(spoken, speech)
 	}, nil, nil)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
 	err := app.pipeline.Chat(ctx, "你好，请回答一句话：你是谁？")
 	if err != nil {
 		t.Fatalf("Live Chat error: %v", err)
@@ -89,5 +95,29 @@ func TestLiveLLMConversation(t *testing.T) {
 	t.Logf("Spoken count: %d, chunks: %v", len(spoken), spoken)
 	if len(spoken) == 0 {
 		t.Fatal("expected at least one speech chunk")
+	}
+}
+
+func TestApp_FastPathMockVehicleWorksWithoutLLM(t *testing.T) {
+	app := NewApp()
+	var spoken []string
+	app.pipeline.SetCallbacks(nil, func(speech string) {
+		spoken = append(spoken, speech)
+	}, nil, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// 车控快环不需要任何运行中的 LLM 服务，100% 本地完成
+	err := app.pipeline.Chat(ctx, "把空调调到24度")
+	if err != nil {
+		t.Fatalf("fast-path vehicle command failed: %v", err)
+	}
+
+	if len(spoken) == 0 {
+		t.Fatal("expected spoken confirmation for mock vehicle")
+	}
+	if app.pipeline.State() != engine.StateIdle {
+		t.Fatalf("expected state idle, got %s", app.pipeline.State())
 	}
 }

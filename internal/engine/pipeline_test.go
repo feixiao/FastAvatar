@@ -73,4 +73,17 @@ func TestPipelineChatAndInterrupt(t *testing.T) {
 	if len(mockTTS.Spoken) == 0 || personaMgr.GetActiveSlot().ID != "jarvis" {
 		t.Fatalf("expected persona switch spoken confirmation and active jarvis, got %v", personaMgr.GetActiveSlot())
 	}
+
+	// 测试端侧快环（Mock 车控）
+	mockTTS.Spoken = nil
+	err = pipeline.Chat(ctx, "把空调调到24度")
+	if err != nil {
+		t.Fatalf("mock vehicle chat error: %v", err)
+	}
+	if len(mockTTS.Spoken) == 0 {
+		t.Fatal("expected mock vehicle spoken confirmation")
+	}
+	if pipeline.State() != StateIdle {
+		t.Fatalf("expected state Idle after mock vehicle, got %s", pipeline.State())
+	}
 }

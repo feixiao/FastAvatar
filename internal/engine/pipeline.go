@@ -28,6 +28,7 @@ const (
 type Pipeline struct {
 	coordinator *orchestrator.Coordinator
 	interaction *interaction.Manager
+	fastPath    *interaction.FastPathHandler
 	taskRunner  *task.Runner
 	toolsReg    *tools.Registry
 }
@@ -60,6 +61,7 @@ func NewPipeline(
 	return &Pipeline{
 		coordinator: coord,
 		interaction: interactionMgr,
+		fastPath:    fastPath,
 		taskRunner:  taskRunner,
 		toolsReg:    toolsReg,
 	}
@@ -126,4 +128,9 @@ func (p *Pipeline) TaskRunner() *task.Runner {
 // Tools returns the tool registry.
 func (p *Pipeline) Tools() *tools.Registry {
 	return p.toolsReg
+}
+
+// FastPath returns the fast path handler.
+func (p *Pipeline) FastPath() *interaction.FastPathHandler {
+	return p.fastPath
 }
