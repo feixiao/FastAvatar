@@ -11,13 +11,14 @@ class SpeechManager: NSObject {
     private var localeId: String = "zh-CN"
     private var mode: String = "hands_free" // "hands_free" | "ptt"
     private var isAvatarSpeaking: Bool = false
-    private var isUserSpeaking: Bool = false
-    private var lastVoiceTime: Date = Date()
+    private var sessionStartTime: Date = Date()
+    private var lastTranscriptionTime: Date = Date.distantPast
     private var lastText: String = ""
+    private var hasSpeech: Bool = false
+    private var isFinalizing: Bool = false
     private var isListening: Bool = false
     private var isPttActive: Bool = false
     private var tapInstalled: Bool = false
-
     init(localeId: String = "zh-CN") {
         super.init()
         self.localeId = localeId
@@ -84,8 +85,11 @@ class SpeechManager: NSObject {
         recognitionTask?.cancel()
         recognitionTask = nil
         recognitionRequest = nil
+        sessionStartTime = Date()
+        lastTranscriptionTime = Date.distantPast
         lastText = ""
-        isUserSpeaking = false
+        hasSpeech = false
+        isFinalizing = false
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
@@ -106,7 +110,8 @@ class SpeechManager: NSObject {
                 let text = result.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !text.isEmpty {
                     self.lastText = text
-                    self.lastVoiceTime = Date()
+                    self.lastTranscriptionTime = Date()
+                    self.hasSpeech = true
 
                     if self.isAvatarSpeaking {
                         self.sendJSON(["event": "barge_in", "text": text])
@@ -119,6 +124,8 @@ class SpeechManager: NSObject {
                         self.sendJSON(["event": "final", "text": text])
                     }
                     self.lastText = ""
+                    self.hasSpeech = false
+                    self.isFinalizing = false
                     if self.mode == "hands_free" && self.isListening {
                         DispatchQueue.main.async {
                             self.startRecognitionSession()
@@ -128,9 +135,9 @@ class SpeechManager: NSObject {
             }
 
             if let error = error as NSError? {
-                // Code 203 (silence/retry limit reached) or 216 (cancelled) are expected flow terminations
-                if error.code == 203 && self.mode == "hands_free" && self.isListening {
-                    if !self.lastText.isEmpty {
+                // Code 203 (silence/timeout) or 216 (cancelled) are expected flow terminations
+                if (error.code == 203 || error.code == 216) && self.mode == "hands_free" && self.isListening {
+                    if !self.lastText.isEmpty && !self.isFinalizing {
                         self.sendJSON(["event": "final", "text": self.lastText])
                         self.lastText = ""
                     }
@@ -154,35 +161,35 @@ class SpeechManager: NSObject {
         }
         let rms = sqrt(sum / Float(frames))
 
-        // Only feed buffer if we are currently recording (hands-free or active PTT)
-        if (mode == "hands_free" && isListening) || (mode == "ptt" && isPttActive) {
+        // Feed audio buffer while listening and not currently finalizing
+        if (mode == "hands_free" && isListening && !isFinalizing) || (mode == "ptt" && isPttActive) {
             recognitionRequest?.append(buffer)
         }
 
-        let threshold: Float = isAvatarSpeaking ? 0.035 : 0.015
+        // Report energy for UI soundwave/pet animations
+        if rms > 0.0005 {
+            sendJSON(["event": "vad", "speaking": hasSpeech, "energy": rms])
+        }
+
         let now = Date()
 
-        if rms >= threshold {
-            lastVoiceTime = now
-            if !isUserSpeaking {
-                isUserSpeaking = true
-                sendJSON(["event": "vad", "speaking": true, "energy": rms])
-            }
-        } else {
-            if isUserSpeaking && mode == "hands_free" {
-                let silenceDuration = now.timeIntervalSince(lastVoiceTime)
-                if silenceDuration > 0.75 {
-                    isUserSpeaking = false
-                    sendJSON(["event": "vad", "speaking": false, "energy": rms])
-
-                    if !lastText.isEmpty {
-                        recognitionRequest?.endAudio()
-                    } else {
-                        DispatchQueue.main.async {
-                            self.startRecognitionSession()
-                        }
-                    }
+        // Hands-free utterance finalization based on recognizer transcription silence
+        if mode == "hands_free" && hasSpeech && !lastText.isEmpty && !isFinalizing {
+            let silenceDuration = now.timeIntervalSince(lastTranscriptionTime)
+            if silenceDuration >= 0.75 { // 750ms of silence after transcription
+                isFinalizing = true
+                hasSpeech = false
+                DispatchQueue.main.async {
+                    self.recognitionRequest?.endAudio()
                 }
+            }
+        }
+
+        // Refresh recognition session periodically if idle for > 25s to avoid Apple 60s timeout
+        if mode == "hands_free" && !hasSpeech && !isFinalizing && now.timeIntervalSince(sessionStartTime) > 25.0 {
+            sessionStartTime = now
+            DispatchQueue.main.async {
+                self.startRecognitionSession()
             }
         }
     }

@@ -42,6 +42,20 @@ func (a *App) emitEvent(eventName string, data ...interface{}) {
 // NewApp creates a new App application struct
 func NewApp() *App {
 	cfg := config.LoadConfig()
+	// 自动探测本地大模型端点（若配置的端点离线）
+	ctxProbe, cancelProbe := context.WithTimeout(context.Background(), 1*time.Second)
+	if !llm.ProbeEndpoint(ctxProbe, cfg.LLM.BaseURL, cfg.LLM.APIKey) {
+		if detectedURL, detectedModel, ok := llm.AutoDetectEndpoint(ctxProbe); ok {
+			fmt.Printf("自动检测到本地大模型运行于 %s (模型: %s)，已自动接入\n", detectedURL, detectedModel)
+			cfg.LLM.BaseURL = detectedURL
+			if detectedModel != "" {
+				cfg.LLM.Model = detectedModel
+			}
+			_ = config.SaveConfig(cfg)
+		}
+	}
+	cancelProbe()
+
 	sidecarMgr := sidecar.NewLlamaManager(cfg.LlamaServer, cfg.LocalGGUF, cfg.SidecarPort)
 
 	// 初始化记忆、人格与羁绊管理器
@@ -178,6 +192,16 @@ func (a *App) startup(ctx context.Context) {
 	} else {
 		runtime.WindowSetSize(a.ctx, 260, 320)
 	}
+
+	// 异步检测 LLM 服务连通性并提示
+	go func() {
+		time.Sleep(600 * time.Millisecond)
+		ctxTest, cancelTest := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancelTest()
+		if !llm.ProbeEndpoint(ctxTest, a.cfg.LLM.BaseURL, a.cfg.LLM.APIKey) {
+			a.emitEvent("avatar:error", fmt.Sprintf("大模型未连接 (%s)。请启动 LM Studio 或 Ollama。", a.cfg.LLM.BaseURL))
+		}
+	}()
 }
 
 // shutdown is called when the app terminates

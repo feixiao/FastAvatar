@@ -65,3 +65,26 @@ func TestStreamChat(t *testing.T) {
 		t.Fatalf("expected '你好呀！', got '%s'", received)
 	}
 }
+
+func TestAutoDetectEndpoint(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/models" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":[{"id":"mock-qwen-model"}]}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	model, err := FetchFirstModel(ctx, ts.URL, "")
+	if err != nil {
+		t.Fatalf("FetchFirstModel failed: %v", err)
+	}
+	if model != "mock-qwen-model" {
+		t.Fatalf("expected 'mock-qwen-model', got '%s'", model)
+	}
+}
