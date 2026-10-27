@@ -25,5 +25,7 @@
         <string>{{.Info.Copyright}}</string>
         <key>NSMicrophoneUsageDescription</key>
         <string>Avatar 需要使用麦克风进行实时语音交互</string>
+        <key>NSSpeechRecognitionUsageDescription</key>
+        <string>Avatar 需要使用语音识别进行实时对话</string>
     </dict>
 </plist>

@@ -15,6 +15,11 @@ mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}"
 echo "1. Compiling Go binary..."
 go build -tags production -ldflags="-w -s" -o "${MACOS_DIR}/${APP_NAME}" .
 
+echo "1b. Compiling native avatar-asr helper..."
+mkdir -p bin
+swiftc -O -framework Speech -framework AVFoundation cmd/avatar-asr/main.swift -o bin/avatar-asr
+cp "bin/avatar-asr" "${MACOS_DIR}/avatar-asr"
+
 echo "2. Generating Info.plist..."
 sed \
   -e "s/{{.Info.ProductName}}/${APP_NAME}/g" \

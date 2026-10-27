@@ -6,12 +6,14 @@ import (
 	"sync"
 	"time"
 
+	"avatar/internal/asr"
 	"avatar/internal/config"
 	"avatar/internal/engine"
 	"avatar/internal/llm"
 	"avatar/internal/memory"
 	"avatar/internal/persona"
 	"avatar/internal/sidecar"
+	"avatar/internal/skin"
 	"avatar/internal/tts"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -26,8 +28,16 @@ type App struct {
 	vault      *memory.Vault
 	personaMgr *persona.Manager
 	bondMgr    *persona.BondManager
+	skinMgr    *skin.Manager
+	asrEngine  asr.Engine
 	mu         sync.Mutex
 }
+func (a *App) emitEvent(eventName string, data ...interface{}) {
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, eventName, data...)
+	}
+}
+
 
 // NewApp creates a new App application struct
 func NewApp() *App {
@@ -46,6 +56,15 @@ func NewApp() *App {
 	bondMgr, err := persona.NewBondManager("")
 	if err != nil {
 		fmt.Printf("Init bond manager error: %v\n", err)
+	}
+	skinMgr := skin.NewManager("")
+
+	// 初始化 ASR 语音识别引擎
+	var asrEng asr.Engine
+	if cfg.ASR.Engine == "native_mac" {
+		asrEng = asr.NewNativeMacEngine(cfg.ASR.Locale, string(cfg.Mode))
+	} else {
+		asrEng = asr.NewMockEngine()
 	}
 
 	// 初始化 TTS 引擎
@@ -76,6 +95,8 @@ func NewApp() *App {
 		vault:      vault,
 		personaMgr: personaMgr,
 		bondMgr:    bondMgr,
+		skinMgr:    skinMgr,
+		asrEngine:  asrEng,
 	}
 }
 
@@ -85,14 +106,56 @@ func (a *App) startup(ctx context.Context) {
 
 	// 注册 Pipeline 事件广播
 	a.pipeline.SetCallbacks(func(s engine.State) {
-		runtime.EventsEmit(a.ctx, "avatar:state", string(s))
+		if a.asrEngine != nil {
+			_ = a.asrEngine.SetSpeaking(s == engine.StateSpeaking)
+		}
+		a.emitEvent("avatar:state", string(s))
 	}, func(speech string) {
-		runtime.EventsEmit(a.ctx, "avatar:speech", speech)
+		a.emitEvent("avatar:speech", speech)
 	}, func(slot persona.PersonaSlot) {
-		runtime.EventsEmit(a.ctx, "avatar:persona", slot)
+		a.emitEvent("avatar:persona", slot)
 	}, func(bond persona.BondData) {
-		runtime.EventsEmit(a.ctx, "avatar:bond", bond)
+		a.emitEvent("avatar:bond", bond)
 	})
+
+	// 注册 ASR 语音识别回调并异步启动
+	if a.asrEngine != nil {
+		a.asrEngine.SetCallbacks(func(partial string) {
+			if a.pipeline.State() == engine.StateSpeaking {
+				a.pipeline.Interrupt()
+			}
+			a.emitEvent("avatar:speech_partial", partial)
+			a.emitEvent("avatar:state", "listening")
+		}, func(final string) {
+			a.emitEvent("avatar:speech_final", final)
+			a.emitEvent("avatar:state", "thinking")
+			go func() {
+				err := a.pipeline.Chat(context.Background(), final)
+				if err != nil {
+					a.emitEvent("avatar:error", fmt.Sprintf("Chat error: %v", err))
+				}
+			}()
+		}, func(speaking bool, energy float64) {
+			a.emitEvent("avatar:mic_energy", energy)
+			if speaking {
+				if a.pipeline.State() == engine.StateSpeaking {
+					a.pipeline.Interrupt()
+				}
+				if a.pipeline.State() == engine.StateIdle {
+					a.emitEvent("avatar:state", "listening")
+				}
+			}
+		}, func(errMsg string) {
+			a.emitEvent("avatar:error", errMsg)
+		})
+
+		go func() {
+			if err := a.asrEngine.Start(ctx); err != nil {
+				fmt.Printf("ASR engine start error: %v\n", err)
+				a.emitEvent("avatar:error", fmt.Sprintf("语音引擎启动失败: %v", err))
+			}
+		}()
+	}
 
 	// 异步尝试启动本地伴生服务（如果存在模型）
 	go func() {
@@ -101,17 +164,33 @@ func (a *App) startup(ctx context.Context) {
 
 	// 初始广播当前人格与羁绊数据
 	if a.personaMgr != nil {
-		runtime.EventsEmit(a.ctx, "avatar:persona", a.personaMgr.GetActiveSlot())
+		a.emitEvent("avatar:persona", a.personaMgr.GetActiveSlot())
 	}
 	if a.bondMgr != nil {
-		runtime.EventsEmit(a.ctx, "avatar:bond", a.bondMgr.GetData())
+		a.emitEvent("avatar:bond", a.bondMgr.GetData())
+	}
+
+	// 初始广播形态与桌宠外观配置
+	a.emitEvent("avatar:display_form", a.cfg.DisplayForm)
+	a.emitEvent("avatar:pet_skin", a.cfg.PetSkin)
+	if a.cfg.DisplayForm == "capsule" {
+		runtime.WindowSetSize(a.ctx, 360, 80)
+	} else {
+		runtime.WindowSetSize(a.ctx, 260, 320)
 	}
 }
 
 // shutdown is called when the app terminates
 func (a *App) shutdown(ctx context.Context) {
-	a.sidecar.Stop()
-	a.pipeline.Interrupt()
+	if a.sidecar != nil {
+		a.sidecar.Stop()
+	}
+	if a.asrEngine != nil {
+		_ = a.asrEngine.Stop()
+	}
+	if a.pipeline != nil {
+		a.pipeline.Interrupt()
+	}
 }
 
 // SendTextMessage 处理来自前端的文本提问
@@ -122,7 +201,7 @@ func (a *App) SendTextMessage(text string) error {
 	go func() {
 		err := a.pipeline.Chat(context.Background(), text)
 		if err != nil {
-			runtime.EventsEmit(a.ctx, "avatar:error", fmt.Sprintf("Chat error: %v", err))
+			a.emitEvent("avatar:error", fmt.Sprintf("Chat error: %v", err))
 		}
 	}()
 	return nil
@@ -149,8 +228,27 @@ func (a *App) ToggleMode() string {
 		a.cfg.Mode = config.ModeHandsFree
 	}
 	_ = config.SaveConfig(a.cfg)
-	runtime.EventsEmit(a.ctx, "avatar:mode", string(a.cfg.Mode))
+	if a.asrEngine != nil {
+		_ = a.asrEngine.SetMode(string(a.cfg.Mode))
+	}
+	a.emitEvent("avatar:mode", string(a.cfg.Mode))
 	return string(a.cfg.Mode)
+}
+
+// StartPTT 开始按键语音输入
+func (a *App) StartPTT() error {
+	if a.asrEngine == nil {
+		return fmt.Errorf("asr engine not available")
+	}
+	return a.asrEngine.PTTStart()
+}
+
+// StopPTT 结束按键语音输入并触发识别
+func (a *App) StopPTT() error {
+	if a.asrEngine == nil {
+		return fmt.Errorf("asr engine not available")
+	}
+	return a.asrEngine.PTTStop()
 }
 
 // ==================== 记忆管理 API ====================
@@ -216,9 +314,13 @@ func (a *App) SetWindowExpanded(expanded bool) {
 		return
 	}
 	if expanded {
-		runtime.WindowSetSize(a.ctx, 360, 440)
+		runtime.WindowSetSize(a.ctx, 360, 480)
 	} else {
-		runtime.WindowSetSize(a.ctx, 360, 80)
+		if a.cfg.DisplayForm == "capsule" {
+			runtime.WindowSetSize(a.ctx, 360, 80)
+		} else {
+			runtime.WindowSetSize(a.ctx, 260, 320)
+		}
 	}
 }
 
@@ -268,5 +370,155 @@ func (a *App) CheckEngineStatus() map[string]bool {
 	return map[string]bool{
 		"local_sidecar": localOk,
 		"ollama":        ollamaOk,
+	}
+}
+
+// ==================== 桌面宠物 API ====================
+
+// GetDisplayForm 获取当前形态 ("pet" 桌面宠物 或 "capsule" 悬浮胶囊)
+func (a *App) GetDisplayForm() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.cfg.DisplayForm == "" {
+		return "pet"
+	}
+	return a.cfg.DisplayForm
+}
+
+// SetDisplayForm 切换桌面宠物 / 极简胶囊形态并调整窗口
+func (a *App) SetDisplayForm(form string) string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if form != "capsule" {
+		form = "pet"
+	}
+	a.cfg.DisplayForm = form
+	_ = config.SaveConfig(a.cfg)
+
+	if a.ctx != nil {
+		if form == "capsule" {
+			runtime.WindowSetSize(a.ctx, 360, 80)
+		} else {
+			runtime.WindowSetSize(a.ctx, 260, 320)
+		}
+		runtime.EventsEmit(a.ctx, "avatar:display_form", form)
+	}
+	return form
+}
+
+// GetPetSkin 获取当前桌宠皮肤 ID
+func (a *App) GetPetSkin() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.cfg.PetSkin == "" {
+		return "cat"
+	}
+	return a.cfg.PetSkin
+}
+
+// SetPetSkin 切换桌宠皮肤
+func (a *App) SetPetSkin(skinID string) string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if skinID == "" {
+		skinID = "cat"
+	}
+	a.cfg.PetSkin = skinID
+	_ = config.SaveConfig(a.cfg)
+
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "avatar:pet_skin", skinID)
+	}
+	return skinID
+}
+
+// GetSkinsList 获取内置和已导入的皮肤列表
+func (a *App) GetSkinsList() []skin.SkinInfo {
+	if a.skinMgr == nil {
+		return skin.BuiltinSkins
+	}
+	return a.skinMgr.ListSkins()
+}
+
+// ImportSkinPackage 导入 Codex pet 皮肤包（目录、pet.json 或 zip）
+func (a *App) ImportSkinPackage(sourcePath string) (skin.SkinInfo, error) {
+	if a.skinMgr == nil {
+		return skin.SkinInfo{}, fmt.Errorf("skin manager not initialized")
+	}
+	info, err := a.skinMgr.ImportSkin(sourcePath)
+	if err != nil {
+		return skin.SkinInfo{}, err
+	}
+	// 自动切换为新导入的皮肤
+	a.SetPetSkin(info.ID)
+	return info, nil
+}
+
+// InteractPet 桌面宠物交互（抚摸/投喂/戳戳/唤醒）
+func (a *App) InteractPet(action string) map[string]interface{} {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	var bondData persona.BondData
+	var leveledUp bool
+	if a.bondMgr != nil {
+		_, leveledUp = a.bondMgr.AddInteraction()
+		bondData = a.bondMgr.GetData()
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "avatar:bond", bondData)
+		}
+	}
+
+	msg := "高兴地跳了起来！"
+	cue := "jumping"
+	switch action {
+	case "pet":
+		msg = "舒服地眯起眼睛摇尾巴~ (亲密度 +5!)"
+		cue = "jumping"
+	case "feed":
+		msg = "嗷呜一口吃掉小零食，满脸满足！"
+		cue = "jumping"
+	case "poke":
+		msg = "歪过头眨巴着眼睛看着你：怎么啦？"
+		cue = "jumping"
+	case "wake":
+		msg = "揉了揉眼睛，元气满满地醒来啦！"
+		cue = "jumping"
+	}
+
+	if leveledUp {
+		msg = fmt.Sprintf("🎉 羁绊升级到 %s！", bondData.LevelName)
+	}
+
+	return map[string]interface{}{
+		"action":    action,
+		"message":   msg,
+		"cue":       cue,
+		"xp":        bondData.XP,
+		"level":     bondData.Level,
+		"levelName": bondData.LevelName,
+		"leveledUp": leveledUp,
+	}
+}
+
+// ToggleAlwaysOnTop 切换窗口置顶
+func (a *App) ToggleAlwaysOnTop() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.cfg.AlwaysOnTop = !a.cfg.AlwaysOnTop
+	_ = config.SaveConfig(a.cfg)
+	if a.ctx != nil {
+		runtime.WindowSetAlwaysOnTop(a.ctx, a.cfg.AlwaysOnTop)
+	}
+	return a.cfg.AlwaysOnTop
+}
+
+// QuitApp 退出应用
+func (a *App) QuitApp() {
+	if a.ctx != nil {
+		runtime.Quit(a.ctx)
 	}
 }

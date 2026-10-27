@@ -1,4 +1,4 @@
-.PHONY: help run dev build package start test clean
+.PHONY: help run dev build package start test clean asr
 
 # 配置变量
 TAGS ?= production
@@ -10,7 +10,11 @@ help: ## 显示帮助信息
 	@echo ""
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-run: ## 直接运行应用 (开发调试)
+asr: ## 编译 macOS 原生语音识别组件 (bin/avatar-asr)
+	@mkdir -p bin
+	swiftc -O -framework Speech -framework AVFoundation cmd/avatar-asr/main.swift -o bin/avatar-asr
+
+run: asr ## 直接运行应用 (开发调试)
 	go run -tags $(TAGS) .
 
 dev: run ## run 的别名
@@ -18,7 +22,7 @@ dev: run ## run 的别名
 test: ## 运行所有单元测试
 	go test -v ./...
 
-build: ## 编译可执行二进制文件
+build: asr ## 编译可执行二进制文件
 	@mkdir -p build/bin
 	go build -tags $(TAGS) -ldflags="$(LDFLAGS)" -o build/bin/Avatar .
 package: ## 打包为 macOS 原生应用 (build/bin/Avatar.app)

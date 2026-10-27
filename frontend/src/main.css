@@ -553,3 +553,528 @@ body {
 
 .state-speaking .orb-core { background: var(--glow-speaking); box-shadow: 0 0 18px var(--glow-speaking); }
 .state-speaking .status-indicator { background: var(--glow-speaking); box-shadow: 0 0 6px var(--glow-speaking); }
+
+/* ==================== 桌面宠物形态 (Desktop Pet Mode) ==================== */
+
+body.mode-pet #desktopPet {
+  display: flex;
+}
+body.mode-pet #capsule {
+  display: none !important;
+}
+
+body.mode-capsule #desktopPet {
+  display: none !important;
+}
+body.mode-capsule #capsule {
+  display: flex;
+}
+
+.desktop-pet-container {
+  position: relative;
+  width: 250px;
+  height: 310px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 6px;
+  z-index: 10;
+}
+
+/* 漫画风格对话气泡 */
+.pet-bubble {
+  position: absolute;
+  top: 6px;
+  left: 10px;
+  right: 10px;
+  min-height: 48px;
+  max-height: 98px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  padding: 8px 12px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.5), 0 0 15px rgba(56, 189, 248, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: bubbleFloat 3s ease-in-out infinite alternate;
+  cursor: pointer;
+}
+
+.pet-bubble:hover {
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.6), 0 0 20px rgba(56, 189, 248, 0.25);
+}
+
+.pet-bubble-content {
+  width: 100%;
+  max-height: 82px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pet-bubble-content::-webkit-scrollbar {
+  display: none;
+}
+
+.pet-bubble-text {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #f8fafc;
+  text-align: center;
+  word-break: break-word;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.pet-bubble-tail {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 8px solid rgba(15, 23, 42, 0.92);
+}
+
+@keyframes bubbleFloat {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-4px); }
+}
+
+/* 桌宠舞台区 */
+.pet-stage {
+  position: relative;
+  width: 160px;
+  height: 168px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  z-index: 10;
+  margin-bottom: 2px;
+}
+
+.pet-stage:active {
+  cursor: grabbing;
+}
+
+.pet-canvas {
+  width: 148px;
+  height: 160px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  pointer-events: none;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pet-stage:hover .pet-canvas {
+  transform: scale(1.04);
+}
+
+.pet-stage:active .pet-canvas {
+  transform: scale(0.96) translateY(3px);
+}
+
+/* 状态胶囊角标 */
+.pet-status-pill {
+  position: absolute;
+  bottom: 2px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 10px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.pet-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--glow-idle);
+  box-shadow: 0 0 6px var(--glow-idle);
+}
+
+/* 悬浮快捷工具栏 (Hover 时浮现) */
+.pet-toolbar {
+  display: flex;
+  gap: 4px;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 4px 8px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  z-index: 25;
+  opacity: 0.2;
+  transform: translateY(4px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.desktop-pet-container:hover .pet-toolbar {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.pet-tool-btn {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.pet-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  transform: scale(1.18);
+}
+
+.pet-tool-btn:active {
+  transform: scale(0.92);
+}
+
+.pet-tool-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.5);
+}
+
+/* 桌宠内置快捷文字输入框 */
+.pet-input-bar {
+  position: absolute;
+  top: 60px;
+  left: 14px;
+  right: 14px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1.5px solid var(--accent);
+  border-radius: 20px;
+  padding: 4px 10px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+  display: none;
+  align-items: center;
+  gap: 6px;
+  z-index: 30;
+}
+
+.pet-input-bar.open {
+  display: flex;
+  animation: fadeInDown 0.2s ease;
+}
+
+.pet-input-bar input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-size: 12px;
+  padding: 4px 2px;
+}
+
+.btn-icon-xs {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 特效粒子层与浮动爱心/XP */
+.particle-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 15;
+}
+
+.floating-particle {
+  position: absolute;
+  font-size: 18px;
+  pointer-events: none;
+  animation: particleFloat 1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes particleFloat {
+  0% {
+    transform: scale(0.6) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.3) translateY(-60px);
+    opacity: 0;
+  }
+}
+
+.floating-xp-badge {
+  position: absolute;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+  pointer-events: none;
+  animation: xpPop 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  white-space: nowrap;
+}
+
+@keyframes xpPop {
+  0% {
+    transform: translate(-50%, 0) scale(0.7);
+    opacity: 0;
+  }
+  20% {
+    transform: translate(-50%, -10px) scale(1.15);
+    opacity: 1;
+  }
+  80% {
+    transform: translate(-50%, -28px) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -40px) scale(0.9);
+    opacity: 0;
+  }
+}
+
+/* 右键自定义上下文菜单 */
+.pet-context-menu {
+  position: absolute;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 6px;
+  width: 180px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 14px 35px -5px rgba(0, 0, 0, 0.65), 0 0 15px rgba(56, 189, 248, 0.15);
+  z-index: 100;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  animation: fadeInDown 0.15s ease;
+}
+
+.pet-context-menu.open {
+  display: flex;
+}
+
+.menu-item {
+  padding: 7px 10px;
+  font-size: 12px;
+  color: #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background 0.12s;
+}
+
+.menu-item:hover {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+}
+
+.menu-item.header {
+  font-weight: 700;
+  color: #38bdf8;
+  cursor: default;
+  background: transparent !important;
+}
+
+.menu-item.danger {
+  color: #f87171;
+}
+
+.menu-item.danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 3px 0;
+}
+
+.submenu-parent {
+  position: relative;
+}
+
+.submenu-arrow {
+  font-size: 9px;
+  opacity: 0.6;
+}
+
+.submenu {
+  position: absolute;
+  left: 100%;
+  top: -6px;
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 5px;
+  width: 140px;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+  z-index: 101;
+}
+
+.submenu-parent:hover .submenu {
+  display: flex;
+}
+
+/* 抽屉内桌宠皮肤网格与形态开关 */
+.form-switch-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.pill-toggle {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  color: #94a3b8;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pill-toggle.active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.skin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.skin-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.skin-card:hover {
+  border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.skin-card.active {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.skin-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.skin-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.skin-card-badge {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+}
+
+.skin-card.active .skin-card-badge {
+  background: #38bdf8;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.skin-card-desc {
+  font-size: 10px;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.skin-import-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 10px;
+  margin-top: 6px;
+}
+
+.import-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.import-input-row input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: #fff;
+  font-size: 11px;
+  outline: none;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
