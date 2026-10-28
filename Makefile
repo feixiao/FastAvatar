@@ -1,4 +1,4 @@
-.PHONY: help run dev build package start test test-e2e server clean asr android-test android-build
+.PHONY: help run dev build package start test test-e2e server clean asr android-test android-build livekit-check livekit-stop
 
 # 配置变量
 TAGS ?= production
@@ -31,8 +31,22 @@ android-test: ## 运行 Android 客户端单元测试
 android-build: ## 构建 Android 客户端 Debug APK
 	cd android && ./gradlew assembleDebug
 
-server: ## 启动本地轻量云端实时网关服务 (8088 端口)
+livekit-check:
+	@if nc -z -w 1 localhost 7880 2>/dev/null; then \
+		echo "\033[32m[LiveKit]\033[0m SFU 已在运行 (:7880)"; \
+	elif docker info >/dev/null 2>&1; then \
+		echo "\033[33m[LiveKit]\033[0m 正在后台自动拉起 LiveKit SFU 容器 (:7880)..."; \
+		docker compose -f server/docker-compose.yaml up -d && \
+		echo "\033[32m[LiveKit]\033[0m SFU 容器已就绪 (:7880)"; \
+	else \
+		echo "\033[33m[LiveKit 提示]\033[0m Docker 守护进程未启动，跳过自动拉起。云端网关继续启动 (:8088)，如需使用 WebRTC 流媒体请先启动 Docker"; \
+	fi
+
+server: livekit-check ## 启动本地轻量云端实时网关服务 (8088 端口，自动拉起 LiveKit SFU)
 	go run ./server/cmd/main.go
+
+livekit-stop: ## 停止后台运行的 LiveKit SFU 容器
+	@docker compose -f server/docker-compose.yaml down
 
 build: asr ## 编译可执行二进制文件
 	@mkdir -p build/bin
