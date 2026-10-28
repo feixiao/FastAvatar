@@ -63,6 +63,7 @@ func (s *CloudServer) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/api/v1/auth/token", s.handleToken)
+	mux.HandleFunc("/api/v1/chat", s.handleChat)
 	mux.HandleFunc("/api/v1/session/interrupt", s.handleInterrupt)
 	mux.HandleFunc("/api/v1/session/close", s.handleClose)
 	return mux
@@ -122,6 +123,69 @@ func (s *CloudServer) handleToken(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(res)
+}
+
+type ChatRequest struct {
+	SessionID string `json:"session_id"`
+	TurnID    string `json:"turn_id"`
+	UserID    string `json:"user_id"`
+	DeviceID  string `json:"device_id"`
+	Message   string `json:"message"`
+	Persona   string `json:"persona,omitempty"`
+}
+
+type ChatResponse struct {
+	TurnID    string `json:"turn_id"`
+	Response  string `json:"response"`
+	LatencyMS int64  `json:"latency_ms"`
+}
+
+func (s *CloudServer) handleChat(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req ChatRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	start := time.Now()
+	reply := s.generateReply(req.Message, req.Persona)
+	latency := time.Since(start).Milliseconds()
+
+	s.recordEvent(ServerEvent{
+		EventName:  "cloud_turn_completed",
+		SessionID:  req.SessionID,
+		TurnID:     req.TurnID,
+		Platform:   "gateway",
+		DurationMS: latency,
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(ChatResponse{
+		TurnID:    req.TurnID,
+		Response:  reply,
+		LatencyMS: latency,
+	})
+}
+
+func (s *CloudServer) generateReply(msg, persona string) string {
+	switch persona {
+	case "roaster":
+		return "哟，稀客啊！说吧，今天又遇到什么让人哭笑不得的事想让我吐槽了？"
+	case "jarvis":
+		return "指令已接收。针对该问题，建议从核心目标分解执行，如有进一步分析需求请随时指示。"
+	case "pet":
+		return "喵呜~ 主人终于找我聊天啦！蹭蹭手心，今天我也会一直陪着主人哦！"
+	default:
+		if len(msg) > 0 {
+			return "嗨！很高兴陪你聊天。听你这么说，生活里总有许多值得回味的小瞬间，不管你想聊什么，我都认真听着呢。"
+		}
+		return "你好呀！我是你的 Avatar 伴侣，今天过得开心吗？"
+	}
 }
 
 type InterruptRequest struct {

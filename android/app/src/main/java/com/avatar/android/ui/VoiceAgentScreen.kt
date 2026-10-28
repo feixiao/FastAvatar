@@ -25,11 +25,11 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
@@ -37,10 +37,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -70,7 +67,9 @@ import androidx.compose.ui.unit.sp
 import com.avatar.android.core.dispatcher.RouteTarget
 import com.avatar.android.core.state.SessionState
 import com.avatar.android.ui.components.AuditLogSheet
+import com.avatar.android.ui.components.AvatarPetOrb
 import com.avatar.android.ui.components.MemorySheet
+import com.avatar.android.ui.components.SettingsSheet
 import com.avatar.android.ui.theme.AccentCyan
 import com.avatar.android.ui.theme.AccentGreen
 import com.avatar.android.ui.theme.AccentPurple
@@ -98,9 +97,15 @@ fun VoiceAgentScreen(
     val memories by viewModel.memories.collectAsState()
     val auditLogs by viewModel.auditLogs.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
+    val activePersona by viewModel.activePersona.collectAsState()
+
+    val isVoiceListening by viewModel.isVoiceListening.collectAsState()
+    val partialSpeechText by viewModel.partialSpeechText.collectAsState()
+    val speechVolume by viewModel.speechVolume.collectAsState()
 
     var showMemorySheet by remember { mutableStateOf(false) }
     var showAuditSheet by remember { mutableStateOf(false) }
+    var showSettingsSheet by remember { mutableStateOf(false) }
     var showConsentDialog by remember { mutableStateOf(false) }
     var inputText by remember { mutableStateOf("") }
 
@@ -119,12 +124,12 @@ fun VoiceAgentScreen(
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "Avatar AI 语音伴侣",
+                                text = "Avatar AI 伴侣",
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(4.dp))
@@ -141,6 +146,15 @@ fun VoiceAgentScreen(
                     }
                 },
                 actions = {
+                    // Settings button
+                    IconButton(onClick = { showSettingsSheet = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "伴侣设置",
+                            tint = AccentCyan
+                        )
+                    }
+
                     // Online/Offline switch
                     IconButton(onClick = { viewModel.setOnline(!isOnline) }) {
                         Icon(
@@ -184,116 +198,85 @@ fun VoiceAgentScreen(
                 .padding(padding)
                 .padding(horizontal = 16.dp)
         ) {
-            // 1. Session State & Media Gate Banner
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardDark),
-                shape = RoundedCornerShape(12.dp),
-                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorder))
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
+            // 1. Interactive Avatar Pet Orb (Visual companion, touch reaction & sound waves)
+            AvatarPetOrb(
+                sessionState = sessionState,
+                speechVolume = speechVolume,
+                activePersona = activePersona,
+                onPet = { viewModel.petAvatar() },
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+
+            // 2. Real-time Voice Recognition Banner
+            AnimatedVisibility(visible = isVoiceListening) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1B2E3C)),
+                    shape = RoundedCornerShape(10.dp),
+                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(AccentCyan))
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            val stateColor = when (sessionState) {
-                                SessionState.STOPPED -> TextMuted
-                                SessionState.PREPARING -> AccentYellow
-                                SessionState.LISTENING -> AccentGreen
-                                SessionState.ROUTING, SessionState.LOCAL_PROCESSING -> AccentCyan
-                                SessionState.CLOUD_CONNECTING, SessionState.CLOUD_TURN -> AccentPurple
-                                SessionState.SPEAKING -> AccentCyan
-                                SessionState.PAUSED -> AccentYellow
-                                SessionState.OFFLINE, SessionState.LOCAL_ONLY -> AccentRed
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .clip(CircleShape)
-                                    .background(stateColor)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = sessionState.displayName,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                        }
-
-                        // Cloud consent status toggle
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = if (isCloudConsented) "云端已授权" else "仅限本地",
-                                fontSize = 12.sp,
-                                color = if (isCloudConsented) AccentCyan else TextMuted
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Switch(
-                                checked = isCloudConsented,
-                                onCheckedChange = { checked ->
-                                    if (checked) {
-                                        showConsentDialog = true
-                                    } else {
-                                        viewModel.setCloudConsent(false)
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = AccentCyan,
-                                    checkedTrackColor = CardBorder,
-                                    uncheckedThumbColor = TextMuted,
-                                    uncheckedTrackColor = BgDark
-                                ),
-                                modifier = Modifier.size(width = 44.dp, height = 24.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = sessionState.description,
-                        fontSize = 12.sp,
-                        color = TextSecondary
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Audio Gate Guardrail Display
-                    val isMuted = viewModel.isAudioMuted
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (isMuted) Color(0xFF1E2631) else Color(0xFF231B34))
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = if (isMuted) Icons.Default.Lock else Icons.Default.VolumeUp,
-                            contentDescription = "媒体门禁",
-                            tint = if (isMuted) AccentGreen else AccentPurple,
-                            modifier = Modifier.size(14.dp)
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = null,
+                            tint = AccentGreen,
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isMuted)
-                                "媒体门禁: 已安全闭锁 (Muted=true，零网络音频泄露)"
-                            else
-                                "媒体门禁: 临时推流中 (Audio Gate Active，云端流式传输)",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = if (isMuted) AccentGreen else AccentPurple
+                            text = if (partialSpeechText.isNotBlank()) "听到: $partialSpeechText" else "正在聆听您的声音，请说话...",
+                            fontSize = 12.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            // 3. Audio Gate Guardrail Status
+            val isMuted = viewModel.isAudioMuted
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (isMuted) Color(0xFF161E28) else Color(0xFF231B34))
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (isMuted) Icons.Default.Lock else Icons.Default.VolumeUp,
+                        contentDescription = "媒体门禁",
+                        tint = if (isMuted) AccentGreen else AccentPurple,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isMuted)
+                            "媒体门禁: 已安全闭锁 (Muted=true，零网络泄露)"
+                        else
+                            "媒体门禁: 临时推流中 (Audio Gate Active)",
+                        fontSize = 10.sp,
+                        color = if (isMuted) AccentGreen else AccentPurple
+                    )
+                }
 
-            // 2. Pending Memory Confirmation Card (Two-phase commit per Section 4.3)
+                Text(
+                    text = if (isCloudConsented) "云端已授权" else "仅限本地",
+                    fontSize = 10.sp,
+                    color = if (isCloudConsented) AccentCyan else TextMuted
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // 4. Pending Memory Confirmation Card
             AnimatedVisibility(visible = pendingMemory != null) {
                 pendingMemory?.let { pending ->
                     Card(
@@ -307,14 +290,14 @@ fun VoiceAgentScreen(
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(
                                 text = "💡 本地记忆保存确认 (需用户明确授权)",
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = AccentCyan
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = pending.prompt,
-                                fontSize = 14.sp,
+                                fontSize = 13.sp,
                                 color = TextPrimary
                             )
                             Spacer(modifier = Modifier.height(8.dp))
@@ -325,17 +308,17 @@ fun VoiceAgentScreen(
                                 OutlinedButton(
                                     onClick = { viewModel.rejectStagedMemory() },
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentRed),
-                                    modifier = Modifier.height(34.dp)
+                                    modifier = Modifier.height(32.dp)
                                 ) {
-                                    Text("放弃", fontSize = 12.sp)
+                                    Text("放弃", fontSize = 11.sp)
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Button(
                                     onClick = { viewModel.confirmStagedMemory() },
                                     colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
-                                    modifier = Modifier.height(34.dp)
+                                    modifier = Modifier.height(32.dp)
                                 ) {
-                                    Text("确认记住", fontSize = 12.sp, color = Color.White)
+                                    Text("确认记住", fontSize = 11.sp, color = Color.White)
                                 }
                             }
                         }
@@ -343,7 +326,7 @@ fun VoiceAgentScreen(
                 }
             }
 
-            // 3. Conversation Message Stream
+            // 5. Conversation Message Stream
             LazyColumn(
                 state = listState,
                 modifier = Modifier
@@ -356,57 +339,88 @@ fun VoiceAgentScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // 4. Quick Test Chips
-            Text(
-                text = "验收快捷场景 (点击快速评测):",
-                fontSize = 11.sp,
-                color = TextMuted
-            )
+            // 6. Quick Interactive Chips
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                    .padding(vertical = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 item {
+                    TestChip("你好呀，在干嘛？") {
+                        viewModel.submitUtterance("你好呀，在干嘛？")
+                    }
+                }
+                item {
+                    TestChip("讲个笑话开心一下") {
+                        viewModel.submitUtterance("讲个笑话开心一下")
+                    }
+                }
+                item {
+                    TestChip("摸摸头 (互动)") {
+                        viewModel.petAvatar()
+                    }
+                }
+                item {
                     TestChip("把空调调到24度") {
-                        ensureSessionStarted(sessionState, hasMicPermission, onRequestMicPermission, viewModel)
                         viewModel.submitUtterance("把空调调到24度")
                     }
                 }
                 item {
-                    TestChip("切换到漂移模式 (危险拦截)") {
-                        ensureSessionStarted(sessionState, hasMicPermission, onRequestMicPermission, viewModel)
-                        viewModel.submitUtterance("切换到漂移模式")
+                    TestChip("切换成猫娘人设") {
+                        viewModel.submitUtterance("切换成猫娘人设")
                     }
                 }
                 item {
-                    TestChip("帮我记一下我喜欢美式咖啡") {
-                        ensureSessionStarted(sessionState, hasMicPermission, onRequestMicPermission, viewModel)
-                        viewModel.submitUtterance("帮我记一下我喜欢美式咖啡")
-                    }
-                }
-                item {
-                    TestChip("为什么海水是蓝色的？") {
-                        ensureSessionStarted(sessionState, hasMicPermission, onRequestMicPermission, viewModel)
-                        viewModel.submitUtterance("为什么海水是蓝色的？")
+                    TestChip("帮我记一下美式咖啡") {
+                        viewModel.submitUtterance("帮我记一下美式咖啡")
                     }
                 }
             }
 
-            // 5. Input and Control Bar
+            // 7. Interactive Input & Voice Control Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Voice Recognition Mic Button
+                IconButton(
+                    onClick = {
+                        if (isVoiceListening) {
+                            viewModel.stopVoiceInput()
+                        } else {
+                            viewModel.startVoiceInput(hasMicPermission, onRequestMicPermission)
+                        }
+                    },
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(if (isVoiceListening) AccentRed else Color(0xFF238636))
+                ) {
+                    Icon(
+                        imageVector = if (isVoiceListening) Icons.Default.Stop else Icons.Default.Mic,
+                        contentDescription = "语音输入",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
                 OutlinedTextField(
                     value = inputText,
                     onValueChange = { inputText = it },
-                    placeholder = { Text("输入语音模拟文字...", fontSize = 13.sp, color = TextMuted) },
+                    placeholder = {
+                        Text(
+                            if (isVoiceListening) "正在聆听语音中..." else "输入聊天或指令...",
+                            fontSize = 13.sp,
+                            color = TextMuted
+                        )
+                    },
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
@@ -422,10 +436,10 @@ fun VoiceAgentScreen(
 
                 Spacer(modifier = Modifier.width(6.dp))
 
+                // Send text button
                 IconButton(
                     onClick = {
                         if (inputText.isNotBlank()) {
-                            ensureSessionStarted(sessionState, hasMicPermission, onRequestMicPermission, viewModel)
                             viewModel.submitUtterance(inputText.trim())
                             inputText = ""
                         }
@@ -449,57 +463,40 @@ fun VoiceAgentScreen(
                 Button(
                     onClick = { viewModel.bargeIn() },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isPlaying) AccentRed else CardBorder
+                        containerColor = if (isPlaying || sessionState == SessionState.SPEAKING) AccentRed else CardBorder
                     ),
                     shape = RoundedCornerShape(20.dp),
                     modifier = Modifier.height(42.dp)
                 ) {
                     Text(
                         text = "打断",
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isPlaying) Color.White else TextSecondary
+                        color = if (isPlaying || sessionState == SessionState.SPEAKING) Color.White else TextSecondary
                     )
                 }
             }
-
-            // 6. Session Lifecycle Toggle
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (sessionState == SessionState.STOPPED) {
-                    Button(
-                        onClick = {
-                            if (!hasMicPermission) {
-                                onRequestMicPermission()
-                            } else {
-                                viewModel.startSession(true)
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("启动语音会话 (Start Session)")
-                    }
-                } else {
-                    Button(
-                        onClick = { viewModel.stopSession() },
-                        colors = ButtonDefaults.buttonColors(containerColor = CardBorder),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Stop, contentDescription = null, tint = AccentRed, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("结束语音会话 (Stop Session)", color = AccentRed)
-                    }
-                }
-            }
         }
+    }
+
+    // Settings BottomSheet
+    if (showSettingsSheet && viewModel.appSettings != null) {
+        SettingsSheet(
+            appSettings = viewModel.appSettings,
+            onSaveSettings = { url, consent, autoTts, rate, persona, llmUrl, llmKey, llmModel ->
+                viewModel.updateSettings(
+                    serverUrl = url,
+                    isCloudConsented = consent,
+                    autoTts = autoTts,
+                    speechRate = rate,
+                    activePersona = persona,
+                    customLlmUrl = llmUrl,
+                    customLlmKey = llmKey,
+                    customLlmModel = llmModel
+                )
+            },
+            onDismiss = { showSettingsSheet = false }
+        )
     }
 
     // Consent Confirmation Dialog
@@ -511,7 +508,7 @@ fun VoiceAgentScreen(
                 Text(
                     "开启后，开放式对话语音回合将通过加密通道发送至云端服务进行流式生成。\n\n" +
                             "• 本地记忆与车控指令仍在端侧本地处理，不会上传云端；\n" +
-                            "• 您可随时在此撤销云端授权；\n" +
+                            "• 您可随时在设置中撤销云端授权；\n" +
                             "• 断网时本地功能仍然可用，不会排队或自动重发语音。"
                 )
             },
@@ -553,21 +550,6 @@ fun VoiceAgentScreen(
     }
 }
 
-private fun ensureSessionStarted(
-    sessionState: SessionState,
-    hasMicPermission: Boolean,
-    onRequestMicPermission: () -> Unit,
-    viewModel: VoiceAgentViewModel
-) {
-    if (sessionState == SessionState.STOPPED) {
-        if (!hasMicPermission) {
-            onRequestMicPermission()
-        } else {
-            viewModel.startSession(true)
-        }
-    }
-}
-
 @Composable
 fun TestChip(label: String, onClick: () -> Unit) {
     Box(
@@ -575,7 +557,7 @@ fun TestChip(label: String, onClick: () -> Unit) {
             .clip(RoundedCornerShape(16.dp))
             .background(CardDark)
             .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
     ) {
         TextButton(
             onClick = onClick,
@@ -645,9 +627,9 @@ fun MessageBubble(msg: MessageItem) {
 
                             val routeLabel = when (msg.routeTarget) {
                                 RouteTarget.LOCAL_MEMORY -> "本地记忆快环"
-                                RouteTarget.LOCAL_PERSONA -> "本地人设快环"
+                                RouteTarget.LOCAL_PERSONA -> "人设快环"
                                 RouteTarget.MOCK_VEHICLE -> "Mock车控快环"
-                                RouteTarget.CLOUD_CHAT -> "云端实时对话"
+                                RouteTarget.CLOUD_CHAT -> "智能对话"
                                 RouteTarget.LOCAL_ONLY_PROMPT -> "未授权降级"
                                 RouteTarget.OFFLINE_PROMPT -> "离线降级"
                             }

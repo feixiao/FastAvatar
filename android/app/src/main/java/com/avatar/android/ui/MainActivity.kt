@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.avatar.android.VoiceApplication
+import com.avatar.android.core.audio.SpeechRecognitionHelper
 import com.avatar.android.core.state.SessionState
 import com.avatar.android.service.VoiceSessionService
 import com.avatar.android.ui.theme.AvatarTheme
@@ -18,14 +19,18 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private lateinit var viewModel: VoiceAgentViewModel
+    private var speechHelper: SpeechRecognitionHelper? = null
     private var hasMicPermission: Boolean = false
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         hasMicPermission = permissions[Manifest.permission.RECORD_AUDIO] == true
-        if (hasMicPermission && viewModel.sessionState.value == SessionState.STOPPED) {
-            viewModel.startSession(true)
+        if (hasMicPermission) {
+            initSpeechHelper()
+            if (viewModel.sessionState.value == SessionState.STOPPED) {
+                viewModel.startSession(true)
+            }
         }
     }
 
@@ -33,6 +38,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val app = application as VoiceApplication
+        checkPermissions()
+        if (hasMicPermission) {
+            initSpeechHelper()
+        }
+
         viewModel = VoiceAgentViewModel(
             stateMachine = app.stateMachine,
             memoryVault = app.memoryVault,
@@ -40,10 +50,15 @@ class MainActivity : ComponentActivity() {
             playbackController = app.playbackController,
             privacyGuard = app.privacyGuard,
             cloudClient = app.cloudClient,
-            deviceId = app.deviceId
+            deviceId = app.deviceId,
+            appSettings = app.appSettings,
+            speechRecognitionHelper = speechHelper
         )
 
-        checkPermissions()
+        // Automatically start session if permission is granted so user doesn't face dead STOPPED state
+        if (hasMicPermission && viewModel.sessionState.value == SessionState.STOPPED) {
+            viewModel.startSession(true)
+        }
 
         // Sync foreground service with session state
         lifecycleScope.launch {
@@ -76,6 +91,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun initSpeechHelper() {
+        if (speechHelper == null) {
+            speechHelper = SpeechRecognitionHelper(this) { text ->
+                viewModel.submitUtterance(text)
+            }
+        }
+    }
+
     private fun checkPermissions() {
         hasMicPermission = ContextCompat.checkSelfPermission(
             this,
@@ -100,5 +123,11 @@ class MainActivity : ComponentActivity() {
         if (permissionsToRequest.isNotEmpty()) {
             permissionLauncher.launch(permissionsToRequest.toTypedArray())
         }
+    }
+
+    override fun onDestroy() {
+        speechHelper?.destroy()
+        speechHelper = null
+        super.onDestroy()
     }
 }

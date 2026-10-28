@@ -10,7 +10,9 @@ interface AudioPlaybackListener {
     fun onPlaybackCompleted(turnId: String)
 }
 
-class AudioPlaybackController {
+class AudioPlaybackController(
+    val synthesizer: SpeechSynthesizer? = null
+) {
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
@@ -18,6 +20,9 @@ class AudioPlaybackController {
     @Volatile
     var currentTurnId: String? = null
         private set
+
+    val hasActiveSynthesizer: Boolean
+        get() = synthesizer != null && synthesizer.isAvailable
 
     private val listeners = mutableListOf<AudioPlaybackListener>()
     private val lock = Any()
@@ -33,11 +38,30 @@ class AudioPlaybackController {
     /**
      * Start playing audio response.
      */
-    fun startPlayback(turnId: String, text: String) {
+    fun startPlayback(
+        turnId: String,
+        text: String,
+        onNaturalDone: (() -> Unit)? = null
+    ) {
         synchronized(lock) {
             currentTurnId = turnId
             _isPlaying.value = true
             listeners.forEach { it.onPlaybackStarted(turnId) }
+        }
+
+        if (synthesizer != null && synthesizer.isAvailable) {
+            synthesizer.speak(
+                turnId = turnId,
+                text = text,
+                onDone = {
+                    finishPlayback()
+                    onNaturalDone?.invoke()
+                },
+                onError = {
+                    finishPlayback()
+                    onNaturalDone?.invoke()
+                }
+            )
         }
     }
 
@@ -46,6 +70,7 @@ class AudioPlaybackController {
      */
     fun stopPlayback(reason: String = "stop"): Long {
         val startNano = System.nanoTime()
+        synthesizer?.stop()
         val turnId: String?
         synchronized(lock) {
             turnId = currentTurnId

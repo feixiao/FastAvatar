@@ -61,6 +61,17 @@
   - 前台服务 (`VoiceSessionService`): 声明 `foregroundServiceType="microphone|mediaPlayback"`，支持息屏与锁屏下会话继续运行；
   - 音频隐私保护 (`AudioPrivacyGuard`): 监听 `ACTION_AUDIO_BECOMING_NOISY`，耳机拔出时瞬间暂停播放，杜绝私密语音外放至扬声器；
   - 音频焦点管理 (`AudioFocusHelper`): 监听电话及第三方音频抢占，自动暂停会话。
+- **本地智能情感闲聊引擎 (`LocalCompanionEngine`)**:
+  - 杜绝断网或未连云端时无法聊天；提供问候、情绪共情、幽默笑话、睡前故事及人设自适应的本地多轮陪伴对话；
+  - 与 `MemoryVault` 深度整合，可记忆用户专属偏好并随时温情唤回。
+- **全双工语音输入输出 (`SpeechRecognitionHelper` & `AndroidSpeechSynthesizer`)**:
+  - 语音识别输入：集成 Android 原生 `SpeechRecognizer`，支持实时音量波形感知与实时转写预览；
+  - 语音合成输出：集成 Android 原生 `TextToSpeech`，真实朗读助手回复，支持可配置语速与多语言；
+  - 实体物理打断：插话或点击打断时调用 `tts.stop()` 瞬间闭音（< 80ms）。
+- **动态交互精灵球 (`AvatarPetOrb`)**:
+  - Jetpack Compose Canvas 原生渲染；提供待机呼吸、倾听声流波形、思考光环自转、说话跳动以及轻触抚摸（伴随震动反馈与情绪反馈）。
+- **配置与人设管理 (`AppSettings` & `SettingsSheet`)**:
+  - 支持配置云端网关地址、局域网 IP、自定义大模型端点（Ollama / DeepSeek / OpenAI）、TTS 语速与多重人设切换（知心伴侣、元气小猫、高效幕僚、毒舌损友）。
 - **诊断日志 (`DiagnosticLogger`)**:
   - 写入 `diagnostics.log`，严格遵循 PRD Section 5.3，仅记录受控元数据，杜绝内容泄露。
 

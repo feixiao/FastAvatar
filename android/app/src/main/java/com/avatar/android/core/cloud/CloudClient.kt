@@ -1,6 +1,7 @@
 package com.avatar.android.core.cloud
 
 import com.google.gson.Gson
+import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -86,6 +87,103 @@ class CloudClient(
             }
         } catch (e: Exception) {
             synchronized(lock) { state = CloudConnectionState.DISCONNECTED }
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 发送聊天文本到云端服务器或用户配置的自定义 LLM 端点
+     */
+    suspend fun sendChatMessage(
+        turnId: String,
+        message: String,
+        persona: String,
+        customLlmUrl: String = "",
+        customLlmKey: String = "",
+        customLlmModel: String = ""
+    ): Result<String> = withContext(Dispatchers.IO) {
+        // 1. 如果用户配置了自定义 OpenAI / Ollama 兼容端点
+        if (customLlmUrl.isNotBlank()) {
+            val endpoint = if (customLlmUrl.endsWith("/chat/completions")) {
+                customLlmUrl
+            } else {
+                "${customLlmUrl.trimEnd('/')}/chat/completions"
+            }
+
+            val systemPrompt = when (persona) {
+                "roaster" -> "你是一位幽默犀利的毒舌损友，说话风趣、善意吐槽，拒绝鸡汤和套话，简短口语化。"
+                "jarvis" -> "你是一位高水准的私人幕僚顾问，回答极其凝练、专业、有条理，适合快速语音收听。"
+                "pet" -> "你是一只元气可爱的猫娘/宠物小精灵，说话活泼软萌、爱撒娇，常用‘喵呜’等语气词。"
+                else -> "你是一位温柔体贴的知心伴侣，温和共情、善解人意，像老朋友闲聊一样陪伴用户。"
+            }
+
+            val requestBodyJson = gson.toJson(
+                mapOf(
+                    "model" to (customLlmModel.ifBlank { "gpt-3.5-turbo" }),
+                    "messages" to listOf(
+                        mapOf("role" to "system", "content" to systemPrompt),
+                        mapOf("role" to "user", "content" to message)
+                    ),
+                    "temperature" to 0.7,
+                    "max_tokens" to 300
+                )
+            )
+
+            val reqBuilder = Request.Builder()
+                .url(endpoint)
+                .post(requestBodyJson.toRequestBody(jsonMediaType))
+
+            if (customLlmKey.isNotBlank()) {
+                reqBuilder.addHeader("Authorization", "Bearer $customLlmKey")
+            }
+
+            return@withContext try {
+                httpClient.newCall(reqBuilder.build()).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        return@withContext Result.failure(IOException("LLM request failed with status ${response.code}"))
+                    }
+                    val bodyStr = response.body?.string() ?: ""
+                    val root = gson.fromJson(bodyStr, JsonObject::class.java)
+                    val choices = root.getAsJsonArray("choices")
+                    val content = choices?.get(0)?.asJsonObject
+                        ?.getAsJsonObject("message")
+                        ?.get("content")?.asString ?: ""
+                    if (content.isNotBlank()) {
+                        Result.success(content)
+                    } else {
+                        Result.failure(IOException("Empty LLM reply"))
+                    }
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+        // 2. 默认向云端网关发起 /api/v1/chat
+        val bodyObj = ChatTurnRequest(
+            sessionId = currentRoom.ifBlank { "sess_${deviceId}" },
+            turnId = turnId,
+            userId = userId,
+            deviceId = deviceId,
+            message = message,
+            persona = persona
+        )
+        val bodyJson = gson.toJson(bodyObj)
+        val request = Request.Builder()
+            .url("$serverUrl/api/v1/chat")
+            .post(bodyJson.toRequestBody(jsonMediaType))
+            .build()
+
+        try {
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    return@withContext Result.failure(IOException("Server /api/v1/chat failed with status ${response.code}"))
+                }
+                val respBody = response.body?.string() ?: ""
+                val chatResp = gson.fromJson(respBody, ChatTurnResponse::class.java)
+                Result.success(chatResp.response)
+            }
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }

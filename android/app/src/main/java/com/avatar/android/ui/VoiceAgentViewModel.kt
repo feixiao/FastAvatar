@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.avatar.android.core.audio.AudioPlaybackController
 import com.avatar.android.core.audio.AudioPrivacyGuard
+import com.avatar.android.core.audio.SpeechRecognitionHelper
 import com.avatar.android.core.cloud.CloudClient
+import com.avatar.android.core.config.AppSettings
 import com.avatar.android.core.dispatcher.RouteTarget
 import com.avatar.android.core.memory.MemoryItem
 import com.avatar.android.core.memory.MemoryVault
@@ -41,7 +43,9 @@ class VoiceAgentViewModel(
     val playbackController: AudioPlaybackController,
     val privacyGuard: AudioPrivacyGuard,
     val cloudClient: CloudClient,
-    val deviceId: String
+    val deviceId: String,
+    val appSettings: AppSettings? = null,
+    val speechRecognitionHelper: SpeechRecognitionHelper? = null
 ) : ViewModel() {
 
     val sessionState: StateFlow<SessionState> = stateMachine.state
@@ -64,10 +68,22 @@ class VoiceAgentViewModel(
     private val _auditLogs = MutableStateFlow<List<AuditLogEntry>>(emptyList())
     val auditLogs: StateFlow<List<AuditLogEntry>> = _auditLogs.asStateFlow()
 
+    private val _activePersona = MutableStateFlow(stateMachine.activePersona)
+    val activePersona: StateFlow<String> = _activePersona.asStateFlow()
+
     val isAudioMuted: Boolean
         get() = cloudClient.isAudioMuted
 
     val isPlaying: StateFlow<Boolean> = playbackController.isPlaying
+
+    val isVoiceListening: StateFlow<Boolean> =
+        speechRecognitionHelper?.isListening ?: MutableStateFlow(false).asStateFlow()
+
+    val partialSpeechText: StateFlow<String> =
+        speechRecognitionHelper?.partialTranscript ?: MutableStateFlow("").asStateFlow()
+
+    val speechVolume: StateFlow<Float> =
+        speechRecognitionHelper?.speechVolume ?: MutableStateFlow(0f).asStateFlow()
 
     init {
         refreshMemories()
@@ -85,6 +101,7 @@ class VoiceAgentViewModel(
                 )
                 _messages.value = _messages.value + assistantMsg
                 _pendingMemory.value = memoryVault.pendingMemory
+                _activePersona.value = stateMachine.activePersona
                 refreshMemories()
                 refreshAuditLogs()
             }
@@ -96,10 +113,17 @@ class VoiceAgentViewModel(
     }
 
     fun stopSession() {
+        stopVoiceInput()
         stateMachine.stopSession()
     }
 
     fun submitUtterance(text: String) {
+        if (text.isBlank()) return
+
+        if (stateMachine.state.value == SessionState.STOPPED) {
+            stateMachine.startSession(hasMicPermission = true)
+        }
+
         val userMsg = MessageItem(
             id = "user_${System.currentTimeMillis()}",
             sender = MessageSender.USER,
@@ -107,6 +131,35 @@ class VoiceAgentViewModel(
         )
         _messages.value = _messages.value + userMsg
         stateMachine.submitUtterance(text)
+    }
+
+    fun startVoiceInput(hasMicPermission: Boolean, onRequestPermission: () -> Unit) {
+        if (!hasMicPermission) {
+            onRequestPermission()
+            return
+        }
+
+        if (stateMachine.state.value == SessionState.STOPPED) {
+            stateMachine.startSession(true)
+        }
+
+        // If assistant is currently speaking, barge-in first
+        if (stateMachine.state.value == SessionState.SPEAKING || isPlaying.value) {
+            bargeIn()
+        }
+
+        speechRecognitionHelper?.startListening()
+    }
+
+    fun stopVoiceInput() {
+        speechRecognitionHelper?.stopListening()
+    }
+
+    fun petAvatar() {
+        if (stateMachine.state.value == SessionState.STOPPED) {
+            stateMachine.startSession(hasMicPermission = true)
+        }
+        submitUtterance("摸摸头")
     }
 
     fun bargeIn() {
@@ -123,11 +176,45 @@ class VoiceAgentViewModel(
     fun setCloudConsent(consented: Boolean) {
         _isCloudConsented.value = consented
         stateMachine.isCloudConsented = consented
+        appSettings?.isCloudConsented = consented
     }
 
     fun setOnline(online: Boolean) {
         _isOnline.value = online
         stateMachine.isOnline = online
+    }
+
+    fun updateSettings(
+        serverUrl: String,
+        isCloudConsented: Boolean,
+        autoTts: Boolean,
+        speechRate: Float,
+        activePersona: String,
+        customLlmUrl: String,
+        customLlmKey: String,
+        customLlmModel: String
+    ) {
+        appSettings?.let {
+            it.serverUrl = serverUrl
+            it.isCloudConsented = isCloudConsented
+            it.isAutoTtsEnabled = autoTts
+            it.speechRate = speechRate
+            it.activePersona = activePersona
+            it.customLlmUrl = customLlmUrl
+            it.customLlmKey = customLlmKey
+            it.customLlmModel = customLlmModel
+        }
+
+        cloudClient.serverUrl = serverUrl
+        setCloudConsent(isCloudConsented)
+
+        stateMachine.activePersona = activePersona
+        stateMachine.customLlmUrl = customLlmUrl
+        stateMachine.customLlmKey = customLlmKey
+        stateMachine.customLlmModel = customLlmModel
+        _activePersona.value = activePersona
+
+        playbackController.synthesizer?.setSpeechRate(speechRate)
     }
 
     fun confirmStagedMemory() {

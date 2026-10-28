@@ -31,3 +31,18 @@ data class InterruptRequest(
 data class CloseSessionRequest(
     @SerializedName("session_id") val sessionId: String
 )
+
+data class ChatTurnRequest(
+    @SerializedName("session_id") val sessionId: String,
+    @SerializedName("turn_id") val turnId: String,
+    @SerializedName("user_id") val userId: String,
+    @SerializedName("device_id") val deviceId: String,
+    @SerializedName("message") val message: String,
+    @SerializedName("persona") val persona: String? = null
+)
+
+data class ChatTurnResponse(
+    @SerializedName("turn_id") val turnId: String,
+    @SerializedName("response") val response: String,
+    @SerializedName("latency_ms") val latencyMs: Long? = null
+)

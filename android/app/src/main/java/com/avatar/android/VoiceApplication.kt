@@ -6,7 +6,10 @@ import com.avatar.android.core.audio.AudioFocusListener
 import com.avatar.android.core.audio.AudioPlaybackController
 import com.avatar.android.core.audio.AudioPrivacyGuard
 import com.avatar.android.core.audio.AudioPrivacyListener
+import com.avatar.android.core.audio.AndroidSpeechSynthesizer
+import com.avatar.android.core.audio.SpeechSynthesizer
 import com.avatar.android.core.cloud.CloudClient
+import com.avatar.android.core.config.AppSettings
 import com.avatar.android.core.diagnostics.DiagnosticLogger
 import com.avatar.android.core.dispatcher.FastDispatcher
 import com.avatar.android.core.memory.MemoryVault
@@ -17,6 +20,8 @@ import java.util.UUID
 
 class VoiceApplication : Application() {
 
+    lateinit var appSettings: AppSettings
+        private set
     lateinit var dispatcher: FastDispatcher
         private set
     lateinit var vehicleEngine: MockVehicleEngine
@@ -24,6 +29,8 @@ class VoiceApplication : Application() {
     lateinit var memoryVault: MemoryVault
         private set
     lateinit var cloudClient: CloudClient
+        private set
+    lateinit var speechSynthesizer: SpeechSynthesizer
         private set
     lateinit var playbackController: AudioPlaybackController
         private set
@@ -49,6 +56,8 @@ class VoiceApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        appSettings = AppSettings(this)
+
         dispatcher = FastDispatcher()
         val logFile = File(filesDir, "mock_vehicle.log")
         vehicleEngine = MockVehicleEngine(logFile)
@@ -59,11 +68,16 @@ class VoiceApplication : Application() {
         val diagFile = File(filesDir, "diagnostics.log")
         diagnosticLogger = DiagnosticLogger(diagFile)
 
-        playbackController = AudioPlaybackController()
+        speechSynthesizer = AndroidSpeechSynthesizer(this)
+        speechSynthesizer.setSpeechRate(appSettings.speechRate)
+
+        playbackController = AudioPlaybackController(
+            synthesizer = if (appSettings.isAutoTtsEnabled) speechSynthesizer else null
+        )
         privacyGuard = AudioPrivacyGuard(this, playbackController)
 
         cloudClient = CloudClient(
-            serverUrl = "http://10.0.2.2:8088", // Default Android emulator loopback or LAN IP
+            serverUrl = appSettings.serverUrl,
             userId = "user_pixel",
             deviceId = deviceId,
             clientType = "pixel_10"
@@ -76,7 +90,13 @@ class VoiceApplication : Application() {
             cloudClient = cloudClient,
             playbackController = playbackController,
             diagnosticLogger = diagnosticLogger
-        )
+        ).apply {
+            isCloudConsented = appSettings.isCloudConsented
+            activePersona = appSettings.activePersona
+            customLlmUrl = appSettings.customLlmUrl
+            customLlmKey = appSettings.customLlmKey
+            customLlmModel = appSettings.customLlmModel
+        }
 
         audioFocusHelper = AudioFocusHelper(this, object : AudioFocusListener {
             override fun onAudioFocusLost(isTransient: Boolean) {

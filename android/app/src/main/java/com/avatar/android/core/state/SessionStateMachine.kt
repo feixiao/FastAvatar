@@ -3,6 +3,7 @@ package com.avatar.android.core.state
 import com.avatar.android.core.audio.AudioPlaybackController
 import com.avatar.android.core.cloud.CloudClient
 import com.avatar.android.core.diagnostics.DiagnosticLogger
+import com.avatar.android.core.dialog.LocalCompanionEngine
 import com.avatar.android.core.dispatcher.FastDispatcher
 import com.avatar.android.core.dispatcher.RouteTarget
 import com.avatar.android.core.memory.MemoryVault
@@ -46,6 +47,11 @@ class SessionStateMachine(
 
     var isCloudConsented: Boolean = false
     var isOnline: Boolean = true
+
+    var activePersona: String = "companion"
+    var customLlmUrl: String = ""
+    var customLlmKey: String = ""
+    var customLlmModel: String = ""
 
     @Volatile
     private var activeTurnJob: Job? = null
@@ -106,15 +112,20 @@ class SessionStateMachine(
      */
     fun submitUtterance(text: String, simulateCloudResponse: String? = null) {
         val currentState = _state.value
-        if (currentState != SessionState.LISTENING &&
-            currentState != SessionState.SPEAKING &&
-            currentState != SessionState.LOCAL_ONLY &&
-            currentState != SessionState.OFFLINE) {
+        if (currentState == SessionState.STOPPED) {
+            startSession(hasMicPermission = true)
+        }
+
+        val refreshedState = _state.value
+        if (refreshedState != SessionState.LISTENING &&
+            refreshedState != SessionState.SPEAKING &&
+            refreshedState != SessionState.LOCAL_ONLY &&
+            refreshedState != SessionState.OFFLINE) {
             return
         }
 
         // If currently speaking, auto-interrupt old turn before handling new input
-        if (currentState == SessionState.SPEAKING || activeTurnJob?.isActive == true) {
+        if (refreshedState == SessionState.SPEAKING || activeTurnJob?.isActive == true) {
             interrupt(reason = "barge_in_new_input")
         }
 
@@ -177,7 +188,19 @@ class SessionStateMachine(
 
                 RouteTarget.LOCAL_PERSONA -> {
                     _state.value = SessionState.LOCAL_PROCESSING
-                    val response = "已为您切换至该陪伴人设体验。"
+                    val newPersona = when {
+                        text.contains("猫娘") || text.contains("宠物") || text.contains("可爱") -> "pet"
+                        text.contains("毒舌") || text.contains("损友") -> "roaster"
+                        text.contains("幕僚") || text.contains("助理") || text.contains("顾问") || text.contains("效率") -> "jarvis"
+                        else -> "companion"
+                    }
+                    activePersona = newPersona
+                    val response = when (newPersona) {
+                        "roaster" -> "已为您切换至该陪伴人设体验。做好心理准备，毒舌损友可不会再对你客客气气哦！"
+                        "jarvis" -> "已为您切换至该陪伴人设体验。高效幕僚模式已就绪，直入主题拒绝冗余。"
+                        "pet" -> "已为您切换至该陪伴人设体验。喵呜~ 元气宠物小精灵上线啦！"
+                        else -> "已为您切换至该陪伴人设体验。"
+                    }
                     val elapsed = System.currentTimeMillis() - startTime
 
                     playAndEmitResult(
@@ -220,30 +243,35 @@ class SessionStateMachine(
                 RouteTarget.CLOUD_CHAT -> {
                     _state.value = SessionState.CLOUD_CONNECTING
 
-                    // Check token / session
-                    if (cloudClient.currentRoom.isEmpty()) {
-                        val tokenRes = cloudClient.acquireSessionToken(isCloudConsented)
-                        if (tokenRes.isFailure) {
-                            _state.value = SessionState.LISTENING
-                            _turnResults.emit(
-                                TurnResult(
-                                    turnId = turnId,
-                                    userText = text,
-                                    routeTarget = dispatchResult.target,
-                                    responseText = "云端服务连接失败，请检查网络后重试。",
-                                    latencyMs = System.currentTimeMillis() - startTime
-                                )
+                    // Cloud response synthesis:
+                    // 1. Prioritize simulateCloudResponse (e2e testing or deterministic simulation)
+                    val cloudReply = if (simulateCloudResponse != null) {
+                        simulateCloudResponse
+                    } else {
+                        // 2. Try real remote/custom LLM call via CloudClient
+                        val remoteResult = cloudClient.sendChatMessage(
+                            turnId = turnId,
+                            message = text,
+                            persona = activePersona,
+                            customLlmUrl = customLlmUrl,
+                            customLlmKey = customLlmKey,
+                            customLlmModel = customLlmModel
+                        )
+
+                        if (remoteResult.isSuccess) {
+                            remoteResult.getOrThrow()
+                        } else {
+                            // 3. Graceful Local Companion Fallback (ensures dialogue never breaks)
+                            LocalCompanionEngine.generateResponse(
+                                userInput = text,
+                                persona = activePersona,
+                                memoryVault = memoryVault
                             )
-                            return@launch
                         }
                     }
 
                     _state.value = SessionState.CLOUD_TURN
                     cloudClient.startTurn(turnId)
-
-                    // Cloud response synthesis (or custom simulated payload)
-                    val cloudReply = simulateCloudResponse
-                        ?: "海水呈现蓝色主要是因为水分子对波长较长的红光吸收较强，而对波长较短的蓝光发生强烈散射。"
 
                     val elapsed = System.currentTimeMillis() - startTime
                     diagnosticLogger.logEvent("client_turn_completed", mapOf(
@@ -274,7 +302,12 @@ class SessionStateMachine(
         latencyMs: Long
     ) {
         _state.value = SessionState.SPEAKING
-        playbackController.startPlayback(turnId, response)
+        playbackController.startPlayback(turnId, response) {
+            // Natural TTS finish callback
+            if (activeTurnId == turnId && _state.value == SessionState.SPEAKING) {
+                _state.value = SessionState.LISTENING
+            }
+        }
 
         _turnResults.emit(
             TurnResult(
@@ -286,8 +319,8 @@ class SessionStateMachine(
             )
         )
 
-        // Mark naturally completed unless interrupted
-        if (playbackController.currentTurnId == turnId) {
+        // Mark naturally completed immediately if no active synthesizer is playing
+        if (!playbackController.hasActiveSynthesizer && playbackController.currentTurnId == turnId) {
             playbackController.finishPlayback()
             _state.value = SessionState.LISTENING
         }
