@@ -35,15 +35,15 @@ func main() {
 			app,
 		},
 		Mac: &mac.Options{
-			TitleBar:             mac.TitleBarHidden(),
+			TitleBar:             nil,
 			WebviewIsTransparent: true,
-			WindowIsTranslucent:  true,
+			WindowIsTranslucent:  false,
 			Appearance:           mac.NSAppearanceNameDarkAqua,
 		},
 		Windows: &windows.Options{
 			WebviewIsTransparent: true,
-			WindowIsTranslucent:  true,
-			BackdropType:         windows.Mica,
+			WindowIsTranslucent:  false,
+			BackdropType:         windows.None,
 		},
 	})
 
