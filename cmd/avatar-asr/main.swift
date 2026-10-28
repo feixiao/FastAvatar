@@ -44,8 +44,14 @@ class SpeechManager: NSObject {
         audioConverter = AVAudioConverter(from: inputFormat, to: targetFormat)
 
         if !tapInstalled {
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, time in
-                self?.processAudioBuffer(buffer)
+            if #available(macOS 27.0, *) {
+                try? inputNode.__installTap(onBus: 0, bufferSize: 1024, format: inputFormat, error: ()) { [weak self] buffer, time in
+                    self?.processAudioBuffer(buffer)
+                }
+            } else {
+                inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, time in
+                    self?.processAudioBuffer(buffer)
+                }
             }
             tapInstalled = true
         }
@@ -142,7 +148,7 @@ class SpeechManager: NSObject {
                 }
             }
 
-            if let err = error as NSError? {
+            if error != nil {
                 if !self.lastText.isEmpty && !self.isFinalizing {
                     fputs("[avatar-asr] Finalized on task end: \(self.lastText)\n", stderr)
                     self.sendJSON(["event": "final", "text": self.lastText])

@@ -1,4 +1,4 @@
-.PHONY: help run dev build package start test test-e2e server clean asr android-test android-build livekit-check livekit-stop
+.PHONY: help run dev build package start test test-e2e server clean asr android-test android-build android-install install-apk install apk livekit-check livekit-stop
 
 # 配置变量
 TAGS ?= production
@@ -8,7 +8,7 @@ LDFLAGS ?= -w -s
 help: ## 显示帮助信息
 	@echo "Avatar 构建与管理指令:"
 	@echo ""
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 asr: ## 编译 macOS 原生语音识别组件 (bin/avatar-asr)
 	@mkdir -p bin
@@ -30,6 +30,15 @@ android-test: ## 运行 Android 客户端单元测试
 
 android-build: ## 构建 Android 客户端 Debug APK
 	cd android && ./gradlew assembleDebug
+
+apk: android-build ## 构建 Android 客户端 Debug APK (android-build 的别名)
+
+android-install: ## 构建并安装 Android Debug APK 到已连接的设备或模拟器
+	cd android && ./gradlew installDebug
+
+install-apk: android-install ## 安装 Android Debug APK 到设备 (android-install 的别名)
+
+install: android-install ## 安装应用到设备 (默认安装 Android APK)
 
 livekit-check:
 	@if nc -z -w 1 localhost 7880 2>/dev/null; then \

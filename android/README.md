@@ -114,7 +114,10 @@ android/
 make android-test
 
 # 构建 Debug APK (app/build/outputs/apk/debug/app-debug.apk)
-make android-build
+make android-build   # 或 make apk
+
+# 一键构建并安装 APK 到连接的 Pixel 设备/模拟器
+make android-install # 或 make install-apk / make install
 ```
 
 或者进入 `android` 目录运行：
@@ -123,6 +126,7 @@ make android-build
 cd android
 ./gradlew test            # 执行单元测试
 ./gradlew assembleDebug   # 编译 APK
+./gradlew installDebug    # 编译并安装 APK 到连接设备
 ```
 
 ---
