@@ -3,7 +3,7 @@ version: '3.8'
 services:
   livekit:
     image: livekit/livekit-server:latest
-    container_name: livekit-server
+    container_name: avatar-livekit-server
     restart: unless-stopped
     command: --dev
     ports:
@@ -12,3 +12,41 @@ services:
       - "7882:7882/udp"
     environment:
       - "LIVEKIT_KEYS=devkey: secret_avatar_livekit_key_2026"
+
+  cloud-gateway:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile.gateway
+    container_name: avatar-cloud-gateway
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    depends_on:
+      - livekit
+    environment:
+      - PORT=8088
+      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=secret_avatar_livekit_key_2026
+      - LLM_BASE_URL=http://host.docker.internal:8000/v1
+      - LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  agent-worker:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: avatar-agent-worker
+    restart: unless-stopped
+    depends_on:
+      - livekit
+    environment:
+      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=secret_avatar_livekit_key_2026
+      - LLM_BASE_URL=http://host.docker.internal:8000/v1
+      - LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
+      - AGENT_PERSONA=assistant
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

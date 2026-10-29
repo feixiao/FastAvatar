@@ -1,0 +1,22 @@
+FROM golang:alpine AS builder
+
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY server/ ./server/
+COPY internal/ ./internal/
+RUN CGO_ENABLED=0 go build -o /app/cloud-gateway ./server/cmd/main.go
+
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates
+WORKDIR /app
+COPY --from=builder /app/cloud-gateway .
+
+EXPOSE 8088
+ENV PORT=8088
+ENV LIVEKIT_URL=ws://livekit:7880
+ENV LIVEKIT_API_KEY=devkey
+ENV LIVEKIT_API_SECRET=secret_avatar_livekit_key_2026
+
+CMD ["/app/cloud-gateway"]

@@ -1,10 +1,15 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
+
+	"avatar/internal/llm"
 )
 
 // ServerEvent represents structured operational telemetry strictly without user content.
@@ -48,6 +53,8 @@ type CloudServer struct {
 	mu           sync.RWMutex
 	sessions     map[string]*ActiveSession
 	eventsLog    []ServerEvent // In-memory audit telemetry for PRD verification
+	llmClient    *llm.Client
+	llmModel     string
 }
 
 // NewCloudServer creates a new cloud realtime server.
@@ -56,6 +63,21 @@ func NewCloudServer(tokenService *TokenService) *CloudServer {
 		tokenService: tokenService,
 		sessions:     make(map[string]*ActiveSession),
 	}
+}
+
+// SetLLM configures upstream LLM service for dynamic chat generation.
+func (s *CloudServer) SetLLM(client *llm.Client, model string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.llmClient = client
+	s.llmModel = model
+}
+
+// GetLLMModel returns configured LLM model name.
+func (s *CloudServer) GetLLMModel() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.llmModel
 }
 
 // Routes sets up standard HTTP endpoints.
@@ -132,12 +154,21 @@ type ChatRequest struct {
 	DeviceID  string `json:"device_id"`
 	Message   string `json:"message"`
 	Persona   string `json:"persona,omitempty"`
+	Stream    bool   `json:"stream,omitempty"`
 }
 
 type ChatResponse struct {
 	TurnID    string `json:"turn_id"`
 	Response  string `json:"response"`
 	LatencyMS int64  `json:"latency_ms"`
+}
+
+type StreamChunk struct {
+	TurnID    string `json:"turn_id"`
+	Chunk     string `json:"chunk,omitempty"`
+	Done      bool   `json:"done,omitempty"`
+	LatencyMS int64  `json:"latency_ms,omitempty"`
+	Error     string `json:"error,omitempty"`
 }
 
 func (s *CloudServer) handleChat(w http.ResponseWriter, r *http.Request) {
@@ -153,16 +184,70 @@ func (s *CloudServer) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	start := time.Now()
-	reply := s.generateReply(req.Message, req.Persona)
+	ctx := r.Context()
+
+	// Update session state if session exists
+	s.mu.Lock()
+	if sess, exists := s.sessions[req.SessionID]; exists {
+		sess.State = SessionStateProcessing
+		sess.ActiveTurn = req.TurnID
+		sess.UpdatedAt = time.Now()
+	}
+	s.mu.Unlock()
+
+	wantsStream := req.Stream || strings.Contains(r.Header.Get("Accept"), "text/event-stream")
+
+	if wantsStream {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+
+		var fullReply strings.Builder
+		err := s.streamReply(ctx, req.Message, req.Persona, func(token string) error {
+			fullReply.WriteString(token)
+			chunkPayload, _ := json.Marshal(StreamChunk{
+				TurnID: req.TurnID,
+				Chunk:  token,
+			})
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", chunkPayload)
+			flusher.Flush()
+			return nil
+		})
+
+		latency := time.Since(start).Milliseconds()
+		if err != nil && fullReply.Len() == 0 {
+			// Fallback on total failure before any token sent
+			fallback := s.getFallbackReply(req.Message, req.Persona)
+			chunkPayload, _ := json.Marshal(StreamChunk{
+				TurnID: req.TurnID,
+				Chunk:  fallback,
+			})
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", chunkPayload)
+			flusher.Flush()
+		}
+
+		donePayload, _ := json.Marshal(StreamChunk{
+			TurnID:    req.TurnID,
+			Done:      true,
+			LatencyMS: latency,
+		})
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", donePayload)
+		flusher.Flush()
+
+		s.finishTurnSession(req.SessionID, req.TurnID, latency, err)
+		return
+	}
+
+	reply, err := s.generateReply(ctx, req.Message, req.Persona)
 	latency := time.Since(start).Milliseconds()
 
-	s.recordEvent(ServerEvent{
-		EventName:  "cloud_turn_completed",
-		SessionID:  req.SessionID,
-		TurnID:     req.TurnID,
-		Platform:   "gateway",
-		DurationMS: latency,
-	})
+	s.finishTurnSession(req.SessionID, req.TurnID, latency, err)
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(ChatResponse{
@@ -172,7 +257,87 @@ func (s *CloudServer) handleChat(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *CloudServer) generateReply(msg, persona string) string {
+func (s *CloudServer) finishTurnSession(sessionID, turnID string, latency int64, err error) {
+	s.mu.Lock()
+	if sess, exists := s.sessions[sessionID]; exists {
+		sess.State = SessionStateReady
+		sess.ActiveTurn = ""
+		sess.UpdatedAt = time.Now()
+	}
+	s.mu.Unlock()
+
+	errorCode := ""
+	if err != nil {
+		errorCode = "ERR_UPSTREAM_LLM"
+	}
+
+	s.recordEvent(ServerEvent{
+		EventName:  "cloud_turn_completed",
+		SessionID:  sessionID,
+		TurnID:     turnID,
+		Platform:   "gateway",
+		DurationMS: latency,
+		ErrorCode:  errorCode,
+	})
+}
+
+func (s *CloudServer) streamReply(ctx context.Context, msg, persona string, onToken func(string) error) error {
+	s.mu.RLock()
+	client := s.llmClient
+	model := s.llmModel
+	s.mu.RUnlock()
+
+	if client == nil {
+		fallback := s.getFallbackReply(msg, persona)
+		return onToken(fallback)
+	}
+
+	if model == "" {
+		model = "default"
+	}
+
+	systemPrompt := getPersonaPrompt(persona)
+	req := llm.ChatCompletionRequest{
+		Model: model,
+		Messages: []llm.Message{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: msg},
+		},
+		Temperature: 0.7,
+	}
+
+	return client.StreamChat(ctx, req, onToken)
+}
+
+func (s *CloudServer) generateReply(ctx context.Context, msg, persona string) (string, error) {
+	var builder strings.Builder
+	err := s.streamReply(ctx, msg, persona, func(token string) error {
+		builder.WriteString(token)
+		return nil
+	})
+	if err != nil {
+		if builder.Len() > 0 {
+			return builder.String(), err
+		}
+		return s.getFallbackReply(msg, persona), err
+	}
+	return builder.String(), nil
+}
+
+func getPersonaPrompt(persona string) string {
+	switch persona {
+	case "roaster":
+		return "你是一个幽默犀利的吐槽高手，说话毒舌但充满关怀和智慧，善于用讽刺和诙谐化解尴尬，句句精辟，语言简明有力，适合语音播报。"
+	case "jarvis":
+		return "你是一个极度严谨高效的智能顾问与私人幕僚，擅长结构化拆解问题并提供执行导向的高价值建议，语气专业温和克制，语言精炼。"
+	case "pet":
+		return "你是一只贴心黏人的专属桌宠小伴侣，性格乖巧软萌，喜欢用拟声词（如喵呜、蹭蹭）表达喜爱与支持，永远陪伴倾听。"
+	default:
+		return "你是一个温暖亲切、富有同理心的 AI 语音伴侣，倾听并支持用户，回答自然口语化、简洁精炼适合语音播报。"
+	}
+}
+
+func (s *CloudServer) getFallbackReply(msg, persona string) string {
 	switch persona {
 	case "roaster":
 		return "哟，稀客啊！说吧，今天又遇到什么让人哭笑不得的事想让我吐槽了？"

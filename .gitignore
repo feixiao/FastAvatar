@@ -17,3 +17,9 @@ avatar_config.json
 .DS_Store
 .idea/
 .vscode/
+
+# Python & Virtual Environments
+__pycache__/
+*.pyc
+.venv/
+venv/

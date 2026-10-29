@@ -72,3 +72,45 @@ func TestCloudClient_EndToEndLifecycle(t *testing.T) {
 		t.Fatalf("expected state disconnected, got %s", client.GetState())
 	}
 }
+
+func TestCloudClient_ChatAndStreaming(t *testing.T) {
+	tokenSvc := server.NewTokenService(server.TokenConfig{
+		APIKey:     "testkey",
+		APISecret:  "secretsecretsecret123456789012345",
+		LiveKitURL: "ws://localhost:7880",
+	})
+	cloudSrv := server.NewCloudServer(tokenSvc)
+	ts := httptest.NewServer(cloudSrv.Routes())
+	defer ts.Close()
+
+	client := NewClient(ts.URL, "user_test", "mac_device_01", "mac")
+	ctx := context.Background()
+
+	// 1. Establish session token
+	_, err := client.AcquireSessionToken(ctx, true)
+	if err != nil {
+		t.Fatalf("failed to acquire token: %v", err)
+	}
+
+	// 2. Test unary Chat
+	chatRes, err := client.Chat(ctx, "turn_chat_1", "你好呀！", "pet")
+	if err != nil {
+		t.Fatalf("chat failed: %v", err)
+	}
+	if chatRes.TurnID != "turn_chat_1" || chatRes.Response == "" {
+		t.Fatalf("invalid chat response: %+v", chatRes)
+	}
+
+	// 3. Test ChatStream
+	var streamedTokens []string
+	err = client.ChatStream(ctx, "turn_stream_1", "在吗？", "jarvis", func(chunk string) error {
+		streamedTokens = append(streamedTokens, chunk)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("chat stream failed: %v", err)
+	}
+	if len(streamedTokens) == 0 {
+		t.Fatal("expected at least one streamed token")
+	}
+}

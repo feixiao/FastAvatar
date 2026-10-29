@@ -1,12 +1,14 @@
 package cloud
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -29,6 +31,20 @@ type TokenResponse struct {
 	RoomName   string `json:"room_name"`
 	Token      string `json:"token"`
 	ExpiresIn  int64  `json:"expires_in_seconds"`
+}
+
+type ChatResponse struct {
+	TurnID    string `json:"turn_id"`
+	Response  string `json:"response"`
+	LatencyMS int64  `json:"latency_ms"`
+}
+
+type streamChunkPayload struct {
+	TurnID    string `json:"turn_id"`
+	Chunk     string `json:"chunk,omitempty"`
+	Done      bool   `json:"done,omitempty"`
+	LatencyMS int64  `json:"latency_ms,omitempty"`
+	Error     string `json:"error,omitempty"`
 }
 
 // Client manages cloud session lifecycle, token negotiation, and turn-level interruptions.
@@ -212,4 +228,123 @@ func (c *Client) GetState() ConnectionState {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.state
+}
+
+// Chat invokes the cloud server /api/v1/chat endpoint and returns full response.
+func (c *Client) Chat(ctx context.Context, turnID, message, persona string) (*ChatResponse, error) {
+	c.mu.RLock()
+	room := c.currentRoom
+	c.mu.RUnlock()
+
+	payload, err := json.Marshal(map[string]interface{}{
+		"session_id": room,
+		"turn_id":    turnID,
+		"user_id":    c.userID,
+		"device_id":  c.deviceID,
+		"message":    message,
+		"persona":    persona,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal chat request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.serverURL+"/api/v1/chat", bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("create chat request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("do chat request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("chat request failed with status: %d", resp.StatusCode)
+	}
+
+	var res ChatResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("decode chat response: %w", err)
+	}
+	return &res, nil
+}
+
+// ChatStream invokes the cloud server /api/v1/chat with SSE streaming and invokes onChunk for each token.
+func (c *Client) ChatStream(ctx context.Context, turnID, message, persona string, onChunk func(string) error) error {
+	c.mu.RLock()
+	room := c.currentRoom
+	c.mu.RUnlock()
+
+	payload, err := json.Marshal(map[string]interface{}{
+		"session_id": room,
+		"turn_id":    turnID,
+		"user_id":    c.userID,
+		"device_id":  c.deviceID,
+		"message":    message,
+		"persona":    persona,
+		"stream":     true,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal stream request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.serverURL+"/api/v1/chat", bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("create stream request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("do stream request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("stream request failed with status: %d", resp.StatusCode)
+	}
+
+	reader := bufio.NewReader(resp.Body)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			break
+		}
+
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+
+		dataStr := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if dataStr == "" {
+			continue
+		}
+
+		var chunk streamChunkPayload
+		if err := json.Unmarshal([]byte(dataStr), &chunk); err != nil {
+			continue
+		}
+
+		if chunk.Chunk != "" && onChunk != nil {
+			if err := onChunk(chunk.Chunk); err != nil {
+				return err
+			}
+		}
+
+		if chunk.Done {
+			break
+		}
+	}
+
+	return nil
 }

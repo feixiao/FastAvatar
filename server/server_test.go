@@ -1,11 +1,16 @@
 package server
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"avatar/internal/llm"
 )
 
 func TestServer_AuthAndConsentGate(t *testing.T) {
@@ -134,5 +139,130 @@ func TestServer_InterruptAndCloseLifecycle(t *testing.T) {
 		if ev.EventName == "" || ev.Timestamp == "" {
 			t.Errorf("incomplete telemetry event: %+v", ev)
 		}
+	}
+}
+
+func TestServer_LLMUnaryAndStreamingChat(t *testing.T) {
+	// 1. Mock upstream OpenAI-compatible LLM endpoint
+	var lastReceivedSystemPrompt string
+	upstreamSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req llm.ChatCompletionRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		for _, m := range req.Messages {
+			if m.Role == "system" {
+				lastReceivedSystemPrompt = m.Content
+			}
+		}
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher := w.(http.Flusher)
+		tokens := []string{"云端", "智能体", "为您服务。"}
+		for _, tok := range tokens {
+			chunkJSON := fmt.Sprintf(`{"choices":[{"delta":{"content":"%s"}}]}`, tok)
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", chunkJSON)
+			flusher.Flush()
+		}
+		_, _ = fmt.Fprintf(w, "data: [DONE]\n\n")
+		flusher.Flush()
+	}))
+	defer upstreamSrv.Close()
+
+	tokenSvc := NewTokenService(TokenConfig{
+		APIKey:     "testkey",
+		APISecret:  "secretsecretsecret123456789012345",
+		LiveKitURL: "ws://localhost:7880",
+	})
+	srv := NewCloudServer(tokenSvc)
+	srv.SetLLM(llm.NewClient(upstreamSrv.URL, "key_123"), "qwen-2.5-7b")
+	handler := srv.Routes()
+
+	// 2. Unary Chat verification with Roaster persona
+	unaryReqBody, _ := json.Marshal(ChatRequest{
+		SessionID: "room_test_1",
+		TurnID:    "turn_01",
+		UserID:    "user_frank",
+		DeviceID:  "mac_01",
+		Message:   "你觉得今天天气怎么样？",
+		Persona:   "roaster",
+	})
+	wUnary := httptest.NewRecorder()
+	handler.ServeHTTP(wUnary, httptest.NewRequest(http.MethodPost, "/api/v1/chat", bytes.NewReader(unaryReqBody)))
+
+	if wUnary.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from unary chat, got %d: %s", wUnary.Code, wUnary.Body.String())
+	}
+	var unaryRes ChatResponse
+	if err := json.Unmarshal(wUnary.Body.Bytes(), &unaryRes); err != nil {
+		t.Fatalf("failed to decode unary response: %v", err)
+	}
+	if unaryRes.Response != "云端智能体为您服务。" {
+		t.Fatalf("expected accumulated response, got %s", unaryRes.Response)
+	}
+	if !strings.Contains(lastReceivedSystemPrompt, "吐槽") {
+		t.Fatalf("expected roaster prompt to be sent to upstream LLM, got: %s", lastReceivedSystemPrompt)
+	}
+
+	// 3. Streaming Chat verification with SSE
+	streamReqBody, _ := json.Marshal(ChatRequest{
+		SessionID: "room_test_1",
+		TurnID:    "turn_02",
+		UserID:    "user_frank",
+		DeviceID:  "mac_01",
+		Message:   "详细说说。",
+		Persona:   "jarvis",
+		Stream:    true,
+	})
+	wStream := httptest.NewRecorder()
+	handler.ServeHTTP(wStream, httptest.NewRequest(http.MethodPost, "/api/v1/chat", bytes.NewReader(streamReqBody)))
+
+	if wStream.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from stream chat, got %d", wStream.Code)
+	}
+	if !strings.Contains(wStream.Header().Get("Content-Type"), "text/event-stream") {
+		t.Fatalf("expected SSE content type, got %s", wStream.Header().Get("Content-Type"))
+	}
+
+	scanner := bufio.NewScanner(wStream.Body)
+	var receivedChunks []string
+	foundDone := false
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "data:") {
+			raw := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+			var chunk StreamChunk
+			if err := json.Unmarshal([]byte(raw), &chunk); err == nil {
+				if chunk.Chunk != "" {
+					receivedChunks = append(receivedChunks, chunk.Chunk)
+				}
+				if chunk.Done {
+					foundDone = true
+				}
+			}
+		}
+	}
+	if !foundDone || len(receivedChunks) == 0 {
+		t.Fatalf("expected valid stream chunks and done indicator, got chunks: %v, done: %v", receivedChunks, foundDone)
+	}
+	if !strings.Contains(lastReceivedSystemPrompt, "严谨") {
+		t.Fatalf("expected jarvis prompt, got: %s", lastReceivedSystemPrompt)
+	}
+
+	// 4. Test Upstream LLM Failure & Graceful Fallback
+	upstreamSrv.Close() // terminate upstream
+	wFail := httptest.NewRecorder()
+	failReqBody, _ := json.Marshal(ChatRequest{
+		SessionID: "room_test_1",
+		TurnID:    "turn_03",
+		Message:   "测试离线",
+		Persona:   "pet",
+	})
+	handler.ServeHTTP(wFail, httptest.NewRequest(http.MethodPost, "/api/v1/chat", bytes.NewReader(failReqBody)))
+	if wFail.Code != http.StatusOK {
+		t.Fatalf("expected graceful 200 OK with fallback, got %d", wFail.Code)
+	}
+	var failRes ChatResponse
+	_ = json.Unmarshal(wFail.Body.Bytes(), &failRes)
+	if !strings.Contains(failRes.Response, "喵呜") {
+		t.Fatalf("expected pet fallback reply on upstream failure, got %s", failRes.Response)
 	}
 }
