@@ -90,10 +90,30 @@ class AndroidSpeechSynthesizer(
         onDone: (() -> Unit)?,
         onError: ((String) -> Unit)?
     ) {
+        speakChunk(
+            turnId = turnId,
+            utteranceId = turnId,
+            text = text,
+            isQueueAdd = false,
+            onStart = onStart,
+            onDone = onDone,
+            onError = onError
+        )
+    }
+
+    override fun speakChunk(
+        turnId: String,
+        utteranceId: String,
+        text: String,
+        isQueueAdd: Boolean,
+        onStart: (() -> Unit)?,
+        onDone: (() -> Unit)?,
+        onError: ((String) -> Unit)?
+    ) {
         currentTurnId = turnId
-        if (onStart != null) startCallbacks[turnId] = onStart
-        if (onDone != null) doneCallbacks[turnId] = onDone
-        if (onError != null) errorCallbacks[turnId] = onError
+        if (onStart != null) startCallbacks[utteranceId] = onStart
+        if (onDone != null) doneCallbacks[utteranceId] = onDone
+        if (onError != null) errorCallbacks[utteranceId] = onError
 
         if (!isInitialized || tts == null) {
             // TTS 尚未就绪，快速降级触发 onDone 避免状态卡死
@@ -103,8 +123,9 @@ class AndroidSpeechSynthesizer(
             return
         }
 
+        val queueMode = if (isQueueAdd) TextToSpeech.QUEUE_ADD else TextToSpeech.QUEUE_FLUSH
         val params = Bundle()
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, turnId)
+        tts?.speak(text, queueMode, params, utteranceId)
     }
 
     override fun stop() {

@@ -91,15 +91,29 @@ class VoiceAgentViewModel(
 
         viewModelScope.launch {
             stateMachine.turnResults.collect { turn ->
-                val assistantMsg = MessageItem(
-                    id = turn.turnId,
-                    sender = MessageSender.ASSISTANT,
-                    text = turn.responseText,
-                    routeTarget = turn.routeTarget,
-                    latencyMs = turn.latencyMs,
-                    isInterrupted = turn.isInterrupted
-                )
-                _messages.value = _messages.value + assistantMsg
+                val currentList = _messages.value
+                val existingIndex = currentList.indexOfFirst { it.id == turn.turnId }
+                if (existingIndex >= 0) {
+                    // 打断回滚：更新已有回答为实际听到的截断文本并标记被打断
+                    val updated = currentList.toMutableList()
+                    val old = updated[existingIndex]
+                    updated[existingIndex] = old.copy(
+                        text = turn.responseText,
+                        isInterrupted = turn.isInterrupted,
+                        latencyMs = turn.latencyMs
+                    )
+                    _messages.value = updated
+                } else {
+                    val assistantMsg = MessageItem(
+                        id = turn.turnId,
+                        sender = MessageSender.ASSISTANT,
+                        text = turn.responseText,
+                        routeTarget = turn.routeTarget,
+                        latencyMs = turn.latencyMs,
+                        isInterrupted = turn.isInterrupted
+                    )
+                    _messages.value = currentList + assistantMsg
+                }
                 _pendingMemory.value = memoryVault.pendingMemory
                 _activePersona.value = stateMachine.activePersona
                 refreshMemories()

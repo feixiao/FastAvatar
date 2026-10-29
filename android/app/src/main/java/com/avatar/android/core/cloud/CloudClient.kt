@@ -3,6 +3,9 @@ package com.avatar.android.core.cloud
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -187,6 +190,87 @@ class CloudClient(
             Result.failure(e)
         }
     }
+
+    /**
+     * 流式获取聊天回复 Token (基于 SSE Server-Sent Events 流式通道)
+     */
+    fun streamChatMessage(
+        turnId: String,
+        message: String,
+        persona: String,
+        customLlmUrl: String = "",
+        customLlmKey: String = "",
+        customLlmModel: String = ""
+    ): Flow<String> = flow {
+        if (customLlmUrl.isNotBlank()) {
+            val endpoint = if (customLlmUrl.endsWith("/chat/completions")) {
+                customLlmUrl
+            } else {
+                "${customLlmUrl.trimEnd('/')}/chat/completions"
+            }
+
+            val systemPrompt = when (persona) {
+                "roaster" -> "你是一位幽默犀利的毒舌损友，说话风趣、善意吐槽，拒绝鸡汤和套话，简短口语化。"
+                "jarvis" -> "你是一位高水准的私人幕僚顾问，回答极其凝练、专业、有条理，适合快速语音收听。"
+                "pet" -> "你是一只元气可爱的猫娘/宠物小精灵，说话活泼软萌、爱撒娇，常用‘喵呜’等语气词。"
+                else -> "你是一位温柔体贴的知心伴侣，温和共情、善解人意，像老朋友闲聊一样陪伴用户。"
+            }
+
+            val requestBodyJson = gson.toJson(
+                mapOf(
+                    "model" to (customLlmModel.ifBlank { "gpt-3.5-turbo" }),
+                    "stream" to true,
+                    "messages" to listOf(
+                        mapOf("role" to "system", "content" to systemPrompt),
+                        mapOf("role" to "user", "content" to message)
+                    ),
+                    "temperature" to 0.7,
+                    "max_tokens" to 300
+                )
+            )
+
+            val reqBuilder = Request.Builder()
+                .url(endpoint)
+                .post(requestBodyJson.toRequestBody(jsonMediaType))
+
+            if (customLlmKey.isNotBlank()) {
+                reqBuilder.addHeader("Authorization", "Bearer $customLlmKey")
+            }
+
+            val response = httpClient.newCall(reqBuilder.build()).execute()
+            if (!response.isSuccessful) {
+                throw IOException("LLM streaming failed with status ${response.code}")
+            }
+
+            response.body?.source()?.let { source ->
+                while (!source.exhausted()) {
+                    val line = source.readUtf8Line() ?: break
+                    if (line.startsWith("data: ")) {
+                        val data = line.removePrefix("data: ").trim()
+                        if (data == "[DONE]") break
+                        try {
+                            val root = gson.fromJson(data, JsonObject::class.java)
+                            val choices = root.getAsJsonArray("choices")
+                            val delta = choices?.get(0)?.asJsonObject?.getAsJsonObject("delta")
+                            val content = delta?.get("content")?.asString
+                            if (!content.isNullOrEmpty()) {
+                                emit(content)
+                            }
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+            }
+        } else {
+            // 云端标准接口非流式降级为单次 emit
+            val result = sendChatMessage(turnId, message, persona)
+            if (result.isSuccess) {
+                emit(result.getOrThrow())
+            } else {
+                throw result.exceptionOrNull() ?: IOException("Failed to send chat message")
+            }
+        }
+    }.flowOn(Dispatchers.IO)
 
     fun startTurn(turnId: String): Boolean {
         synchronized(lock) {

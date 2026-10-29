@@ -9,7 +9,8 @@ import com.avatar.android.core.memory.MemoryVault
 import com.avatar.android.core.mockvehicle.MockVehicleEngine
 import com.avatar.android.core.state.SessionState
 import com.avatar.android.core.state.SessionStateMachine
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import com.avatar.android.core.state.TurnResult
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -112,6 +113,41 @@ class SessionStateMachineTest {
         assertFalse("Playback should be stopped", playbackController.isPlaying.value)
         assertTrue("Interruption stop latency should be <= 80ms, actual: $latencyMs ms", latencyMs <= 80)
         assertEquals(SessionState.LISTENING, stateMachine.state.value)
+    }
+
+    @Test
+    fun testBargeInInterruption_RollsBackTurnResultContext() = testScope.runTest {
+        stateMachine.startSession(hasMicPermission = true)
+
+        val turnResults = mutableListOf<TurnResult>()
+        val job = testScope.launch {
+            stateMachine.turnResults.collect {
+                turnResults.add(it)
+            }
+        }
+
+        // 提交自定义云端回复的长文本
+        stateMachine.submitUtterance(
+            text = "讲个长故事",
+            simulateCloudResponse = "很久很久以前，在一个遥远的山谷里，住着一只可爱的小松鼠。它每天都会收集松果。"
+        )
+
+        // 此时已开始播放并发出首个 TurnResult (isInterrupted = false)
+        assertTrue(turnResults.isNotEmpty())
+        assertEquals(false, turnResults.last().isInterrupted)
+
+        // 触发插话打断
+        stateMachine.interrupt(reason = "user_barge_in")
+
+        // 验证打断后发射了回滚后的 TurnResult (isInterrupted = true)
+        val lastResult = turnResults.last()
+        assertTrue("Interrupted result must have isInterrupted = true", lastResult.isInterrupted)
+        assertTrue(
+            "Rolled back text should contain interruption suffix",
+            lastResult.responseText.contains("（被用户打断）")
+        )
+
+        job.cancel()
     }
 
     @Test

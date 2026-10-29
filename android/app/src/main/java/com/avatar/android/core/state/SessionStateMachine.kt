@@ -1,6 +1,7 @@
 package com.avatar.android.core.state
 
 import com.avatar.android.core.audio.AudioPlaybackController
+import com.avatar.android.core.audio.SentenceChunker
 import com.avatar.android.core.cloud.CloudClient
 import com.avatar.android.core.diagnostics.DiagnosticLogger
 import com.avatar.android.core.dialog.LocalCompanionEngine
@@ -58,7 +59,15 @@ class SessionStateMachine(
     @Volatile
     var activeTurnId: String? = null
         private set
-
+    @Volatile
+    var activeUserText: String = ""
+        private set
+    @Volatile
+    var activeRouteTarget: RouteTarget? = null
+        private set
+    @Volatile
+    var activeTurnStartTime: Long = 0
+        private set
     fun startSession(hasMicPermission: Boolean): Boolean {
         if (_state.value != SessionState.STOPPED && _state.value != SessionState.PAUSED) {
             return false
@@ -131,7 +140,8 @@ class SessionStateMachine(
 
         val turnId = "turn_${UUID.randomUUID().toString().take(8)}"
         activeTurnId = turnId
-
+        activeUserText = text
+        activeTurnStartTime = System.currentTimeMillis()
         activeTurnJob = scope.launch {
             val startTime = System.currentTimeMillis()
             _state.value = SessionState.ROUTING
@@ -142,6 +152,7 @@ class SessionStateMachine(
                 isOnline = isOnline
             )
 
+            activeRouteTarget = dispatchResult.target
             when (dispatchResult.target) {
                 RouteTarget.LOCAL_MEMORY -> {
                     _state.value = SessionState.LOCAL_PROCESSING
@@ -243,12 +254,110 @@ class SessionStateMachine(
                 RouteTarget.CLOUD_CHAT -> {
                     _state.value = SessionState.CLOUD_CONNECTING
 
-                    // Cloud response synthesis:
-                    // 1. Prioritize simulateCloudResponse (e2e testing or deterministic simulation)
-                    val cloudReply = if (simulateCloudResponse != null) {
-                        simulateCloudResponse
+                    if (simulateCloudResponse != null) {
+                        _state.value = SessionState.CLOUD_TURN
+                        cloudClient.startTurn(turnId)
+                        val elapsed = System.currentTimeMillis() - startTime
+                        diagnosticLogger.logEvent("client_turn_completed", mapOf(
+                            "route" to "CLOUD_CHAT",
+                            "latency_ms" to elapsed,
+                            "result" to "success"
+                        ))
+                        cloudClient.finishTurn(turnId)
+                        playAndEmitResult(
+                            turnId = turnId,
+                            userText = text,
+                            target = dispatchResult.target,
+                            response = simulateCloudResponse,
+                            latencyMs = elapsed
+                        )
+                    } else if (customLlmUrl.isNotBlank()) {
+                        // 流式 Token 接收 + 标点切句极速首音播放
+                        try {
+                            _state.value = SessionState.CLOUD_TURN
+                            cloudClient.startTurn(turnId)
+                            val streamChunker = SentenceChunker()
+                            val fullResponse = StringBuilder()
+                            var isPlaybackStarted = false
+
+                            playbackController.startStreamingPlayback(turnId) {
+                                if (activeTurnId == turnId && _state.value == SessionState.SPEAKING) {
+                                    _state.value = SessionState.LISTENING
+                                    activeTurnId = null
+                                }
+                            }
+
+                            cloudClient.streamChatMessage(
+                                turnId = turnId,
+                                message = text,
+                                persona = activePersona,
+                                customLlmUrl = customLlmUrl,
+                                customLlmKey = customLlmKey,
+                                customLlmModel = customLlmModel
+                            ).collect { token ->
+                                fullResponse.append(token)
+                                val chunks = streamChunker.push(token)
+                                for (chunk in chunks) {
+                                    if (!isPlaybackStarted) {
+                                        _state.value = SessionState.SPEAKING
+                                        isPlaybackStarted = true
+                                    }
+                                    playbackController.enqueueChunk(turnId, chunk)
+                                }
+                            }
+
+                            val remainingChunks = streamChunker.flush()
+                            for (chunk in remainingChunks) {
+                                if (!isPlaybackStarted) {
+                                    _state.value = SessionState.SPEAKING
+                                    isPlaybackStarted = true
+                                }
+                                playbackController.enqueueChunk(turnId, chunk)
+                            }
+                            playbackController.finishStreaming(turnId)
+
+                            val elapsed = System.currentTimeMillis() - startTime
+                            diagnosticLogger.logEvent("client_turn_completed", mapOf(
+                                "route" to "CLOUD_CHAT",
+                                "latency_ms" to elapsed,
+                                "result" to "success"
+                            ))
+                            cloudClient.finishTurn(turnId)
+
+                            _turnResults.emit(
+                                TurnResult(
+                                    turnId = turnId,
+                                    userText = text,
+                                    routeTarget = dispatchResult.target,
+                                    responseText = fullResponse.toString(),
+                                    latencyMs = elapsed,
+                                    isInterrupted = false
+                                )
+                            )
+
+                            if (!playbackController.hasActiveSynthesizer && playbackController.currentTurnId == turnId) {
+                                playbackController.finishPlayback()
+                                _state.value = SessionState.LISTENING
+                                activeTurnId = null
+                            }
+                        } catch (e: Exception) {
+                            // 优雅降级到本地伴生闲聊引擎
+                            val fallbackReply = LocalCompanionEngine.generateResponse(
+                                userInput = text,
+                                persona = activePersona,
+                                memoryVault = memoryVault
+                            )
+                            val elapsed = System.currentTimeMillis() - startTime
+                            playAndEmitResult(
+                                turnId = turnId,
+                                userText = text,
+                                target = dispatchResult.target,
+                                response = fallbackReply,
+                                latencyMs = elapsed
+                            )
+                        }
                     } else {
-                        // 2. Try real remote/custom LLM call via CloudClient
+                        // 2. 标准云端调用或本地伴生兜底
                         val remoteResult = cloudClient.sendChatMessage(
                             turnId = turnId,
                             message = text,
@@ -258,42 +367,40 @@ class SessionStateMachine(
                             customLlmModel = customLlmModel
                         )
 
-                        if (remoteResult.isSuccess) {
+                        val cloudReply = if (remoteResult.isSuccess) {
                             remoteResult.getOrThrow()
                         } else {
-                            // 3. Graceful Local Companion Fallback (ensures dialogue never breaks)
                             LocalCompanionEngine.generateResponse(
                                 userInput = text,
                                 persona = activePersona,
                                 memoryVault = memoryVault
                             )
                         }
+
+                        _state.value = SessionState.CLOUD_TURN
+                        cloudClient.startTurn(turnId)
+
+                        val elapsed = System.currentTimeMillis() - startTime
+                        diagnosticLogger.logEvent("client_turn_completed", mapOf(
+                            "route" to "CLOUD_CHAT",
+                            "latency_ms" to elapsed,
+                            "result" to "success"
+                        ))
+
+                        cloudClient.finishTurn(turnId)
+
+                        playAndEmitResult(
+                            turnId = turnId,
+                            userText = text,
+                            target = dispatchResult.target,
+                            response = cloudReply,
+                            latencyMs = elapsed
+                        )
                     }
-
-                    _state.value = SessionState.CLOUD_TURN
-                    cloudClient.startTurn(turnId)
-
-                    val elapsed = System.currentTimeMillis() - startTime
-                    diagnosticLogger.logEvent("client_turn_completed", mapOf(
-                        "route" to "CLOUD_CHAT",
-                        "latency_ms" to elapsed,
-                        "result" to "success"
-                    ))
-
-                    cloudClient.finishTurn(turnId)
-
-                    playAndEmitResult(
-                        turnId = turnId,
-                        userText = text,
-                        target = dispatchResult.target,
-                        response = cloudReply,
-                        latencyMs = elapsed
-                    )
                 }
             }
         }
     }
-
     private suspend fun playAndEmitResult(
         turnId: String,
         userText: String,
@@ -302,10 +409,13 @@ class SessionStateMachine(
         latencyMs: Long
     ) {
         _state.value = SessionState.SPEAKING
+        activeRouteTarget = target
+
         playbackController.startPlayback(turnId, response) {
             // Natural TTS finish callback
             if (activeTurnId == turnId && _state.value == SessionState.SPEAKING) {
                 _state.value = SessionState.LISTENING
+                activeTurnId = null
             }
         }
 
@@ -315,7 +425,8 @@ class SessionStateMachine(
                 userText = userText,
                 routeTarget = target,
                 responseText = response,
-                latencyMs = latencyMs
+                latencyMs = latencyMs,
+                isInterrupted = false
             )
         )
 
@@ -323,6 +434,7 @@ class SessionStateMachine(
         if (!playbackController.hasActiveSynthesizer && playbackController.currentTurnId == turnId) {
             playbackController.finishPlayback()
             _state.value = SessionState.LISTENING
+            activeTurnId = null
         }
     }
 
@@ -331,21 +443,47 @@ class SessionStateMachine(
      */
     fun interrupt(reason: String = "user_barge_in"): Long {
         val currentTid = activeTurnId
+        val currentUserText = activeUserText
+        val currentRoute = activeRouteTarget ?: RouteTarget.CLOUD_CHAT
+        val wasSpeaking = _state.value == SessionState.SPEAKING
+        val wasActiveTurn = currentTid != null
+
         activeTurnJob?.cancel()
         activeTurnJob = null
         activeTurnId = null
 
+        val spokenText = playbackController.getSpokenText()
         val stopLatency = playbackController.stopPlayback(reason = reason)
 
-        currentTid?.let { tid ->
+        if (wasActiveTurn && currentTid != null) {
             scope.launch {
-                cloudClient.interruptActiveTurn(tid, reason)
+                cloudClient.interruptActiveTurn(currentTid, reason)
             }
             diagnosticLogger.logEvent("client_turn_cancelled", mapOf(
-                "turn_id" to tid,
+                "turn_id" to currentTid,
                 "reason" to reason,
                 "stop_latency_ms" to stopLatency
             ))
+
+            // 精准打断记忆回滚：实际听到的内容 == 模型记住的内容
+            val rolledBackText = if (wasSpeaking && spokenText.isNotBlank()) {
+                "$spokenText（被用户打断）"
+            } else {
+                "（被用户打断）"
+            }
+
+            scope.launch {
+                _turnResults.emit(
+                    TurnResult(
+                        turnId = currentTid,
+                        userText = currentUserText,
+                        routeTarget = currentRoute,
+                        responseText = rolledBackText,
+                        latencyMs = stopLatency,
+                        isInterrupted = true
+                    )
+                )
+            }
         }
 
         if (_state.value != SessionState.STOPPED && _state.value != SessionState.PAUSED) {

@@ -25,6 +25,25 @@ interface SpeechSynthesizer {
     )
 
     /**
+     * 合成并播报分句片段 (用于低延迟流式切句)
+     * @param turnId 当前回合 ID
+     * @param utteranceId 当前分句片段的唯一 ID
+     * @param text 待朗读文本
+     * @param isQueueAdd 是否加入播放队列 (false 为立即清空队列排他播放)
+     */
+    fun speakChunk(
+        turnId: String,
+        utteranceId: String,
+        text: String,
+        isQueueAdd: Boolean = false,
+        onStart: (() -> Unit)? = null,
+        onDone: (() -> Unit)? = null,
+        onError: ((String) -> Unit)? = null
+    ) {
+        speak(turnId, text, onStart, onDone, onError)
+    }
+
+    /**
      * 极速停止当前播报 (< 80ms)
      */
     fun stop()
