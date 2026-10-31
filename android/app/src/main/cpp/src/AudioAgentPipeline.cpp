@@ -420,8 +420,6 @@ void AudioAgentPipeline::CognitionWorkerLoop() {
         watchdog_.Stop();
         // 意图补偿防漏调：若端侧小模型未能吐出 <|tool_call|>，而该 Query 包含明确的系统控制指令
         if (!chunker.HasDispatchedToolCall() && !fallback_tool_json.empty() && !IsBargeInAborted()) {
-            std::cerr << "[IntentArbiter] Compensating missing tool call for query: '" << query
-                      << "' -> dispatching: " << fallback_tool_json << std::endl;
             DispatchAsyncToolCall(fallback_tool_json);
 
             // 若模型未生成任何回复（如超时或未吐字），自动合成口语安抚回复推入 TTS
