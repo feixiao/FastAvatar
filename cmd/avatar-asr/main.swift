@@ -89,7 +89,7 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
         recognitionTask?.cancel()
         recognitionRequest = nil
         recognitionTask = nil
-        sendJSON(["event": "state", "state": "idle"])
+        sendJSON(["event": "state", "state": "idle", "tag": "stop"])
     }
 
     private func startRecognitionSession() {
@@ -117,7 +117,12 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
 
         recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
             guard let self = self else { return }
-
+            if let error = error {
+                fputs("[avatar-asr] recognitionTask error: \(error.localizedDescription)\n", stderr)
+            }
+            if let result = result {
+                fputs("[avatar-asr] recognitionTask result: '\(result.bestTranscription.formattedString)' isFinal: \(result.isFinal)\n", stderr)
+            }
             if let result = result {
                 let text = result.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !text.isEmpty {
@@ -137,7 +142,7 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
                         fputs("[avatar-asr] Finalized: \(finalText)\n", stderr)
                         self.sendJSON(["event": "final", "text": finalText])
                     } else {
-                        self.sendJSON(["event": "state", "state": "idle"])
+                        self.sendJSON(["event": "state", "state": "idle", "tag": "result_isFinal_empty"])
                     }
                     self.lastText = ""
                     self.hasSpeech = false
@@ -156,7 +161,7 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
                     self.sendJSON(["event": "final", "text": self.lastText])
                     self.lastText = ""
                 } else if self.mode == "ptt" {
-                    self.sendJSON(["event": "state", "state": "idle"])
+                    self.sendJSON(["event": "state", "state": "idle", "tag": "error_ptt"])
                 }
                 self.hasSpeech = false
                 self.isFinalizing = false

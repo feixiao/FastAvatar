@@ -8,7 +8,7 @@
 ## 1. 系统全景架构图 (System Architecture Panorama)
 
 Avatar 采用**端云双环架构（Dual-Loop Architecture）**：
-- **端侧极速快环（Local Fast Loop ≤ 150ms）**：端侧感知、毫秒级意图分流路由器（Fast Dispatcher）、本地记忆库（Memory Vault）、Mock 车控审计引擎（Mock Vehicle Engine）、离线发音与本地伴生模型（Sidecar SLM），断网物理隔离可用；
+- **端侧极速快环（Local Fast Loop ≤ 150ms）**：端侧感知、毫秒级意图分流路由器（Fast Dispatcher）、本地记忆底座（Memory Vault）、多模态人格引擎（Persona Engine）、离线发音与本地伴生模型（Sidecar SLM），断网物理隔离可用；
 - **云端认知慢环（Cloud Realtime Loop P50 ≤ 800ms）**：在用户显式授权的前提下，通过 LiveKit SFU 与 Go 网关建立全双工实时音视频通道，承接开放式多轮对话、深度推理与流式播报，并支持毫秒级协同打断（Barge-in）。
 
 ```mermaid
@@ -19,7 +19,7 @@ flowchart TB
 
         subgraph ClientUI["1. 交互与表现层 (UI & Presentation)"]
             WailsUI["macOS: Wails v2 透明动态岛胶囊 / 桌面宠物<br/>(HTML5 / CSS / Canvas Sprite / Web Audio)"]
-            ComposeUI["Android: Jetpack Compose Material 3<br/>(VoiceAgentScreen / MemorySheet / AuditLogSheet)"]
+            ComposeUI["Android: Jetpack Compose Material 3<br/>(VoiceAgentScreen / MemorySheet / PersonaSheet)"]
         end
 
         subgraph PerceptionLayer["2. 感知与信号处理 (Perception & VAD)"]
@@ -37,7 +37,6 @@ flowchart TB
         subgraph LocalFastLoop["4. 端侧极速快环 (Local Fast Loop ≤ 150ms · 零网络依赖)"]
             direction TB
             MemVault["本地记忆底座 (Memory Vault)<br/>Profile KV + Episodic Tags + 二阶段确认<br/>(~/.avatar/memory.json / memory_vault.json)"]
-            MockVehicle["Mock 车控审计引擎 (Mock Vehicle Engine)<br/>温控 16-30℃ 校验 / 危险驾驶模式拦截<br/>(mock_vehicle.log · JSON Lines)"]
             PersonaMgr["多模态人格引擎 (Persona Slots & Bond)<br/>幕僚 💼 / 伴侣 🌙 / 损友 🔥<br/>(时段调度 / 亲密度羁绊流转)"]
             LocalTTS["本地离线合成/播报<br/>(macOS say / Android TTS Engine)"]
             LocalSidecar["本地伴生模型 (Sidecar SLM)<br/>(llama-server 伴生进程 / 本地 GGUF)"]
@@ -55,7 +54,6 @@ flowchart TB
         ClientUI <--> PerceptionLayer
         PerceptionLayer --> Dispatcher
         Dispatcher -- "【本地记忆指令】" --> MemVault --> LocalTTS
-        Dispatcher -- "【车控模拟指令】" --> MockVehicle --> LocalTTS
         Dispatcher -- "【人格切换指令】" --> PersonaMgr --> LocalTTS
         Dispatcher -. "【端侧小模型优先】" .-> LocalSidecar --> LocalTTS
         Dispatcher -- "【开放式对话 · 已授权且在线】" --> MediaGating --> LiveKitClient
@@ -115,8 +113,7 @@ Avatar (macOS Desktop)
 │   └── InteractionManager (0.1ms 极速快路径拦截、时段调度、语音中断)
 │
 ├── Routing & Verification Layer
-│   ├── FastDispatcher (internal/dispatcher: 意图分流路由器，< 1ms 决策)
-│   └── MockVehicleEngine (internal/mockvehicle: 车控参数范围与安全规则拦截校验)
+│   └── FastDispatcher (internal/dispatcher: 意图分流路由器，< 1ms 决策)
 │
 ├── Execution & Storage Layer
 │   ├── MemoryVault (internal/memory: Profile KV + Episodic 事实，~/.avatar/memory.json)
@@ -137,14 +134,14 @@ Avatar (macOS Desktop)
 
 ### 2.2 Android 移动端架构 (Pixel 10 / Kotlin Jetpack Compose)
 
-Android 端面向 Android 16 (Pixel 10) 平台定制，严格遵循 PRD 契约，采用单向数据流（UDF）与系统级前台服务。
+Android 端面向 Android 16 (Pixel 10) 平台定制，采用单向数据流（UDF）与系统级前台服务。
 
 ```
 Avatar (Android Client)
 ├── UI & ViewModel Layer (com.avatar.android.ui)
 │   ├── MainActivity (动态权限申请、沉浸式窗口)
 │   ├── VoiceAgentScreen / VoiceAgentViewModel (状态感知与事件分发)
-│   └── components/ (MemorySheet 记忆管理面板、AuditLogSheet 车控审计面板)
+│   └── components/ (MemorySheet 记忆管理面板、BondSheet 人格与羁绊面板)
 │
 ├── Background Service Layer (com.avatar.android.service)
 │   └── VoiceSessionService (Foreground Service: microphone | mediaPlayback)
@@ -154,7 +151,6 @@ Avatar (Android Client)
 │
 ├── Routing & Local Loop (com.avatar.android.core)
 │   ├── FastDispatcher (dispatcher: 4 级优先级确定性分流器)
-│   ├── MockVehicleEngine (mockvehicle: 结构化 JSON Lines 审计日志写入器)
 │   └── MemoryVault (memory: 两阶段确认本地记忆隔离存储)
 │
 ├── Audio & Privacy Safeguards (com.avatar.android.core.audio)
@@ -193,7 +189,7 @@ Cloud Infrastructure (:8088 & :7880)
 
 ### 4.1 端侧极速快环时序图 (Local Fast Loop ≤ 150ms)
 
-当用户发起物理设备控制（如车控）或本地记忆管理时，系统在端侧直接完成全流程，网络媒体门禁物理锁闭，数据绝对不出端。
+当用户发起本地记忆管理（如偏好记录）或人格流转指令时，系统在端侧直接完成全流程，网络媒体门禁物理锁闭，数据绝对不出端。
 
 ```mermaid
 sequenceDiagram
@@ -201,24 +197,22 @@ sequenceDiagram
     actor User as 用户
     participant Audio as 音频感知 (AEC/VAD)
     participant Dispatcher as FastDispatcher (<1ms)
-    participant LocalEngine as 本地引擎 (MockVehicle / Memory)
+    participant LocalEngine as 本地引擎 (Memory / Persona)
     participant LocalTTS as 本地 TTS / 反馈
     participant CloudBridge as 云端隧道门禁
 
-    User->>Audio: 口语输入 ("把空调调到24度" / "记一下美式咖啡")
+    User->>Audio: 口语输入 ("记一下我喝美式咖啡" / "切换到伴侣模式")
     Audio->>Dispatcher: 识别文本流 (Final Transcript)
     Note over Dispatcher: 确定性正则/槽位分流判定 (< 1ms)
     
-    alt 命中车控意图 (RouteMockVehicle)
-        Dispatcher->>LocalEngine: ParseIntentFromText -> ExecuteCommand()
-        LocalEngine->>LocalEngine: 安全规则校验 (16℃~30℃，拦截危险驾驶模式)
-        LocalEngine->>LocalEngine: 写入结构化审计日志 (mock_vehicle.log)
-        LocalEngine-->>LocalTTS: 触发确定性播报 ("已将空调调至 24 度")
-        LocalTTS-->>User: 播放语音回执 (总耗时 ≤ 150ms)
-    else 命中记忆意图 (RouteLocalMemory)
+    alt 命中记忆意图 (RouteLocalMemory)
         Dispatcher->>LocalEngine: MemoryVault.StageProfile() (两阶段暂存)
         LocalEngine-->>LocalTTS: 请求二次确认 ("确定要记住这条偏好吗？")
-        LocalTTS-->>User: 播报确认提示
+        LocalTTS-->>User: 播报确认提示 (总耗时 ≤ 150ms)
+    else 命中人格切换意图 (RoutePersonaSwitch)
+        Dispatcher->>LocalEngine: PersonaManager.SwitchPersona("companion")
+        LocalEngine-->>LocalTTS: 触发即时确认播报 ("已切换至知心伴侣模式")
+        LocalTTS-->>User: 播放角色应答音效与语音
     end
 
     Note over CloudBridge: 媒体门禁保持闭锁 (isAudioMuted=true)，零网络通信
@@ -319,7 +313,7 @@ stateDiagram-v2
     
     state ROUTING {
         [*] --> FastEvaluating
-        FastEvaluating --> LocalBranch: 命中记忆/车控/人格
+        FastEvaluating --> LocalBranch: 命中记忆/人格
         FastEvaluating --> CloudBranch: 开放对话且已授权
         FastEvaluating --> LocalOnlyBranch: 未授权云端
         FastEvaluating --> OfflineBranch: 网络断开
@@ -372,9 +366,7 @@ stateDiagram-v2
 | :--- | :--- | :--- | :--- |
 | **macOS** | **Memory Vault** | `~/.avatar/memory.json` (JSON) | 用户事实画像（Identity, Preference, Habit）及时间衰减情景日志，纯本地保存 |
 | **macOS** | **Persona Storage** | `~/.avatar/personas.json` (JSON) | 自定义人设卡槽参数、语速及音色覆盖配置 |
-| **macOS** | **Mock Vehicle Audit**| `mock_vehicle.log` (JSON Lines) | 车控意图审计，仅含时间戳、意图名、槽位及决策，**严禁明文音频/文本** |
 | **Android** | **Memory Vault** | `context.filesDir/memory_vault.json` | 隔离存储于 Android 内部私有目录，支持双阶段口语确认 |
-| **Android** | **Mock Vehicle Audit**| `context.filesDir/mock_vehicle.log` | 与 macOS 遵循同构 JSON Lines 规范，用于安全验收与合规审查 |
 | **Android** | **Diagnostics Log** | `context.filesDir/diagnostics.log` | 仅记录时延、状态跳转与错误码，杜绝用户敏感内容 |
 | **Cloud** | **Ephemeral Gateway** | 纯内存映射 (`sync.RWMutex`) | **零磁盘持久化**。会话随用随毁，严禁留存用户原始音频与完整对话文本 |
 
@@ -383,11 +375,7 @@ stateDiagram-v2
 1. **媒体门禁（Audio Track Gating）**：
    - 客户端音频采集层与云端推流层之间设置物理门禁；
    - 默认状态 `isAudioMuted = true`。只有在分流器判定为 `CLOUD_CHAT`、会话处于 `CLOUD_TURN` 且网络在线时，音轨才临时开锁推流。
-2. **车控安全沙箱（Mock Vehicle Guard）**：
-   - 空调温度限定范围 `16.0℃ ~ 30.0℃`，超出范围返回 `ERR_TEMP_OUT_OF_RANGE` 并拒绝；
-   - 严禁任何高危驾驶控制（赛道模式、漂移模式、越野模式），直接拦截并返回 `ERR_DANGEROUS_ACTION_REJECTED`；
-   - 任何车控只写审计日志，不调用操作系统或实体车辆接口。
-3. **防断网重放机制（Anti-Replay Guard）**：
+2. **防断网重放机制（Anti-Replay Guard）**：
    - 断网或弱网阻断后，系统立即将当前会话转入 `OFFLINE` 状态，未竟请求直接丢弃，严禁建立本地离线重试队列，避免网络恢复后突然重放旧音频引发惊吓或隐私外泄。
 
 ---
@@ -400,7 +388,6 @@ stateDiagram-v2
 | **桌面端应用胶水** | Wails 绑定 | `app.go`, `main.go` | `App.startup()`, `App.Chat()`, 事件广播 `runtime.EventsEmit` |
 | **桌面端感知层** | Swift 原生 ASR | `cmd/avatar-asr/main.swift`, `internal/asr/` | `NativeMacEngine`, `SFSpeechRecognizer`, `AVAudioEngine` |
 | **分流路由引擎** | 极速分流器 | `internal/dispatcher/dispatcher.go` | `FastDispatcher.Evaluate()`, `RouteTarget` |
-| **车控审计引擎** | 车控模拟核 | `internal/mockvehicle/engine.go` | `MockVehicleEngine`, `ParseIntentFromText()`, 规则安全检查 |
 | **记忆与人格** | 记忆/人设/羁绊 | `internal/memory/`, `internal/persona/` | `Vault`, `PersonaManager`, `BondManager`, `FastPathHandler` |
 | **桌面编排核心** | 协调状态机 | `internal/orchestrator/`, `internal/engine/` | `Coordinator`, `Pipeline`, `Manager`, `TaskRunner` |
 | **微切词断句** | 流式断句器 | `internal/splitter/splitter.go` | `SentenceSplitter.Feed()`, 4 字符首句快速切割 |

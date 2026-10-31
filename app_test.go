@@ -98,6 +98,28 @@ func TestLiveLLMConversation(t *testing.T) {
 	}
 }
 
+func TestLiveLLMConversationWithASR(t *testing.T) {
+	app := NewApp()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if err := app.asrEngine.Start(ctx); err != nil {
+		t.Fatalf("ASR start: %v", err)
+	}
+	defer app.asrEngine.Stop()
+
+	var spoken []string
+	app.pipeline.SetCallbacks(func(s engine.State) {
+		t.Logf("State -> %s", s)
+	}, func(speech string) {
+		t.Logf("Speech -> %s", speech)
+		spoken = append(spoken, speech)
+	}, nil, nil)
+
+	err := app.pipeline.Chat(ctx, "你好")
+	if err != nil {
+		t.Fatalf("Live Chat error: %v", err)
+	}
+}
 func TestApp_FastPathMockVehicleWorksWithoutLLM(t *testing.T) {
 	app := NewApp()
 	var spoken []string

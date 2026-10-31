@@ -1,10 +1,10 @@
 # Avatar Android 客户端 (Pixel 10 / Android 16)
 
-基于 [`PRD_AI_AUDIO_AGENT_CLIENT_MVP_v1.0.md`](../docs/prd/PRD_AI_AUDIO_AGENT_CLIENT_MVP_v1.0.md) 实现的原生 Android 语音陪伴智能体客户端。
+原生 Android 语音陪伴智能体客户端。
 
 ---
 
-## 1. 核心架构与 PRD 对齐
+## 1. 核心架构设计
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
