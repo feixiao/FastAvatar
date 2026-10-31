@@ -16,33 +16,36 @@ template <typename T>
 class LockFreeSPSCRingBuffer {
 public:
     explicit LockFreeSPSCRingBuffer(size_t capacity)
-        : capacity_(capacity + 1), buffer_(capacity + 1) {}
+        : capacity_(capacity + 1), buffer_(capacity + 1), data_ptr_(buffer_.data()) {}
 
     ~LockFreeSPSCRingBuffer() = default;
 
     // Non-copyable, movable
     LockFreeSPSCRingBuffer(const LockFreeSPSCRingBuffer&) = delete;
     LockFreeSPSCRingBuffer& operator=(const LockFreeSPSCRingBuffer&) = delete;
-    LockFreeSPSCRingBuffer(LockFreeSPSCRingBuffer&&) noexcept = default;
-    LockFreeSPSCRingBuffer& operator=(LockFreeSPSCRingBuffer&&) noexcept = default;
-
+    LockFreeSPSCRingBuffer(LockFreeSPSCRingBuffer&& other) noexcept
+        : capacity_(other.capacity_), buffer_(std::move(other.buffer_)),
+          data_ptr_(buffer_.data()),
+          head_(other.head_.load(std::memory_order_relaxed)),
+          tail_(other.tail_.load(std::memory_order_relaxed)) {}
+    LockFreeSPSCRingBuffer& operator=(LockFreeSPSCRingBuffer&&) noexcept = delete;
     /**
      * Producer writes up to `count` elements into the ring buffer.
      * Returns the actual number of elements written.
      */
-    size_t write(const T* data, size_t count) {
+    size_t write(const T* __restrict__ data, size_t count) {
         if (!data || count == 0) return 0;
 
         const size_t head = head_.load(std::memory_order_relaxed);
         const size_t tail = tail_.load(std::memory_order_acquire);
         const size_t free_space = (tail > head) ? (tail - head - 1) : (capacity_ + tail - head - 1);
         const size_t to_write = std::min(count, free_space);
-        if (to_write == 0) return 0;
+        if (__builtin_expect(to_write == 0, 0)) return 0;
 
         const size_t first_chunk = std::min(to_write, capacity_ - head);
-        std::memcpy(&buffer_[head], data, first_chunk * sizeof(T));
-        if (to_write > first_chunk) {
-            std::memcpy(&buffer_[0], data + first_chunk, (to_write - first_chunk) * sizeof(T));
+        std::memcpy(data_ptr_ + head, data, first_chunk * sizeof(T));
+        if (__builtin_expect(to_write > first_chunk, 0)) {
+            std::memcpy(data_ptr_, data + first_chunk, (to_write - first_chunk) * sizeof(T));
         }
         size_t next_head = head + to_write;
         if (next_head >= capacity_) next_head -= capacity_;
@@ -54,19 +57,19 @@ public:
      * Consumer reads up to `count` elements from the ring buffer.
      * Returns the actual number of elements read.
      */
-    size_t read(T* dest, size_t count) {
+    size_t read(T* __restrict__ dest, size_t count) {
         if (!dest || count == 0) return 0;
 
         const size_t tail = tail_.load(std::memory_order_relaxed);
         const size_t head = head_.load(std::memory_order_acquire);
         const size_t available = (head >= tail) ? (head - tail) : (capacity_ + head - tail);
         const size_t to_read = std::min(count, available);
-        if (to_read == 0) return 0;
+        if (__builtin_expect(to_read == 0, 0)) return 0;
 
         const size_t first_chunk = std::min(to_read, capacity_ - tail);
-        std::memcpy(dest, &buffer_[tail], first_chunk * sizeof(T));
-        if (to_read > first_chunk) {
-            std::memcpy(dest + first_chunk, &buffer_[0], (to_read - first_chunk) * sizeof(T));
+        std::memcpy(dest, data_ptr_ + tail, first_chunk * sizeof(T));
+        if (__builtin_expect(to_read > first_chunk, 0)) {
+            std::memcpy(dest + first_chunk, data_ptr_, (to_read - first_chunk) * sizeof(T));
         }
         size_t next_tail = tail + to_read;
         if (next_tail >= capacity_) next_tail -= capacity_;
@@ -104,6 +107,7 @@ public:
 private:
     const size_t capacity_;
     std::vector<T> buffer_;
+    T* data_ptr_{nullptr};
     alignas(64) std::atomic<size_t> head_{0}; // 64-byte cache line alignment prevents false sharing
     alignas(64) std::atomic<size_t> tail_{0};
 };
