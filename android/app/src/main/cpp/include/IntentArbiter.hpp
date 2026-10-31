@@ -94,7 +94,7 @@ public:
     /**
      * @brief 清理文本首尾标点、空白与中文语气助词
      */
-    static std::string CleanPunctuationAndParticles(const std::string& text);
+    static std::string CleanPunctuationAndParticles(std::string_view text);
 
     /**
      * @brief 通用中文/阿拉伯数字转整数 (支持 0 ~ 99)

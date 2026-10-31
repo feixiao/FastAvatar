@@ -33,10 +33,8 @@ void IntentArbiter::RegisterContacts(const std::vector<std::string>& contacts) {
 /**
  * @brief 清理文本首尾标点、空白与中文语气助词
  */
-std::string IntentArbiter::CleanPunctuationAndParticles(const std::string& text) {
-    if (text.empty()) return "";
-
-    std::string_view sv(text);
+std::string IntentArbiter::CleanPunctuationAndParticles(std::string_view sv) {
+    if (sv.empty()) return "";
 
     // 清理首尾空白
     size_t start = sv.find_first_not_of(" \t\r\n");
@@ -197,7 +195,7 @@ std::string IntentArbiter::ExtractNavDestination(const std::string& query) {
         }
     }
 
-    std::string final_dest = CleanPunctuationAndParticles(std::string(dest));
+    std::string final_dest = CleanPunctuationAndParticles(dest);
 
     // 工业级严格校验：过滤无意义虚词与停用词，槽位缺失严格返回空串，严禁伪造虚假目的地
     static constexpr std::string_view invalid_words[] = {
@@ -241,17 +239,17 @@ std::string IntentArbiter::ExtractMusicQuery(const std::string& query) {
         "我想听", "我要听", "帮我放", "来一首", "来首", "放"
     };
 
-    std::string song;
+    std::string_view sv(s);
+    std::string_view song_view;
     for (const auto& pre : music_prefixes) {
-        size_t p = s.find(pre);
-        if (p != std::string::npos) {
-            song = s.substr(p + pre.size());
+        size_t p = sv.find(pre);
+        if (p != std::string_view::npos) {
+            song_view = sv.substr(p + pre.size());
             break;
         }
     }
 
-    song = CleanPunctuationAndParticles(song);
-    return song;
+    return CleanPunctuationAndParticles(song_view);
 }
 
 std::string IntentArbiter::ExtractAlarmTime(const std::string& query) {
@@ -345,10 +343,11 @@ std::string IntentArbiter::ExtractPhoneTarget(const std::string& query) {
     static constexpr std::string_view phone_prefixes[] = {
         "打电话给", "电话给", "呼叫", "拨打", "拨给"
     };
+    std::string_view q(query);
     for (const auto& pre : phone_prefixes) {
-        size_t p = query.find(pre);
-        if (p != std::string::npos) {
-            std::string target = CleanPunctuationAndParticles(query.substr(p + pre.size()));
+        size_t p = q.find(pre);
+        if (p != std::string_view::npos) {
+            std::string target = CleanPunctuationAndParticles(q.substr(p + pre.size()));
             if (!target.empty()) return target;
         }
     }
