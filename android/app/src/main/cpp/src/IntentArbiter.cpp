@@ -480,10 +480,12 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
         res.confidence = 0.95f;
         std::string city = ExtractWeatherCity(query);
         if (city.empty()) {
-            city = "current_location";
+            res.slots.emplace("city", "current_location");
+            res.payload_json = R"({"action":"query_weather","city":"current_location"})";
+        } else {
+            res.payload_json = R"({"action":"query_weather","city":")" + city + R"("})";
+            res.slots.emplace("city", std::move(city));
         }
-        res.slots["city"] = city;
-        res.payload_json = R"({"action":"query_weather","city":")" + city + R"("})";
         return res;
     }
 
