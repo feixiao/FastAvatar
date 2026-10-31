@@ -146,20 +146,20 @@ int IntentArbiter::ParseChineseTemperature(const std::string& query) {
 std::string IntentArbiter::ExtractNavDestination(const std::string& query) {
     std::string s = CleanPunctuationAndParticles(query);
     if (s.empty()) return "";
-
-    std::string dest;
+    std::string_view sv(s);
+    std::string_view dest;
 
     // 场景 1：包含起点 "从...到/去/导航到/导航去..."
-    size_t from_pos = s.find("从");
-    if (from_pos != std::string::npos) {
+    size_t from_pos = sv.find("从");
+    if (from_pos != std::string_view::npos) {
         static constexpr std::string_view to_markers[] = {
             "导航设到", "导航设去", "导航开到", "导航到", "导航去", "导航至",
             "设到", "设去", "开到", "到", "去", "至"
         };
         for (const auto& marker : to_markers) {
-            size_t to_pos = s.find(marker, from_pos + 3);
-            if (to_pos != std::string::npos) {
-                dest = s.substr(to_pos + marker.size());
+            size_t to_pos = sv.find(marker, from_pos + 3);
+            if (to_pos != std::string_view::npos) {
+                dest = sv.substr(to_pos + marker.size());
                 break;
             }
         }
@@ -178,12 +178,12 @@ std::string IntentArbiter::ExtractNavDestination(const std::string& query) {
             "去", "到"
         };
         for (const auto& marker : prefix_markers) {
-            size_t p = s.find(marker);
-            if (p != std::string::npos) {
+            size_t p = sv.find(marker);
+            if (p != std::string_view::npos) {
                 if (marker == "去" || marker == "到") {
                     if (p > 9) continue; // 仅当动词在句首附近时视为导航触发词
                 }
-                dest = s.substr(p + marker.size());
+                dest = sv.substr(p + marker.size());
                 break;
             }
         }
@@ -191,25 +191,25 @@ std::string IntentArbiter::ExtractNavDestination(const std::string& query) {
 
     // 场景 3：直接形如 "导航西湖"
     if (dest.empty()) {
-        size_t p = s.find("导航");
-        if (p != std::string::npos) {
-            dest = s.substr(p + 6); // "导航" 占 6 字节
+        size_t p = sv.find("导航");
+        if (p != std::string_view::npos) {
+            dest = sv.substr(p + 6); // "导航" 占 6 字节
         }
     }
 
-    dest = CleanPunctuationAndParticles(dest);
+    std::string final_dest = CleanPunctuationAndParticles(std::string(dest));
 
     // 工业级严格校验：过滤无意义虚词与停用词，槽位缺失严格返回空串，严禁伪造虚假目的地
-    static const std::vector<std::string> invalid_words = {
+    static constexpr std::string_view invalid_words[] = {
         "一下", "走", "路", "导航", "路线", "那里", "地方", "哪儿", "哪里"
     };
     for (const auto& inv : invalid_words) {
-        if (dest == inv) {
+        if (final_dest == inv) {
             return "";
         }
     }
 
-    return dest;
+    return final_dest;
 }
 
 std::string IntentArbiter::ResolveAcAction(const std::string& query) {
