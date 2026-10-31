@@ -75,7 +75,7 @@ public:
     void TriggerBargeIn();
 
     // Directly submit text query (e.g. from ASR or UI test input)
-    void SubmitUserQuery(const std::string& user_query);
+    void SubmitUserQuery(std::string user_query);
 
     // Directly push mic audio data (e.g. from Oboe or simulated file)
     size_t PushMicAudio(const float* data, size_t count);
@@ -135,7 +135,7 @@ private:
     void IdleMonitorWorkerLoop();
 
     // Handles sentence emission from Chunker
-    void EnqueueTtsSentence(const std::string& sentence);
+    void EnqueueTtsSentence(std::string sentence);
 
     // Handles async tool call dispatch from Chunker
     void DispatchAsyncToolCall(const std::string& tool_json);

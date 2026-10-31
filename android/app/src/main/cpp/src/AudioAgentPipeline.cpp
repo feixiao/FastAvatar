@@ -222,12 +222,12 @@ void AudioAgentPipeline::TriggerBargeIn() {
 /**
  * @brief 投递一条已完成识别的用户提问至认知处理队列
  */
-void AudioAgentPipeline::SubmitUserQuery(const std::string& user_query) {
+void AudioAgentPipeline::SubmitUserQuery(std::string user_query) {
     if (user_query.empty()) return;
 
     {
         std::lock_guard<std::mutex> lock(query_mtx_);
-        query_queue_.push(user_query);
+        query_queue_.push(std::move(user_query));
     }
     query_cv_.notify_one();
 }
@@ -578,12 +578,12 @@ void AudioAgentPipeline::IdleMonitorWorkerLoop() {
     }
 }
 
-void AudioAgentPipeline::EnqueueTtsSentence(const std::string& sentence) {
+void AudioAgentPipeline::EnqueueTtsSentence(std::string sentence) {
     if (IsBargeInAborted() || sentence.empty()) return;
 
     {
         std::lock_guard<std::mutex> lock(tts_mtx_);
-        tts_queue_.push(sentence);
+        tts_queue_.push(std::move(sentence));
     }
     tts_cv_.notify_one();
 }
