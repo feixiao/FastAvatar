@@ -51,11 +51,11 @@ void ThreeTierMemory::AddTurn(const std::string& user_query, const std::string& 
     turn.was_interrupted = was_interrupted;
     turn.timestamp_ms = now;
 
-    l1_active_turns_.push_back(turn);
+    l1_active_turns_.push_back(std::move(turn));
 
     // L1 FIFO 淘汰：超出最大轮数时移入待归纳缓冲区
     while (l1_active_turns_.size() > MAX_L1_TURNS) {
-        evicted_turns_pending_summary_.push_back(l1_active_turns_.front());
+        evicted_turns_pending_summary_.push_back(std::move(l1_active_turns_.front()));
         l1_active_turns_.pop_front();
     }
 }
@@ -72,7 +72,8 @@ void ThreeTierMemory::RollbackLastAssistantTurn(const std::string& actually_spok
     std::lock_guard<std::mutex> lock(mtx_);
     if (!l1_active_turns_.empty()) {
         auto& last = l1_active_turns_.back();
-        last.assistant_response = actually_spoken_text + "（被用户打断）";
+        last.assistant_response.assign(actually_spoken_text);
+        last.assistant_response.append("（被用户打断）");
         last.was_interrupted = true;
     }
 }
