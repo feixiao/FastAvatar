@@ -28,6 +28,7 @@ type NativeMacEngine struct {
 	onVAD     func(bool, float64)
 	onError   func(string)
 	onState   func(string)
+	ttsDoneCh chan struct{}
 }
 
 // NewNativeMacEngine creates a new macOS native ASR engine instance.
@@ -178,6 +179,16 @@ func (e *NativeMacEngine) readLoop(stdout io.Reader) {
 			if cb != nil {
 				cb(speaking, energy)
 			}
+		case "tts_done":
+			e.mu.Lock()
+			ch := e.ttsDoneCh
+			e.mu.Unlock()
+			if ch != nil {
+				select {
+				case ch <- struct{}{}:
+				default:
+				}
+			}
 		case "state":
 			st, _ := payload["state"].(string)
 			e.mu.Lock()
@@ -202,7 +213,7 @@ func (e *NativeMacEngine) readLoop(stdout io.Reader) {
 	e.mu.Unlock()
 }
 
-func (e *NativeMacEngine) sendCommand(cmd map[string]interface{}) error {
+func (e *NativeMacEngine) SendCommand(cmd map[string]interface{}) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -253,28 +264,62 @@ func (e *NativeMacEngine) Stop() error {
 
 func (e *NativeMacEngine) SetMode(mode string) error {
 	e.mode = mode
-	return e.sendCommand(map[string]interface{}{
+	return e.SendCommand(map[string]interface{}{
 		"cmd":  "set_mode",
 		"mode": mode,
 	})
 }
 
 func (e *NativeMacEngine) SetSpeaking(speaking bool) error {
-	return e.sendCommand(map[string]interface{}{
+	return e.SendCommand(map[string]interface{}{
 		"cmd":      "set_speaking",
 		"speaking": speaking,
 	})
 }
 
 func (e *NativeMacEngine) PTTStart() error {
-	return e.sendCommand(map[string]interface{}{
+	return e.SendCommand(map[string]interface{}{
 		"cmd": "ptt_start",
 	})
 }
 
 func (e *NativeMacEngine) PTTStop() error {
-	return e.sendCommand(map[string]interface{}{
+	return e.SendCommand(map[string]interface{}{
 		"cmd": "ptt_stop",
+	})
+}
+
+// Speak instructs the native macOS engine to synthesize speech in-process using AVSpeechSynthesizer.
+func (e *NativeMacEngine) Speak(ctx context.Context, text string) error {
+	e.mu.Lock()
+	if !e.running {
+		e.mu.Unlock()
+		return fmt.Errorf("engine not running")
+	}
+	doneCh := make(chan struct{}, 1)
+	e.ttsDoneCh = doneCh
+	e.mu.Unlock()
+
+	if err := e.SendCommand(map[string]interface{}{
+		"cmd":  "speak",
+		"text": text,
+	}); err != nil {
+		return err
+	}
+
+	select {
+	case <-ctx.Done():
+		_ = e.StopSpeaking()
+		return ctx.Err()
+	case <-doneCh:
+		return nil
+	}
+}
+
+// StopSpeaking immediately interrupts speech synthesis without killing the process.
+func (e *NativeMacEngine) StopSpeaking() error {
+	return e.SendCommand(map[string]interface{}{
+		"cmd": "stop_speaking",
 	})
 }
 

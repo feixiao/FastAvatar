@@ -28,9 +28,13 @@ test: ## 运行所有单元测试
 test-e2e: ## 运行端云协同端到端集成对接与打断贯通测试
 	go run ./cmd/e2e-test/main.go
 
+core-build: ## 编译跨平台 C++ 核心库 (libaudio_agent.dylib / libaudio_agent.a)
+	@echo "==> 构建 core C++ 原生跨平台通用库..."
+	cmake -B core/build -S core && cmake --build core/build
+
 native-test: ## 编译并在宿主机运行 C++ 核心单元测试套件
 	@echo "==> 运行 C++17 核心单元冒烟测试套件..."
-	cd android/app/src/main/cpp && clang++ -std=c++17 -O2 -Wall -Wextra \
+	cd core && clang++ -std=c++17 -O2 -Wall -Wextra \
 		-I include \
 		src/CpuAffinity.cpp \
 		src/IntentArbiter.cpp \
@@ -41,12 +45,13 @@ native-test: ## 编译并在宿主机运行 C++ 核心单元测试套件
 		src/AudioAgentPipeline.cpp \
 		src/MnnLlmEngine.cpp \
 		src/SherpaOnnxPerceptionEngine.cpp \
+		src/audio_agent_c_api.cpp \
 		src/test_main.cpp \
 		-o audio_agent_test && ./audio_agent_test && rm -f audio_agent_test
 
 native-bench: ## 运行 C++17 全双工性能基准测试
 	@echo "==> 运行 C++17 性能基准测试..."
-	cd android/app/src/main/cpp && clang++ -std=c++17 -O3 \
+	cd core && clang++ -std=c++17 -O3 \
 		-I include \
 		src/CpuAffinity.cpp \
 		src/IntentArbiter.cpp \
@@ -57,9 +62,9 @@ native-bench: ## 运行 C++17 全双工性能基准测试
 		src/AudioAgentPipeline.cpp \
 		src/MnnLlmEngine.cpp \
 		src/SherpaOnnxPerceptionEngine.cpp \
+		src/audio_agent_c_api.cpp \
 		src/bench_main.cpp \
 		-o audio_agent_bench && ./audio_agent_bench && rm -f audio_agent_bench
-
 android-test: ## 运行 Android 客户端单元测试
 	cd android && $(GRADLEW) test
 

@@ -18,22 +18,26 @@ if(ANDROID_ABI STREQUAL "arm64-v8a")
     add_compile_options(-march=armv8.2-a+dotprod+fp16)
 endif()
 
+set(CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../core")
+
 # Header include search directories
 include_directories(
+    ${CORE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 # Source files
 set(AUDIO_AGENT_SOURCES
-    src/CpuAffinity.cpp
-    src/IntentArbiter.cpp
-    src/StreamingSentenceChunker.cpp
-    src/WatchdogAndRepetition.cpp
-    src/ThreeTierMemory.cpp
-    src/FullDuplexAudioIO.cpp
-    src/AudioAgentPipeline.cpp
-    src/MnnLlmEngine.cpp
-    src/SherpaOnnxPerceptionEngine.cpp
+    ${CORE_DIR}/src/CpuAffinity.cpp
+    ${CORE_DIR}/src/IntentArbiter.cpp
+    ${CORE_DIR}/src/StreamingSentenceChunker.cpp
+    ${CORE_DIR}/src/WatchdogAndRepetition.cpp
+    ${CORE_DIR}/src/ThreeTierMemory.cpp
+    ${CORE_DIR}/src/FullDuplexAudioIO.cpp
+    ${CORE_DIR}/src/AudioAgentPipeline.cpp
+    ${CORE_DIR}/src/MnnLlmEngine.cpp
+    ${CORE_DIR}/src/SherpaOnnxPerceptionEngine.cpp
+    ${CORE_DIR}/src/audio_agent_c_api.cpp
     src/NativeJniBridge.cpp
 )
 

@@ -90,3 +90,43 @@ func (m *MockSynthesizer) Speak(ctx context.Context, text string) error {
 func (m *MockSynthesizer) Stop() {
 	// no-op
 }
+
+// SpeakerClient represents an in-process native speech synthesizer interface.
+type SpeakerClient interface {
+	Speak(ctx context.Context, text string) error
+	StopSpeaking() error
+}
+
+// NativeDaemonSynthesizer coordinates speech through the native audio daemon, avoiding fork/exec overhead.
+type NativeDaemonSynthesizer struct {
+	speaker  SpeakerClient
+	fallback Synthesizer
+}
+
+func NewNativeDaemonSynthesizer(speaker SpeakerClient, fallback Synthesizer) *NativeDaemonSynthesizer {
+	return &NativeDaemonSynthesizer{
+		speaker:  speaker,
+		fallback: fallback,
+	}
+}
+
+func (s *NativeDaemonSynthesizer) Speak(ctx context.Context, text string) error {
+	if s.speaker != nil {
+		if err := s.speaker.Speak(ctx, text); err == nil {
+			return nil
+		}
+	}
+	if s.fallback != nil {
+		return s.fallback.Speak(ctx, text)
+	}
+	return nil
+}
+
+func (s *NativeDaemonSynthesizer) Stop() {
+	if s.speaker != nil {
+		_ = s.speaker.StopSpeaking()
+	}
+	if s.fallback != nil {
+		s.fallback.Stop()
+	}
+}

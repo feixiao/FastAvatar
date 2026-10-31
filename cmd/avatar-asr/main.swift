@@ -2,8 +2,9 @@ import Foundation
 import Speech
 import AVFoundation
 
-class SpeechManager: NSObject {
+class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
     private let audioEngine = AVAudioEngine()
+    private let speechSynthesizer = AVSpeechSynthesizer()
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
@@ -27,6 +28,7 @@ class SpeechManager: NSObject {
         super.init()
         self.localeId = localeId
         self.mode = mode
+        speechSynthesizer.delegate = self
         setupRecognizer(localeId: localeId)
     }
 
@@ -274,6 +276,38 @@ class SpeechManager: NSObject {
     func setAvatarSpeaking(_ speaking: Bool) {
         isAvatarSpeaking = speaking
     }
+    func speak(text: String, rate: Float = 0.52) {
+        if speechSynthesizer.isSpeaking {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+        }
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = AVSpeechSynthesisVoice(language: localeId)
+        utterance.rate = rate
+        isAvatarSpeaking = true
+        speechSynthesizer.speak(utterance)
+    }
+
+    func stopSpeaking() {
+        if speechSynthesizer.isSpeaking {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+        }
+        isAvatarSpeaking = false
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
+        isAvatarSpeaking = true
+        sendJSON(["event": "tts_start"])
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        isAvatarSpeaking = false
+        sendJSON(["event": "tts_done"])
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        isAvatarSpeaking = false
+        sendJSON(["event": "tts_done", "cancelled": true])
+    }
 
     func setMode(_ m: String) {
         let prev = mode
@@ -338,6 +372,13 @@ DispatchQueue.global(qos: .userInteractive).async {
                 if let mode = json["mode"] as? String {
                     manager.setMode(mode)
                 }
+            case "speak":
+                if let text = json["text"] as? String {
+                    let rate = (json["rate"] as? NSNumber)?.floatValue ?? 0.52
+                    manager.speak(text: text, rate: rate)
+                }
+            case "stop_speaking":
+                manager.stopSpeaking()
             default:
                 break
             }
