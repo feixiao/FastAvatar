@@ -87,30 +87,42 @@ void ThreeTierMemory::RollbackLastAssistantTurn(const std::string& actually_spok
  */
 std::string ThreeTierMemory::FormatPromptContext(const std::string& current_query) const {
     std::lock_guard<std::mutex> lock(mtx_);
-    std::ostringstream oss;
 
-    // 1. 系统提示词（System Prompt，支持前缀缓存 Prefix KV Cache）
-    oss << "<|im_start|>system\n" << system_prompt_;
+    std::string prompt;
+    prompt.reserve(system_prompt_.size() + current_query.size() + 256 + l1_active_turns_.size() * 128);
 
-    // 2. 注入 L3 长期记忆事实（基于当前用户提问动态相关度检索）
-    auto relevant_facts = RetrieveRelevantFacts(current_query, 2);
-    if (!relevant_facts.empty()) {
-        oss << "\n【用户长期记忆与习惯】:\n";
-        for (const auto& fact : relevant_facts) {
-            oss << "- " << fact << "\n";
+    // 1. 系统提示词
+    prompt += "<|im_start|>system\n";
+    prompt += system_prompt_;
+
+    // 2. 注入 L3 长期记忆事实
+    if (!l3_facts_.empty()) {
+        auto relevant_facts = RetrieveRelevantFacts(current_query, 2);
+        if (!relevant_facts.empty()) {
+            prompt += "\n【用户长期记忆与习惯】:\n";
+            for (const auto& fact : relevant_facts) {
+                prompt += "- ";
+                prompt += fact;
+                prompt += "\n";
+            }
         }
     }
-    oss << "<|im_end|>\n";
+    prompt += "<|im_end|>\n";
 
     // 3. 注入 L1 活跃多轮历史
     for (const auto& turn : l1_active_turns_) {
-        oss << "<|im_start|>user\n" << turn.user_query << "<|im_end|>\n";
-        oss << "<|im_start|>assistant\n" << turn.assistant_response << "<|im_end|>\n";
+        prompt += "<|im_start|>user\n";
+        prompt += turn.user_query;
+        prompt += "<|im_end|>\n<|im_start|>assistant\n";
+        prompt += turn.assistant_response;
+        prompt += "<|im_end|>\n";
     }
 
     // 4. 拼接当前提问与 Assistant 引导标记
-    oss << "<|im_start|>user\n" << current_query << "<|im_end|>\n<|im_start|>assistant\n";
-    return oss.str();
+    prompt += "<|im_start|>user\n";
+    prompt += current_query;
+    prompt += "<|im_end|>\n<|im_start|>assistant\n";
+    return prompt;
 }
 
 /**
@@ -168,21 +180,22 @@ void ThreeTierMemory::AddFact(const std::string& fact) {
  * 避免引入沉重的向量检索库（Vector DB），保障端侧极低耗电与毫秒级匹配。
  */
 std::vector<std::string> ThreeTierMemory::RetrieveRelevantFacts(const std::string& query, size_t top_k) const {
+    if (l3_facts_.empty() || top_k == 0) return {};
+
     std::vector<std::pair<int, std::string>> scored_facts;
     scored_facts.reserve(l3_facts_.size());
 
     for (const auto& fact : l3_facts_) {
         int score = 0;
-        // 简易 UTF-8 三字节（中文字符）滑动窗口关键词命中打分
+        // 零内存分配：基于 std::string_view 的 UTF-8 滑动窗口关键词命中打分
         for (size_t i = 0; i + 3 <= query.size(); i += 3) {
-            std::string sub = query.substr(i, 3);
+            std::string_view sub(query.data() + i, 3);
             if (fact.fact_text.find(sub) != std::string::npos) {
                 score++;
             }
         }
         scored_facts.emplace_back(score, fact.fact_text);
     }
-
     // 按匹配分值降序排列
     std::sort(scored_facts.begin(), scored_facts.end(), [](const auto& a, const auto& b) {
         return a.first > b.first;
