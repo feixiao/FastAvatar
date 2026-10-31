@@ -1,6 +1,8 @@
 #include "StreamingSentenceChunker.hpp"
 #include <vector>
 #include <algorithm>
+#include <cstring>
+#include <string_view>
 
 namespace audio_agent {
 
@@ -152,7 +154,20 @@ void StreamingSentenceChunker::Flush() {
  * @brief 校验新生成的 token 是否包含中英文自然停顿标点符号
  */
 bool StreamingSentenceChunker::CheckPunctuation(const std::string& token) const {
-    static const std::vector<std::string> puncts = {
+    if (token.empty()) return false;
+
+    // 快速前置剪枝：绝大多数中文与英文字符不含候选标点字节
+    bool has_candidate = false;
+    for (unsigned char c : token) {
+        if (c == ',' || c == '.' || c == '!' || c == '?' || c == ';' || c == ':' || c == '\n' ||
+            c == 0xef || c == 0xe3) {
+            has_candidate = true;
+            break;
+        }
+    }
+    if (!has_candidate) return false;
+
+    static const std::string_view puncts[] = {
         "，", "。", "！", "？", "；", "：", "、",
         ",", ".", "!", "?", ";", ":", "\n"
     };
@@ -176,11 +191,11 @@ bool StreamingSentenceChunker::DetectRepetition(const std::string& new_text) {
         history_for_repetition_.erase(0, history_for_repetition_.size() - 256);
     }
 
-    if (history_for_repetition_.size() >= REPETITION_TRIGGER_BYTES * 2) {
-        size_t len = REPETITION_TRIGGER_BYTES;
-        std::string suffix = history_for_repetition_.substr(history_for_repetition_.size() - len);
-        std::string prior = history_for_repetition_.substr(history_for_repetition_.size() - len * 2, len);
-        if (suffix == prior) {
+    const size_t sz = history_for_repetition_.size();
+    constexpr size_t len = REPETITION_TRIGGER_BYTES;
+    if (sz >= len * 2) {
+        const char* data = history_for_repetition_.data();
+        if (std::memcmp(data + sz - len, data + sz - len * 2, len) == 0) {
             return true;
         }
     }
