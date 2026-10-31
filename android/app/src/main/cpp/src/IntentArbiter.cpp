@@ -6,11 +6,12 @@
 #include <vector>
 #include <sstream>
 #include <mutex>
+#include <shared_mutex>
 
 namespace audio_agent {
 
 // 动态注册字典（支持系统或外部动态下发）
-static std::mutex s_dict_mutex;
+static std::shared_mutex s_dict_mutex;
 static std::vector<std::string> s_registered_cities = {
     "北京", "上海", "广州", "深圳", "杭州", "成都", "武汉",
     "南京", "重庆", "西安", "苏州", "天津", "长沙", "郑州"
@@ -21,12 +22,12 @@ static std::vector<std::string> s_registered_contacts = {
 };
 
 void IntentArbiter::RegisterCities(const std::vector<std::string>& cities) {
-    std::lock_guard<std::mutex> lock(s_dict_mutex);
+    std::unique_lock<std::shared_mutex> lock(s_dict_mutex);
     s_registered_cities = cities;
 }
 
 void IntentArbiter::RegisterContacts(const std::vector<std::string>& contacts) {
-    std::lock_guard<std::mutex> lock(s_dict_mutex);
+    std::unique_lock<std::shared_mutex> lock(s_dict_mutex);
     s_registered_contacts = contacts;
 }
 
@@ -312,7 +313,7 @@ std::string IntentArbiter::ExtractAlarmTime(const std::string& query) {
 }
 
 std::string IntentArbiter::ExtractWeatherCity(const std::string& query) {
-    std::lock_guard<std::mutex> lock(s_dict_mutex);
+    std::shared_lock<std::shared_mutex> lock(s_dict_mutex);
     for (const auto& city : s_registered_cities) {
         if (query.find(city) != std::string::npos) {
             return city;
@@ -331,7 +332,7 @@ std::string IntentArbiter::ExtractPhoneTarget(const std::string& query) {
 
     // 2. 匹配已挂载联系人字典
     {
-        std::lock_guard<std::mutex> lock(s_dict_mutex);
+        std::shared_lock<std::shared_mutex> lock(s_dict_mutex);
         for (const auto& contact : s_registered_contacts) {
             if (query.find(contact) != std::string::npos) {
                 return contact;
@@ -384,9 +385,9 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
     }
 
     // 3. 闹钟意图
-    if (query.find("闹钟") != std::string::npos ||
-        query.find("叫我起床") != std::string::npos ||
-        query.find("提醒我") != std::string::npos) {
+    if (q.find("闹钟") != std::string_view::npos ||
+        q.find("叫我起床") != std::string_view::npos ||
+        q.find("提醒我") != std::string_view::npos) {
         res.intent = "set_alarm";
         std::string alarm_time = ExtractAlarmTime(query);
         if (alarm_time.empty()) {
@@ -403,14 +404,14 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
 
     // 4. 音乐播控
     // 4.1 系统播控快捷指令 (暂停 / 停止 / 继续 / 切歌)
-    if (query.find("暂停音乐") != std::string::npos ||
-        query.find("关闭音乐") != std::string::npos ||
-        query.find("停止音乐") != std::string::npos ||
-        query.find("关掉音乐") != std::string::npos ||
-        query.find("别放了") != std::string::npos ||
-        query.find("停止播放") != std::string::npos ||
-        query.find("暂停播放") != std::string::npos ||
-        query == "暂停" || query == "停止") {
+    if (q.find("暂停音乐") != std::string_view::npos ||
+        q.find("关闭音乐") != std::string_view::npos ||
+        q.find("停止音乐") != std::string_view::npos ||
+        q.find("关掉音乐") != std::string_view::npos ||
+        q.find("别放了") != std::string_view::npos ||
+        q.find("停止播放") != std::string_view::npos ||
+        q.find("暂停播放") != std::string_view::npos ||
+        q == "暂停" || q == "停止") {
         res.status = ArbiterStatus::MATCHED;
         res.intent = "play_music";
         res.action = "pause";
@@ -418,9 +419,9 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
         res.confidence = 1.0f;
         return res;
     }
-    if (query.find("继续播放") != std::string::npos ||
-        query.find("恢复播放") != std::string::npos ||
-        query == "继续") {
+    if (q.find("继续播放") != std::string_view::npos ||
+        q.find("恢复播放") != std::string_view::npos ||
+        q == "继续") {
         res.status = ArbiterStatus::MATCHED;
         res.intent = "play_music";
         res.action = "resume";
@@ -428,11 +429,11 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
         res.confidence = 1.0f;
         return res;
     }
-    if (query.find("下一首") != std::string::npos ||
-        query.find("切歌") != std::string::npos ||
-        query.find("换一首") != std::string::npos ||
-        query.find("换首歌") != std::string::npos ||
-        query.find("下一曲") != std::string::npos) {
+    if (q.find("下一首") != std::string_view::npos ||
+        q.find("切歌") != std::string_view::npos ||
+        q.find("换一首") != std::string_view::npos ||
+        q.find("换首歌") != std::string_view::npos ||
+        q.find("下一曲") != std::string_view::npos) {
         res.status = ArbiterStatus::MATCHED;
         res.intent = "play_music";
         res.action = "next";
@@ -440,7 +441,7 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
         res.confidence = 1.0f;
         return res;
     }
-    if (query.find("上一首") != std::string::npos || query.find("上一曲") != std::string::npos) {
+    if (q.find("上一首") != std::string_view::npos || q.find("上一曲") != std::string_view::npos) {
         res.status = ArbiterStatus::MATCHED;
         res.intent = "play_music";
         res.action = "previous";
@@ -449,13 +450,13 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
         return res;
     }
     // 4.2 点歌与曲目搜索播放
-    if (query.find("放歌") != std::string::npos ||
-        query.find("听歌") != std::string::npos ||
-        query.find("放首") != std::string::npos ||
-        query.find("放一首") != std::string::npos ||
-        query.find("放音乐") != std::string::npos ||
-        query.find("听音乐") != std::string::npos ||
-        query.find("播放") != std::string::npos) {
+    if (q.find("放歌") != std::string_view::npos ||
+        q.find("听歌") != std::string_view::npos ||
+        q.find("放首") != std::string_view::npos ||
+        q.find("放一首") != std::string_view::npos ||
+        q.find("放音乐") != std::string_view::npos ||
+        q.find("听音乐") != std::string_view::npos ||
+        q.find("播放") != std::string_view::npos) {
         std::string song = ExtractMusicQuery(query);
         res.status = ArbiterStatus::MATCHED;
         res.intent = "play_music";
@@ -470,10 +471,10 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
     }
 
     // 5. 天气查询
-    if (query.find("天气") != std::string::npos ||
-        query.find("下雨") != std::string::npos ||
-        query.find("降温") != std::string::npos ||
-        query.find("气温") != std::string::npos) {
+    if (q.find("天气") != std::string_view::npos ||
+        q.find("下雨") != std::string_view::npos ||
+        q.find("降温") != std::string_view::npos ||
+        q.find("气温") != std::string_view::npos) {
         res.status = ArbiterStatus::MATCHED;
         res.intent = "query_weather";
         res.confidence = 0.95f;
@@ -487,9 +488,9 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
     }
 
     // 6. 电话拨号
-    if (query.find("打电话") != std::string::npos ||
-        query.find("拨打") != std::string::npos ||
-        query.find("呼叫") != std::string::npos) {
+    if (q.find("打电话") != std::string_view::npos ||
+        q.find("拨打") != std::string_view::npos ||
+        q.find("呼叫") != std::string_view::npos) {
         std::string target = ExtractPhoneTarget(query);
         res.intent = "make_phone_call";
         if (target.empty()) {
@@ -506,20 +507,20 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
 
     // 7. 导航意图
     bool is_nav = false;
-    if (query.find("导航") != std::string::npos ||
-        query.find("路线") != std::string::npos ||
-        query.find("带我去") != std::string::npos ||
-        query.find("带我到") != std::string::npos ||
-        query.find("送我去") != std::string::npos ||
-        query.find("我要去") != std::string::npos ||
-        query.find("我想去") != std::string::npos ||
-        query.find("怎么走") != std::string::npos) {
+    if (q.find("导航") != std::string_view::npos ||
+        q.find("路线") != std::string_view::npos ||
+        q.find("带我去") != std::string_view::npos ||
+        q.find("带我到") != std::string_view::npos ||
+        q.find("送我去") != std::string_view::npos ||
+        q.find("我要去") != std::string_view::npos ||
+        q.find("我想去") != std::string_view::npos ||
+        q.find("怎么走") != std::string_view::npos) {
         is_nav = true;
-    } else if (query.find("从") != std::string::npos &&
-              (query.find("到") != std::string::npos || query.find("去") != std::string::npos)) {
+    } else if (q.find("从") != std::string_view::npos &&
+              (q.find("到") != std::string_view::npos || q.find("去") != std::string_view::npos)) {
         is_nav = true;
-    } else if (query.rfind("去", 0) == 0 || query.rfind("到", 0) == 0) {
-        if (query.size() > 3) {
+    } else if (q.rfind("去", 0) == 0 || q.rfind("到", 0) == 0) {
+        if (q.size() > 3) {
             is_nav = true;
         }
     }
