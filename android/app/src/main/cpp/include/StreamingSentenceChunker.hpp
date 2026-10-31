@@ -2,6 +2,7 @@
 
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <functional>
 #include <atomic>
@@ -55,8 +56,8 @@ protected:
     int overflow(int c) override;
 
 private:
-    bool CheckPunctuation(const std::string& token) const;
-    bool DetectRepetition(const std::string& new_text);
+    bool CheckPunctuation(std::string_view token) const;
+    bool DetectRepetition(std::string_view new_text);
 
     SentenceChunkerCallbacks callbacks_;
     std::string buffer_;

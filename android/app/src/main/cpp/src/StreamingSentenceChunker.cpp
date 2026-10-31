@@ -37,7 +37,7 @@ std::streamsize StreamingSentenceChunker::xsputn(const char* s, std::streamsize 
         return 0; // 返回 0 触发流写入失败，通知 LLM 提前终止
     }
 
-    std::string token(s, static_cast<size_t>(n));
+    std::string_view token(s, static_cast<size_t>(n));
     total_bytes_emitted_ += token.size();
 
     // 2. 检查 N-gram 重复死循环退化
@@ -48,25 +48,27 @@ std::streamsize StreamingSentenceChunker::xsputn(const char* s, std::streamsize 
         return 0; // 陷入无限复读，强制中止生成
     }
 
-    buffer_ += token;
+    buffer_.append(s, static_cast<size_t>(n));
 
-    // 3. 工具调用协议检测与拦截：识别形如 <|tool_call|>{"name":"..."}<|/tool_call|>
+    // 3. 工具调用协议检测与拦截：仅当 buffer_ 中包含 '<' 候选字符时才执行搜索
     if (!in_tool_call_) {
-        size_t open_pos = buffer_.find("<|tool_call|>");
-        if (open_pos == std::string::npos) {
-            open_pos = buffer_.find("<tool_call>");
-        }
-        if (open_pos != std::string::npos) {
-            // 若标签前存在自然语音片段（如“好的，马上为您查询<|tool_call|>...”），优先将前缀送给 TTS 播报！
-            if (open_pos > 0) {
-                std::string prefix_text = buffer_.substr(0, open_pos);
-                if (callbacks_.on_sentence_ready) {
-                    callbacks_.on_sentence_ready(prefix_text);
-                    sentences_emitted_++;
-                }
-                buffer_ = buffer_.substr(open_pos);
+        if (buffer_.find('<') != std::string::npos) {
+            size_t open_pos = buffer_.find("<|tool_call|>");
+            if (open_pos == std::string::npos) {
+                open_pos = buffer_.find("<tool_call>");
             }
-            in_tool_call_ = true;
+            if (open_pos != std::string::npos) {
+                // 若标签前存在自然语音片段，优先将前缀送给 TTS 播报！
+                if (open_pos > 0) {
+                    std::string prefix_text = buffer_.substr(0, open_pos);
+                    if (callbacks_.on_sentence_ready) {
+                        callbacks_.on_sentence_ready(prefix_text);
+                        sentences_emitted_++;
+                    }
+                    buffer_ = buffer_.substr(open_pos);
+                }
+                in_tool_call_ = true;
+            }
         }
     }
 
@@ -153,7 +155,7 @@ void StreamingSentenceChunker::Flush() {
 /**
  * @brief 校验新生成的 token 是否包含中英文自然停顿标点符号
  */
-bool StreamingSentenceChunker::CheckPunctuation(const std::string& token) const {
+bool StreamingSentenceChunker::CheckPunctuation(std::string_view token) const {
     if (token.empty()) return false;
 
     // 快速前置剪枝：绝大多数中文与英文字符不含候选标点字节
@@ -185,8 +187,8 @@ bool StreamingSentenceChunker::CheckPunctuation(const std::string& token) const 
  * 机制：维护最近 256 字节的历史输出，如果尾部 REPETITION_TRIGGER_BYTES 长度的子串
  * 与紧挨着其前面的子串完全一致，则判定为发生复读退化。
  */
-bool StreamingSentenceChunker::DetectRepetition(const std::string& new_text) {
-    history_for_repetition_ += new_text;
+bool StreamingSentenceChunker::DetectRepetition(std::string_view new_text) {
+    history_for_repetition_.append(new_text.data(), new_text.size());
     if (history_for_repetition_.size() > 256) {
         history_for_repetition_.erase(0, history_for_repetition_.size() - 256);
     }
