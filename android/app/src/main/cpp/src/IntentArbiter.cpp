@@ -1,5 +1,6 @@
 #include "IntentArbiter.hpp"
 #include <string>
+#include <string_view>
 #include <algorithm>
 #include <regex>
 #include <vector>
@@ -35,16 +36,16 @@ void IntentArbiter::RegisterContacts(const std::vector<std::string>& contacts) {
 std::string IntentArbiter::CleanPunctuationAndParticles(const std::string& text) {
     if (text.empty()) return "";
 
-    std::string s = text;
+    std::string_view sv(text);
 
     // 清理首尾空白
-    size_t start = s.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = s.find_last_not_of(" \t\r\n");
-    s = s.substr(start, end - start + 1);
+    size_t start = sv.find_first_not_of(" \t\r\n");
+    if (start == std::string_view::npos) return "";
+    size_t end = sv.find_last_not_of(" \t\r\n");
+    sv = sv.substr(start, end - start + 1);
 
     // 剥离末尾常见的导航疑问词、语气词与标点
-    static const std::vector<std::string> trailing_particles = {
+    static constexpr std::string_view trailing_particles[] = {
         "怎么走", "怎么去", "的最佳路线", "的最优路线", "推荐路线", "的路线", "路线",
         "一下吧", "一下呀", "一下啊", "一下",
         "吧", "吗", "呀", "啊", "呢", "哈", "么",
@@ -52,22 +53,22 @@ std::string IntentArbiter::CleanPunctuationAndParticles(const std::string& text)
     };
 
     bool modified = true;
-    while (modified && !s.empty()) {
+    while (modified && !sv.empty()) {
         modified = false;
         for (const auto& suffix : trailing_particles) {
-            if (s.size() >= suffix.size() &&
-                s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0) {
-                s.erase(s.size() - suffix.size());
+            if (sv.size() >= suffix.size() &&
+                sv.compare(sv.size() - suffix.size(), suffix.size(), suffix) == 0) {
+                sv.remove_suffix(suffix.size());
                 modified = true;
                 break;
             }
         }
     }
 
-    start = s.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    end = s.find_last_not_of(" \t\r\n");
-    return s.substr(start, end - start + 1);
+    start = sv.find_first_not_of(" \t\r\n");
+    if (start == std::string_view::npos) return "";
+    end = sv.find_last_not_of(" \t\r\n");
+    return std::string(sv.substr(start, end - start + 1));
 }
 
 int IntentArbiter::ChineseDigitToVal(const std::string& d) {
