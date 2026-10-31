@@ -106,7 +106,7 @@ int IntentArbiter::ParseChineseNumberToken(const std::string& token) {
 }
 
 int IntentArbiter::ParseChineseNumber(const std::string& text) {
-    std::regex num_reg(R"((\d+))");
+    static const std::regex num_reg(R"((\d+))");
     std::smatch m;
     if (std::regex_search(text, m, num_reg)) {
         try {
@@ -118,7 +118,7 @@ int IntentArbiter::ParseChineseNumber(const std::string& text) {
 
 int IntentArbiter::ParseChineseTemperature(const std::string& query) {
     // 1. 阿拉伯数字匹配 (16 ~ 32)
-    std::regex num_reg(R"((\d{1,2})\s*度?)");
+    static const std::regex num_reg(R"((\d{1,2})\s*度?)");
     std::smatch m;
     if (std::regex_search(query, m, num_reg)) {
         try {
@@ -131,7 +131,7 @@ int IntentArbiter::ParseChineseTemperature(const std::string& query) {
 
     // 2. 通用中文数字匹配 (如 "二十四度", "十六度", "三十二度")
     // UTF-8 多字节字符不能在 std::regex 的中括号字符集使用，必须使用多分支 alternation
-    std::regex cn_num_reg(R"(((?:一|二|两|三|四|五|六|七|八|九)?十(?:一|二|两|三|四|五|六|七|八|九)?|(?:一|二|两|三|四|五|六|七|八|九))\s*度?)");
+    static const std::regex cn_num_reg(R"(((?:一|二|两|三|四|五|六|七|八|九)?十(?:一|二|两|三|四|五|六|七|八|九)?|(?:一|二|两|三|四|五|六|七|八|九))\s*度?)");
     if (std::regex_search(query, m, cn_num_reg)) {
         int val = ParseChineseNumberToken(m[1].str());
         if (val >= 16 && val <= 32) {
@@ -252,7 +252,7 @@ std::string IntentArbiter::ExtractMusicQuery(const std::string& query) {
 
 std::string IntentArbiter::ExtractAlarmTime(const std::string& query) {
     // 1. 匹配标准冒号时间 如 "07:30", "8:00"
-    std::regex time_colon(R"((\d{1,2}):(\d{2}))");
+    static const std::regex time_colon(R"((\d{1,2}):(\d{2}))");
     std::smatch m;
     if (std::regex_search(query, m, time_colon)) {
         int h = std::stoi(m[1].str());
@@ -263,7 +263,7 @@ std::string IntentArbiter::ExtractAlarmTime(const std::string& query) {
     }
 
     // 2. 匹配阿拉伯数字口语时间 如 "7点半", "8点30分", "8点"
-    std::regex time_point(R"((\d{1,2})点(\d{1,2}|半)?(?:分)?)");
+    static const std::regex time_point(R"((\d{1,2})点(\d{1,2}|半)?(?:分)?)");
     if (std::regex_search(query, m, time_point)) {
         int h = std::stoi(m[1].str());
         int min = 0;
@@ -283,8 +283,7 @@ std::string IntentArbiter::ExtractAlarmTime(const std::string& query) {
     }
 
     // 3. 匹配中文数字口语时间 如 "七点半", "八点"
-    std::string cn_num = R"((?:(?:一|二|两|三|四|五|六|七|八|九)?十(?:一|二|两|三|四|五|六|七|八|九)?|(?:一|二|两|三|四|五|六|七|八|九)))";
-    std::regex cn_time_point("(" + cn_num + ")点(" + cn_num + "|半)?(?:分)?");
+    static const std::regex cn_time_point(R"(((?:(?:一|二|两|三|四|五|六|七|八|九)?十(?:一|二|两|三|四|五|六|七|八|九)?|(?:一|二|两|三|四|五|六|七|八|九)))点((?:(?:一|二|两|三|四|五|六|七|八|九)?十(?:一|二|两|三|四|五|六|七|八|九)?|(?:一|二|两|三|四|五|六|七|八|九))|半)?(?:分)?)");
     if (std::regex_search(query, m, cn_time_point)) {
         int h = ParseChineseNumberToken(m[1].str());
         int min = 0;
@@ -322,7 +321,7 @@ std::string IntentArbiter::ExtractWeatherCity(const std::string& query) {
 
 std::string IntentArbiter::ExtractPhoneTarget(const std::string& query) {
     // 1. 匹配纯数字电话号码 (3 ~ 11 位)
-    std::regex num_reg(R"((\d{3,11}))");
+    static const std::regex num_reg(R"((\d{3,11}))");
     std::smatch m;
     if (std::regex_search(query, m, num_reg)) {
         return m[1].str();
