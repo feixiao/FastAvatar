@@ -35,7 +35,7 @@ public:
 
         const size_t head = head_.load(std::memory_order_relaxed);
         const size_t tail = tail_.load(std::memory_order_acquire);
-        const size_t free_space = (tail + capacity_ - head - 1) % capacity_;
+        const size_t free_space = (tail > head) ? (tail - head - 1) : (capacity_ + tail - head - 1);
         const size_t to_write = std::min(count, free_space);
         if (to_write == 0) return 0;
 
@@ -44,7 +44,9 @@ public:
         if (to_write > first_chunk) {
             std::memcpy(&buffer_[0], data + first_chunk, (to_write - first_chunk) * sizeof(T));
         }
-        head_.store((head + to_write) % capacity_, std::memory_order_release);
+        size_t next_head = head + to_write;
+        if (next_head >= capacity_) next_head -= capacity_;
+        head_.store(next_head, std::memory_order_release);
         return to_write;
     }
 
@@ -57,7 +59,7 @@ public:
 
         const size_t tail = tail_.load(std::memory_order_relaxed);
         const size_t head = head_.load(std::memory_order_acquire);
-        const size_t available = (head + capacity_ - tail) % capacity_;
+        const size_t available = (head >= tail) ? (head - tail) : (capacity_ + head - tail);
         const size_t to_read = std::min(count, available);
         if (to_read == 0) return 0;
 
@@ -66,7 +68,9 @@ public:
         if (to_read > first_chunk) {
             std::memcpy(dest + first_chunk, &buffer_[0], (to_read - first_chunk) * sizeof(T));
         }
-        tail_.store((tail + to_read) % capacity_, std::memory_order_release);
+        size_t next_tail = tail + to_read;
+        if (next_tail >= capacity_) next_tail -= capacity_;
+        tail_.store(next_tail, std::memory_order_release);
         return to_read;
     }
 
@@ -80,13 +84,13 @@ public:
     size_t available_read() const {
         const size_t tail = tail_.load(std::memory_order_relaxed);
         const size_t head = head_.load(std::memory_order_acquire);
-        return (head + capacity_ - tail) % capacity_;
+        return (head >= tail) ? (head - tail) : (capacity_ + head - tail);
     }
 
     size_t available_write() const {
         const size_t head = head_.load(std::memory_order_relaxed);
         const size_t tail = tail_.load(std::memory_order_acquire);
-        return (tail + capacity_ - head - 1) % capacity_;
+        return (tail > head) ? (tail - head - 1) : (capacity_ + tail - head - 1);
     }
 
     size_t capacity() const {
