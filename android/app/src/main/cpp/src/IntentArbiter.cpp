@@ -357,21 +357,23 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
     ArbitrationResult res;
     if (query.empty()) return res;
 
+    std::string_view q(query);
+
     // 1. 严格防冲突前置过滤：开放常识、问答、闲聊一律转交 LLM
-    if (query.find("为什么") != std::string::npos ||
-        query.find("怎么会") != std::string::npos ||
-        query.find("是什么") != std::string::npos ||
-        query.find("笑话") != std::string::npos ||
-        query.find("几点了") != std::string::npos ||
-        query.find("时间") != std::string::npos ||
-        query.find("你是谁") != std::string::npos ||
-        query.find("自我介绍") != std::string::npos) {
+    if (q.find("为什么") != std::string_view::npos ||
+        q.find("怎么会") != std::string_view::npos ||
+        q.find("是什么") != std::string_view::npos ||
+        q.find("笑话") != std::string_view::npos ||
+        q.find("几点了") != std::string_view::npos ||
+        q.find("时间") != std::string_view::npos ||
+        q.find("你是谁") != std::string_view::npos ||
+        q.find("自我介绍") != std::string_view::npos) {
         res.status = ArbiterStatus::UNMATCHED;
         return res;
     }
 
     // 2. 空调控制
-    if (query.find("空调") != std::string::npos) {
+    if (q.find("空调") != std::string_view::npos) {
         res.intent = "ac_control";
         res.confidence = 1.0f;
         res.payload_json = ResolveAcAction(query);
@@ -542,7 +544,7 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
 std::string IntentArbiter::ResolveToolCall(const std::string& query) {
     ArbitrationResult res = Arbitrate(query);
     if (res.status == ArbiterStatus::MATCHED) {
-        return res.payload_json;
+        return std::move(res.payload_json);
     }
     return "";
 }
