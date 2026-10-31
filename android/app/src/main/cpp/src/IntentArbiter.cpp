@@ -213,17 +213,20 @@ std::string IntentArbiter::ExtractNavDestination(const std::string& query) {
 }
 
 std::string IntentArbiter::ResolveAcAction(const std::string& query) {
-    if (query.find("关") != std::string::npos) {
+    std::string_view q(query);
+    if (q.find("关") != std::string_view::npos) {
         return R"({"action":"set_ac_power","state":"off"})";
     }
-    if (query.find("开") != std::string::npos &&
-        query.find("度") == std::string::npos &&
-        query.find("温") == std::string::npos) {
+    if (q.find("开") != std::string_view::npos &&
+        q.find("度") == std::string_view::npos &&
+        q.find("温") == std::string_view::npos) {
         return R"({"action":"set_ac_power","state":"on"})";
     }
     int temp = ParseChineseTemperature(query);
     if (temp > 0) {
-        return R"({"action":"set_ac_temp","value":)" + std::to_string(temp) + "}";
+        char buf[64];
+        int len = snprintf(buf, sizeof(buf), R"({"action":"set_ac_temp","value":%d})", temp);
+        return std::string(buf, static_cast<size_t>(len));
     }
     return R"({"action":"set_ac_power","state":"on"})";
 }
