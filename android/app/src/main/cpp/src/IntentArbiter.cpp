@@ -71,7 +71,7 @@ std::string IntentArbiter::CleanPunctuationAndParticles(const std::string& text)
     return std::string(sv.substr(start, end - start + 1));
 }
 
-int IntentArbiter::ChineseDigitToVal(const std::string& d) {
+int IntentArbiter::ChineseDigitToVal(std::string_view d) {
     if (d == "一") return 1;
     if (d == "二" || d == "两") return 2;
     if (d == "三") return 3;
@@ -85,19 +85,19 @@ int IntentArbiter::ChineseDigitToVal(const std::string& d) {
     return -1;
 }
 
-int IntentArbiter::ParseChineseNumberToken(const std::string& token) {
+int IntentArbiter::ParseChineseNumberToken(std::string_view token) {
     if (token.empty()) return -1;
     size_t pos_ten = token.find("十");
-    if (pos_ten != std::string::npos) {
+    if (pos_ten != std::string_view::npos) {
         int tens = 1;
         if (pos_ten > 0) {
-            std::string pre = token.substr(0, pos_ten);
+            std::string_view pre = token.substr(0, pos_ten);
             tens = ChineseDigitToVal(pre);
             if (tens < 0) tens = 1;
         }
         int units = 0;
         if (pos_ten + 3 < token.size()) {
-            std::string post = token.substr(pos_ten + 3);
+            std::string_view post = token.substr(pos_ten + 3);
             units = ChineseDigitToVal(post);
             if (units < 0) units = 0;
         }

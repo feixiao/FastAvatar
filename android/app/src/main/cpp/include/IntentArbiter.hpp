@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <vector>
 #include <unordered_map>
 
@@ -102,8 +103,8 @@ public:
 
 private:
     static int ParseChineseTemperature(const std::string& query);
-    static int ChineseDigitToVal(const std::string& d);
-    static int ParseChineseNumberToken(const std::string& token);
+    static int ChineseDigitToVal(std::string_view d);
+    static int ParseChineseNumberToken(std::string_view token);
 };
 
 } // namespace audio_agent
