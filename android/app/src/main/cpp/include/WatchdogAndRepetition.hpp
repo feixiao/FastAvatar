@@ -44,6 +44,7 @@ private:
     std::thread worker_thread_;
     std::mutex mtx_;
     std::condition_variable cv_;
+    std::mutex start_stop_mtx_;
 };
 
 } // namespace audio_agent

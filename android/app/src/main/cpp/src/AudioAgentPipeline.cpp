@@ -109,10 +109,18 @@ void AudioAgentPipeline::Stop() {
         audio_io_->StopStreams();
     }
 
-    if (perception_thread_.joinable()) perception_thread_.join();
-    if (cognition_thread_.joinable()) cognition_thread_.join();
-    if (expression_thread_.joinable()) expression_thread_.join();
-    if (idle_monitor_thread_.joinable()) idle_monitor_thread_.join();
+    if (perception_thread_.joinable()) {
+        try { perception_thread_.join(); } catch (...) {}
+    }
+    if (cognition_thread_.joinable()) {
+        try { cognition_thread_.join(); } catch (...) {}
+    }
+    if (expression_thread_.joinable()) {
+        try { expression_thread_.join(); } catch (...) {}
+    }
+    if (idle_monitor_thread_.joinable()) {
+        try { idle_monitor_thread_.join(); } catch (...) {}
+    }
 }
 
 /**
@@ -529,6 +537,7 @@ void AudioAgentPipeline::ExpressionWorkerLoop() {
         }
 
         if (queue_empty && !IsBargeInAborted()) {
+#if defined(AUDIO_AGENT_USE_OBOE)
             // 等待扬声器缓冲区内的剩余音频被声卡彻底消费完毕
             while (spk_ring_buffer_ && spk_ring_buffer_->available_read() > 0 &&
                    !IsBargeInAborted() && is_running_.load(std::memory_order_acquire) &&
@@ -542,6 +551,11 @@ void AudioAgentPipeline::ExpressionWorkerLoop() {
             if (spk_ring_buffer_ && (!audio_io_ || !audio_io_->IsRunning())) {
                 spk_ring_buffer_->clear();
             }
+#else
+            if (spk_ring_buffer_) {
+                spk_ring_buffer_->clear();
+            }
+#endif
             if (!IsBargeInAborted() && state_.load(std::memory_order_acquire) == AgentState::SPEAKING) {
                 std::lock_guard<std::mutex> lock(tts_mtx_);
                 if (tts_queue_.empty()) {

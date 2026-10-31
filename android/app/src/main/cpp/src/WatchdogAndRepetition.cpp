@@ -20,7 +20,15 @@ TTFTWatchdog::~TTFTWatchdog() {
  * @param on_timeout 超时未喂狗时的告警/降级回调函数
  */
 void TTFTWatchdog::Start(int timeout_ms, std::function<void()> on_timeout) {
-    Stop(); // 确保先前可能存在的定时线程已被妥善停止并回收
+    std::lock_guard<std::mutex> lock(start_stop_mtx_);
+
+    is_running_.store(false, std::memory_order_release);
+    cv_.notify_all();
+    if (worker_thread_.joinable()) {
+        try {
+            worker_thread_.join();
+        } catch (...) {}
+    }
 
     timeout_ms_ = timeout_ms;
     on_timeout_ = std::move(on_timeout);
@@ -44,11 +52,14 @@ void TTFTWatchdog::Feed() {
  * @brief 停止看门狗并等待后台定时线程结束
  */
 void TTFTWatchdog::Stop() {
+    std::lock_guard<std::mutex> lock(start_stop_mtx_);
     is_running_.store(false, std::memory_order_release);
     cv_.notify_all();
 
     if (worker_thread_.joinable()) {
-        worker_thread_.join();
+        try {
+            worker_thread_.join();
+        } catch (...) {}
     }
 }
 

@@ -131,12 +131,25 @@ public:
     std::string GetRecognizedText(bool) override { return ""; }
     void Reset() override {}
 };
+class FastOnDeviceLlmEngine : public ILlmEngine {
+public:
+    bool WarmupPrefix(const std::string&) override { return true; }
+    void RollbackTokens(size_t) override {}
+    LlmStats GetLatestStats() const override { return {}; }
+    void ResponseStream(const std::string&, std::ostream* out_stream) override {
+        if (!out_stream) return;
+        *out_stream << "好的，";
+        out_stream->flush();
+        *out_stream << "今天天气晴朗，气温二十二度。";
+        out_stream->flush();
+    }
+};
 
 static double BenchmarkPipelineTurnaround() {
-    constexpr size_t ITERATIONS = 5;
+    constexpr size_t ITERATIONS = 50;
 
     auto perception = std::make_shared<FastBenchPerceptionEngine>();
-    auto llm = std::make_shared<MockCloudLlmEngine>();
+    auto llm = std::make_shared<FastOnDeviceLlmEngine>();
     auto tts = std::make_shared<FastBenchTtsEngine>();
 
     std::mutex cv_mtx;
