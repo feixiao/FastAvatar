@@ -21,7 +21,7 @@ class SentenceChunker(
     private var isFirstChunk = true
 
     companion object {
-        private val STRONG_PUNCTS = hashSetOf('。', '！', '？', '!', '?', '\n')
+        private val STRONG_PUNCTS = hashSetOf('。', '！', '？', '!', '?', '\n', '.')
         private val WEAK_PUNCTS = hashSetOf('，', '；', '、', ',', ';', ':', '：')
         private val MARKDOWN_PATTERN = Pattern.compile("(\\*\\*|\\*|`|###|##|#)")
         private const val TOOL_CALL_START = "<|tool_call|>"
@@ -66,23 +66,21 @@ class SentenceChunker(
             for (i in 0 until searchLen) {
                 val ch = currentStr[i]
                 val currLen = i + 1
-                val threshold = if (isFirstChunk || STRONG_PUNCTS.contains(ch)) {
-                    minFirstLength
-                } else {
-                    minNextLength
-                }
 
-                if (currLen >= threshold) {
-                    if (STRONG_PUNCTS.contains(ch)) {
-                        // 浮点数保护：如果 '.' 前后都是数字，则不是句号断点
-                        if (ch == '.' && i > 0 && i + 1 < searchLen &&
-                            currentStr[i - 1].isDigit() && currentStr[i + 1].isDigit()
-                        ) {
-                            continue
-                        }
+                if (STRONG_PUNCTS.contains(ch)) {
+                    // 浮点数保护：如果 '.' 前后都是数字，则不是句号断点
+                    if (ch == '.' && i > 0 && i + 1 < searchLen &&
+                        currentStr[i - 1].isDigit() && currentStr[i + 1].isDigit()
+                    ) {
+                        continue
+                    }
+                    if (currLen >= minFirstLength) {
                         splitIdx = i
                         break
-                    } else if (WEAK_PUNCTS.contains(ch)) {
+                    }
+                } else if (WEAK_PUNCTS.contains(ch)) {
+                    // 首句极短安抚语 (如 "好的，" <= 5 字符) 遇到弱标点即刻切片；后续或较长句子不碎切
+                    if (isFirstChunk && currLen <= 5 && currLen >= minFirstLength) {
                         splitIdx = i
                         break
                     }

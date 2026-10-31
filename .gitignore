@@ -5,6 +5,7 @@ bin/
 *.exe~
 *.dll
 *.so
+!android/app/src/main/jniLibs/**
 *.dylib
 *.app
 

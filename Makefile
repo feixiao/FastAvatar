@@ -1,5 +1,8 @@
 .PHONY: help run dev build package start test test-e2e server clean asr android-test android-build android-install install-apk install apk livekit-check livekit-stop
 
+JAVA_HOME ?= $(shell if [ -d "/Applications/Android Studio.app/Contents/jbr/Contents/Home" ]; then echo "/Applications/Android Studio.app/Contents/jbr/Contents/Home"; fi)
+ANDROID_HOME ?= $(shell if [ -d "/Users/fx/Library/Android/sdk" ]; then echo "/Users/fx/Library/Android/sdk"; fi)
+GRADLEW = JAVA_HOME="$(JAVA_HOME)" ANDROID_HOME="$(ANDROID_HOME)" ./gradlew
 # 配置变量
 TAGS ?= production
 LDFLAGS ?= -w -s
@@ -25,11 +28,43 @@ test: ## 运行所有单元测试
 test-e2e: ## 运行端云协同端到端集成对接与打断贯通测试
 	go run ./cmd/e2e-test/main.go
 
+native-test: ## 编译并在宿主机运行 C++ 核心单元测试套件
+	@echo "==> 运行 C++17 核心单元冒烟测试套件..."
+	cd android/app/src/main/cpp && clang++ -std=c++17 -O2 -Wall -Wextra \
+		-I include \
+		src/CpuAffinity.cpp \
+		src/IntentArbiter.cpp \
+		src/StreamingSentenceChunker.cpp \
+		src/WatchdogAndRepetition.cpp \
+		src/ThreeTierMemory.cpp \
+		src/FullDuplexAudioIO.cpp \
+		src/AudioAgentPipeline.cpp \
+		src/MnnLlmEngine.cpp \
+		src/SherpaOnnxPerceptionEngine.cpp \
+		src/test_main.cpp \
+		-o audio_agent_test && ./audio_agent_test && rm -f audio_agent_test
+
+native-bench: ## 运行 C++17 全双工性能基准测试
+	@echo "==> 运行 C++17 性能基准测试..."
+	cd android/app/src/main/cpp && clang++ -std=c++17 -O3 \
+		-I include \
+		src/CpuAffinity.cpp \
+		src/IntentArbiter.cpp \
+		src/StreamingSentenceChunker.cpp \
+		src/WatchdogAndRepetition.cpp \
+		src/ThreeTierMemory.cpp \
+		src/FullDuplexAudioIO.cpp \
+		src/AudioAgentPipeline.cpp \
+		src/MnnLlmEngine.cpp \
+		src/SherpaOnnxPerceptionEngine.cpp \
+		src/bench_main.cpp \
+		-o audio_agent_bench && ./audio_agent_bench && rm -f audio_agent_bench
+
 android-test: ## 运行 Android 客户端单元测试
-	cd android && ./gradlew test
+	cd android && $(GRADLEW) test
 
 android-build: ## 构建 Android 客户端 Debug APK
-	cd android && ./gradlew assembleDebug
+	cd android && $(GRADLEW) assembleDebug
 
 apk: android-build ## 构建 Android 客户端 Debug APK (android-build 的别名)
 

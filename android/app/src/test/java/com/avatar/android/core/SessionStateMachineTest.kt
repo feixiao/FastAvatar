@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -32,6 +33,7 @@ class SessionStateMachineTest {
     private lateinit var cloudClient: CloudClient
     private lateinit var playbackController: AudioPlaybackController
     private lateinit var diagnosticLogger: DiagnosticLogger
+    private var autoDone: Boolean = true
     private lateinit var stateMachine: SessionStateMachine
 
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -50,7 +52,22 @@ class SessionStateMachineTest {
         dispatcher = FastDispatcher()
         vehicleEngine = MockVehicleEngine(logFile)
         memoryVault = MemoryVault(memFile, "test_device")
-        playbackController = AudioPlaybackController()
+        val mockSynthesizer = object : com.avatar.android.core.audio.SpeechSynthesizer {
+            override val isAvailable: Boolean = true
+            override fun speak(turnId: String, text: String, onStart: (() -> Unit)?, onDone: (() -> Unit)?, onError: ((String) -> Unit)?) {
+                onStart?.invoke()
+                if (autoDone) onDone?.invoke()
+            }
+            override fun speakChunk(turnId: String, utteranceId: String, text: String, isQueueAdd: Boolean, onStart: (() -> Unit)?, onDone: (() -> Unit)?, onError: ((String) -> Unit)?) {
+                onStart?.invoke()
+                if (autoDone) onDone?.invoke()
+            }
+            override fun stop() {}
+            override fun setSpeechRate(rate: Float) {}
+            override fun setPitch(pitch: Float) {}
+            override fun release() {}
+        }
+        playbackController = AudioPlaybackController(synthesizer = mockSynthesizer)
         diagnosticLogger = DiagnosticLogger(diagFile)
         cloudClient = CloudClient("http://localhost:8088", "user_1", "dev_1", "pixel_10")
 
@@ -103,6 +120,7 @@ class SessionStateMachineTest {
     @Test
     fun testBargeInInterruption_StopsPlaybackWithin80ms() = testScope.runTest {
         stateMachine.startSession(hasMicPermission = true)
+        autoDone = false
         playbackController.startPlayback("turn_123", "长回复文本正在播放中...")
 
         assertTrue(playbackController.isPlaying.value)
@@ -118,6 +136,7 @@ class SessionStateMachineTest {
     @Test
     fun testBargeInInterruption_RollsBackTurnResultContext() = testScope.runTest {
         stateMachine.startSession(hasMicPermission = true)
+        autoDone = false
 
         val turnResults = mutableListOf<TurnResult>()
         val job = testScope.launch {
@@ -169,6 +188,7 @@ class SessionStateMachineTest {
     @Test
     fun testDiagnosticLogging_ZeroContentLeak() {
         stateMachine.startSession(hasMicPermission = true)
+        autoDone = false
         stateMachine.submitUtterance("把空调调到23度")
         stateMachine.interrupt(reason = "test_cancel")
         stateMachine.stopSession()

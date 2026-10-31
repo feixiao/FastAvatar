@@ -7,6 +7,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <permission
+        android:name="com.ai.audioagent.permission.CONTROL_AGENT"
+        android:protectionLevel="normal" />
+    <uses-permission android:name="com.ai.audioagent.permission.CONTROL_AGENT" />
 
     <!-- Foreground Service permissions for Pixel screen-off continuous session -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -20,6 +26,31 @@
         </intent>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <!-- Package visibility for Map Navigation Apps -->
+        <package android:name="com.autonavi.minimap" />
+        <package android:name="com.baidu.BaiduMap" />
+        <package android:name="com.tencent.map" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="amapuri" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SET_ALARM" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+        </intent>
+        <!-- Package visibility for Music Streaming Apps -->
+        <package android:name="com.netease.cloudmusic" />
+        <package android:name="com.tencent.qqmusic" />
+        <package android:name="com.kugou.android" />
+        <intent>
+            <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
         </intent>
     </queries>
 
@@ -51,6 +82,20 @@
             android:name=".service.VoiceSessionService"
             android:exported="false"
             android:foregroundServiceType="microphone|mediaPlayback" />
+
+        <!-- AudioAgentService Foreground Service & IPC AIDL interface -->
+        <service
+            android:name="com.ai.audioagent.service.AudioAgentService"
+            android:enabled="true"
+            android:exported="true"
+            android:foregroundServiceType="microphone|mediaPlayback">
+            <intent-filter>
+                <action android:name="com.ai.audioagent.action.BIND_AGENT" />
+                <action android:name="com.ai.audioagent.action.START" />
+                <action android:name="com.ai.audioagent.action.STOP" />
+                <action android:name="com.ai.audioagent.action.BARGE_IN" />
+            </intent-filter>
+        </service>
 
     </application>
 

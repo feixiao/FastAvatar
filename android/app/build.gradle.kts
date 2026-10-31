@@ -1,21 +1,35 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "com.avatar.android"
-    compileSdk = 36
+    compileSdk = 35
+    ndkVersion = "29.0.14206865"
 
     defaultConfig {
         applicationId = "com.avatar.android"
-        minSdk = 33
-        targetSdk = 36
+        minSdk = 26
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        externalNativeBuild {
+            cmake {
+                cppFlags("-std=c++17 -O3 -fPIC")
+                arguments("-DANDROID_STL=c++_shared")
+            }
+        }
+
+        ndk {
+            abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
+        }
+    }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 
     buildTypes {
@@ -33,12 +47,22 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
     }
 
     buildFeatures {
         compose = true
+        prefab = true
+        aidl = true
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
     }
 }
 
@@ -58,6 +82,9 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.kotlinx.coroutines.android)
 
+    implementation(files("libs/sherpa-onnx-2.0.1.aar"))
+    implementation("com.google.oboe:oboe:1.9.0")
+    testImplementation("org.json:json:20240303")
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)

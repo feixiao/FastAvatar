@@ -59,10 +59,7 @@ class AudioPlaybackController(
     /**
      * 获取当前或最近一轮回合已实际播报给用户的完整文本 (用于打断记忆回滚)
      */
-    val spokenText: String
-        get() = synchronized(lock) { _spokenChunks.joinToString("") }
-
-    fun getSpokenText(): String = spokenText
+    fun getSpokenText(): String = synchronized(lock) { _spokenChunks.joinToString("") }
 
     fun resetSpokenText() {
         synchronized(lock) {
