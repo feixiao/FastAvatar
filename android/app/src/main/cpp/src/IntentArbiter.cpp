@@ -152,7 +152,7 @@ std::string IntentArbiter::ExtractNavDestination(const std::string& query) {
     // 场景 1：包含起点 "从...到/去/导航到/导航去..."
     size_t from_pos = s.find("从");
     if (from_pos != std::string::npos) {
-        static const std::vector<std::string> to_markers = {
+        static constexpr std::string_view to_markers[] = {
             "导航设到", "导航设去", "导航开到", "导航到", "导航去", "导航至",
             "设到", "设去", "开到", "到", "去", "至"
         };
@@ -167,7 +167,7 @@ std::string IntentArbiter::ExtractNavDestination(const std::string& query) {
 
     // 场景 2：前置动作引导词
     if (dest.empty()) {
-        static const std::vector<std::string> prefix_markers = {
+        static constexpr std::string_view prefix_markers[] = {
             "帮我把导航设到", "帮我把导航设去", "把导航设到", "把导航设去", "导航设到", "导航设去",
             "帮我把导航开到", "把导航开到", "导航开到",
             "帮我导航到", "帮我导航去", "帮我导航至", "帮我导航",
@@ -232,7 +232,7 @@ std::string IntentArbiter::ExtractMusicQuery(const std::string& query) {
     std::string s = CleanPunctuationAndParticles(query);
     if (s.empty()) return "";
 
-    static const std::vector<std::string> music_prefixes = {
+    static constexpr std::string_view music_prefixes[] = {
         "放一首", "放首", "播放一首", "播放首", "播放", "听一首", "听听",
         "听音乐", "放音乐", "放歌", "听歌", "唱一首", "点一首",
         "我想听", "我要听", "帮我放", "来一首", "来首", "放"
@@ -339,7 +339,7 @@ std::string IntentArbiter::ExtractPhoneTarget(const std::string& query) {
     }
 
     // 3. 语法提取模式 ("打电话给XX", "给XX打电话", "呼叫XX", "拨打XX")
-    static const std::vector<std::string> phone_prefixes = {
+    static constexpr std::string_view phone_prefixes[] = {
         "打电话给", "电话给", "呼叫", "拨打", "拨给"
     };
     for (const auto& pre : phone_prefixes) {
