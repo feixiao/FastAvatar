@@ -40,15 +40,9 @@
   - 严格遵循 PRD Section 3.3 定义的 11 个状态：`STOPPED`, `PREPARING`, `LISTENING`, `ROUTING`, `LOCAL_PROCESSING`, `LOCAL_ONLY`, `CLOUD_CONNECTING`, `CLOUD_TURN`, `SPEAKING`, `PAUSED`, `OFFLINE`。
 - **本地极速分流器 (`FastDispatcher`)**:
   - 优先级 1: 口头记忆命令（`memory.command`: 记住/记一下/忘掉/清除记忆）→ `LOCAL_MEMORY`
-  - 优先级 2: Mock 车控意图（`climate.set_temperature`, `window.control`, `drive.switch_mode`）→ `MOCK_VEHICLE`
-  - 优先级 3: 人设切换命令（`persona.switch`）→ `LOCAL_PERSONA`
-  - 优先级 4: 开放式对话 → 根据授权与联网状态路由至 `CLOUD_CHAT` / `LOCAL_ONLY_PROMPT` / `OFFLINE_PROMPT`
+  - 优先级 2: 人设切换命令（`persona.switch`）→ `LOCAL_PERSONA`
+  - 优先级 3: 开放式对话 → 根据授权与联网状态路由至 `CLOUD_CHAT` / `LOCAL_ONLY_PROMPT` / `OFFLINE_PROMPT`
   - 耗时控制：端侧判定时延实测 `< 1ms`（PRD 目标 ≤ 150ms）。
-- **Mock 车控审计引擎 (`MockVehicleEngine`)**:
-  - 每条意图输出一条严格 JSON Lines 格式审计日志至 `context.filesDir/mock_vehicle.log`；
-  - 字段：`timestamp` (UTC RFC 3339)、`intent`、`slots`、`decision` (`MOCK_ACCEPTED` | `MOCK_REJECTED`)、`reason`、`simulation: true`；
-  - 安全边界检查：空调温度校验（16.0 ~ 30.0℃，超限返回 `ERR_TEMP_OUT_OF_RANGE`）；危险驾驶模式严格拦截（漂移/赛道/越野返回 `ERR_DANGEROUS_ACTION_REJECTED`）；
-  - 数据最小化：严禁记录原始音频或语音转写明文。
 - **本地记忆保险库 (`MemoryVault`)**:
   - 两阶段确认机制：提出保存时先暂存复述，用户明确确认后才持久化；
   - 设备隔离：基于设备标识存储，Pixel 与 Mac 端互相隔离，严禁未经确认同步；
@@ -91,7 +85,6 @@ android/
 │   │   │   │   ├── core/
 │   │   │   │   │   ├── state/         # SessionState, SessionStateMachine
 │   │   │   │   │   ├── dispatcher/    # FastDispatcher, RouteTarget, DispatchResult
-│   │   │   │   │   ├── mockvehicle/   # MockVehicleEngine, AuditLogEntry, VehicleIntentParser
 │   │   │   │   │   ├── memory/        # MemoryVault, MemoryItem
 │   │   │   │   │   ├── cloud/         # CloudClient, CloudModels
 │   │   │   │   │   ├── audio/         # AudioFocusHelper, AudioPrivacyGuard, AudioPlaybackController
@@ -146,10 +139,9 @@ cd android
 
 | 验收项目 | 验证步骤 | 预期结果 |
 | :--- | :--- | :--- |
-| **端侧快环** | 输入"把空调调到24度" | 本地立即响应（< 150ms），生成 `MOCK_ACCEPTED` 审计日志，媒体门禁保持闭锁 |
-| **安全规则拦截** | 输入"切换到漂移模式" | 拦截危险意图，生成 `MOCK_REJECTED` 审计日志（`ERR_DANGEROUS_ACTION_REJECTED`） |
+| **端侧快环** | 输入"帮我记一下美式咖啡" | 本地立即响应（< 150ms），弹出两阶段待保存卡片，媒体门禁保持闭锁 |
 | **两阶段本地记忆** | 输入"帮我记一下美式咖啡" | 界面弹出待保存确认卡片，点击确认后方持久化至本地私有文件 |
 | **媒体门禁闭锁** | 检查云端客户端媒体状态 | 音轨默认处于 Muted=true 闭锁状态，仅在云端通话回合临时开门推流 |
 | **全双工插话打断** | 播报过程中点击"打断" | 扬声器播报立即终止（≤ 80ms），音轨闭锁，发送中断信号给云端 |
-| **离线降级** | 切换离线模式 | 车控与记忆功能完全在本地可用；开放式问题友好提示离线，不排队补发旧语音 |
+| **离线降级** | 切换离线模式 | 本地记忆功能完全在本地可用；开放式问题友好提示离线，不排队补发旧语音 |
 | **耳机拔出防泄露** | 播报时触发 Becoming Noisy | 立即暂停播放，杜绝私密语音从扬声器外放 |

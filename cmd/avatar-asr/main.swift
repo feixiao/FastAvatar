@@ -46,14 +46,8 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
         audioConverter = AVAudioConverter(from: inputFormat, to: targetFormat)
 
         if !tapInstalled {
-            if #available(macOS 27.0, *) {
-                try? inputNode.__installTap(onBus: 0, bufferSize: 1024, format: inputFormat, error: ()) { [weak self] buffer, time in
-                    self?.processAudioBuffer(buffer)
-                }
-            } else {
-                inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, time in
-                    self?.processAudioBuffer(buffer)
-                }
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, time in
+                self?.processAudioBuffer(buffer)
             }
             tapInstalled = true
         }
@@ -89,7 +83,7 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
         recognitionTask?.cancel()
         recognitionRequest = nil
         recognitionTask = nil
-        sendJSON(["event": "state", "state": "idle", "tag": "stop"])
+        sendJSON(["event": "state", "state": "idle"])
     }
 
     private func startRecognitionSession() {
@@ -117,12 +111,7 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
 
         recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
             guard let self = self else { return }
-            if let error = error {
-                fputs("[avatar-asr] recognitionTask error: \(error.localizedDescription)\n", stderr)
-            }
-            if let result = result {
-                fputs("[avatar-asr] recognitionTask result: '\(result.bestTranscription.formattedString)' isFinal: \(result.isFinal)\n", stderr)
-            }
+
             if let result = result {
                 let text = result.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !text.isEmpty {
@@ -142,7 +131,7 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
                         fputs("[avatar-asr] Finalized: \(finalText)\n", stderr)
                         self.sendJSON(["event": "final", "text": finalText])
                     } else {
-                        self.sendJSON(["event": "state", "state": "idle", "tag": "result_isFinal_empty"])
+                        self.sendJSON(["event": "state", "state": "idle"])
                     }
                     self.lastText = ""
                     self.hasSpeech = false
@@ -155,19 +144,25 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
                 }
             }
 
-            if error != nil {
-                if !self.lastText.isEmpty && !self.isFinalizing {
+            if let error = error {
+                fputs("[avatar-asr] recognitionTask end/error: \(error.localizedDescription)\n", stderr)
+                if !self.lastText.isEmpty {
                     fputs("[avatar-asr] Finalized on task end: \(self.lastText)\n", stderr)
                     self.sendJSON(["event": "final", "text": self.lastText])
                     self.lastText = ""
-                } else if self.mode == "ptt" {
-                    self.sendJSON(["event": "state", "state": "idle", "tag": "error_ptt"])
+                } else {
+                    if (error as NSError).code == 201 {
+                        self.sendJSON(["event": "error", "message": "系统听写未开启，请在 macOS 系统设置 -> 键盘 -> 听写中开启"])
+                    }
+                    if self.mode == "ptt" {
+                        self.sendJSON(["event": "state", "state": "idle"])
+                    }
                 }
                 self.hasSpeech = false
                 self.isFinalizing = false
 
                 if self.mode == "hands_free" && self.isListening {
-                    DispatchQueue.main.async {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         self.startRecognitionSession()
                     }
                 }

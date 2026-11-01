@@ -207,6 +207,8 @@ body {
   width: 340px;
   display: none;
   z-index: 20;
+  -webkit-app-region: no-drag;
+  --wails-draggable: no-drag;
 }
 
 .input-drawer.open {
@@ -223,6 +225,10 @@ body {
   font-size: 12px;
   outline: none;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -webkit-app-region: no-drag;
+  --wails-draggable: no-drag;
 }
 
 /* 伴侣中枢管理抽屉 */
@@ -801,6 +807,8 @@ body.mode-capsule #capsule {
   align-items: center;
   gap: 6px;
   z-index: 30;
+  -webkit-app-region: no-drag;
+  --wails-draggable: no-drag;
 }
 
 .pet-input-bar.open {
@@ -816,6 +824,10 @@ body.mode-capsule #capsule {
   color: #fff;
   font-size: 12px;
   padding: 4px 2px;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -webkit-app-region: no-drag;
+  --wails-draggable: no-drag;
 }
 
 .btn-icon-xs {

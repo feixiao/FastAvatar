@@ -46,7 +46,6 @@ class MainActivity : ComponentActivity() {
         viewModel = VoiceAgentViewModel(
             stateMachine = app.stateMachine,
             memoryVault = app.memoryVault,
-            vehicleEngine = app.vehicleEngine,
             playbackController = app.playbackController,
             privacyGuard = app.privacyGuard,
             cloudClient = app.cloudClient,

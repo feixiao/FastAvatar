@@ -21,7 +21,7 @@ enum class ArbiterStatus {
  */
 struct ArbitrationResult {
     ArbiterStatus status = ArbiterStatus::UNMATCHED;
-    std::string intent;                 ///< 意图名称 (如 "start_nav", "play_music", "set_ac_temp")
+    std::string intent;                 ///< 意图名称 (如 "play_music", "query_weather", "set_alarm")
     std::string action;                 ///< 动作 (如 "pause", "resume", "set_temp")
     std::unordered_map<std::string, std::string> slots; ///< 提取的语义槽位
     std::string missing_slot;           ///< 若状态为 SLOT_MISSING，记录缺失的必填槽位名
@@ -50,16 +50,6 @@ public:
      * @brief 判定 Query 是否匹配已知系统工具，若匹配且槽位完整则返回标准格式的 Tool Call JSON；否则返回空串
      */
     static std::string ResolveToolCall(const std::string& query);
-
-    /**
-     * @brief 提取导航目的地 (若无有效目的地返回空串，不进行虚假脑补)
-     */
-    static std::string ExtractNavDestination(const std::string& query);
-
-    /**
-     * @brief 解析空调控制意图与温度/开关
-     */
-    static std::string ResolveAcAction(const std::string& query);
 
     /**
      * @brief 提取音乐查询词 (若为空串则由上层判定为通用播放)
@@ -102,7 +92,6 @@ public:
     static int ParseChineseNumber(const std::string& text);
 
 private:
-    static int ParseChineseTemperature(const std::string& query);
     static int ChineseDigitToVal(std::string_view d);
     static int ParseChineseNumberToken(std::string_view token);
 };

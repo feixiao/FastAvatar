@@ -1,6 +1,5 @@
 package com.avatar.android.core.dispatcher
 
-import com.avatar.android.core.mockvehicle.VehicleIntentParser
 
 class FastDispatcher {
 
@@ -18,20 +17,6 @@ class FastDispatcher {
                 latencyMs = latencyMs
             )
         }
-
-        // P2: Check mock vehicle intent (空调 / 车窗 / 驾驶模式等设备控制)
-        val vehicleParse = VehicleIntentParser.parse(clean)
-        if (vehicleParse.matched) {
-            val latencyMs = (System.nanoTime() - startNano) / 1_000_000
-            return DispatchResult(
-                target = RouteTarget.MOCK_VEHICLE,
-                intentName = vehicleParse.intent,
-                slots = vehicleParse.slots,
-                confidence = 1.0,
-                latencyMs = latencyMs
-            )
-        }
-
         // P3: Check local persona switch command
         if (isPersonaSwitchCommand(clean)) {
             val latencyMs = (System.nanoTime() - startNano) / 1_000_000
@@ -60,9 +45,6 @@ class FastDispatcher {
     }
 
     private fun isPersonaSwitchCommand(text: String): Boolean {
-        if (text.contains("驾驶") || text.contains("漂移") || text.contains("赛道") || text.contains("省油")) {
-            return false
-        }
         return text.startsWith("切换成") ||
                 text.startsWith("切换为") ||
                 text.startsWith("变成") ||

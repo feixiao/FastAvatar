@@ -306,6 +306,9 @@ func (e *NativeMacEngine) Speak(ctx context.Context, text string) error {
 	}); err != nil {
 		return err
 	}
+	timeoutSec := 8 + len([]rune(text))/4
+	timer := time.NewTimer(time.Duration(timeoutSec) * time.Second)
+	defer timer.Stop()
 
 	select {
 	case <-ctx.Done():
@@ -313,9 +316,11 @@ func (e *NativeMacEngine) Speak(ctx context.Context, text string) error {
 		return ctx.Err()
 	case <-doneCh:
 		return nil
+	case <-timer.C:
+		_ = e.StopSpeaking()
+		return fmt.Errorf("native speech synthesis timeout (%ds)", timeoutSec)
 	}
 }
-
 // StopSpeaking immediately interrupts speech synthesis without killing the process.
 func (e *NativeMacEngine) StopSpeaking() error {
 	return e.SendCommand(map[string]interface{}{

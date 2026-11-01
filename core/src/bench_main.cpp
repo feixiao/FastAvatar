@@ -39,9 +39,9 @@ static double BenchmarkRingBuffer() {
 static double BenchmarkIntentArbiter() {
     IntentArbiter arbiter;
     const std::vector<std::string> queries = {
-        "把空调调到二十四度",
-        "稍微调低一点温度",
-        "帮我导航到西湖断桥",
+        "播放周杰伦的稻香",
+        "明天天气怎么样",
+        "定一个明天早上八点的闹钟",
         "播放周杰伦的七里香",
         "暂停播放音乐",
         "调大一点声音",

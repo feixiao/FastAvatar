@@ -15,7 +15,7 @@ func (v *Vault) TryInterceptMemoryCommand(query string) InterceptResult {
 	q := strings.TrimSpace(query)
 
 	// 1. 显式记忆指令: "记住..." / "别忘了..."
-	prefixes := []string{"记住我", "记住：", "记住:", "记住", "别忘了我", "别忘了"}
+	prefixes := []string{"记住我", "记住：", "记住:", "记住", "帮我记一下：", "帮我记一下:", "帮我记一下", "记一下：", "记一下:", "记一下", "别忘了我", "别忘了"}
 	for _, p := range prefixes {
 		if strings.HasPrefix(q, p) {
 			fact := strings.TrimSpace(strings.TrimPrefix(q, p))
@@ -42,7 +42,7 @@ func (v *Vault) TryInterceptMemoryCommand(query string) InterceptResult {
 	}
 
 	// 2. 显式遗忘指令: "忘掉..." / "删除记忆..."
-	forgetPrefixes := []string{"忘掉关于", "忘掉", "忘记关于", "忘记", "删除记忆"}
+	forgetPrefixes := []string{"忘掉关于", "忘掉", "忘记关于", "忘记", "忘了", "删除记忆", "清除记忆"}
 	for _, p := range forgetPrefixes {
 		if strings.HasPrefix(q, p) {
 			target := strings.TrimSpace(strings.TrimPrefix(q, p))

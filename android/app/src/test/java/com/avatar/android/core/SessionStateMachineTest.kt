@@ -6,7 +6,6 @@ import com.avatar.android.core.diagnostics.DiagnosticLogger
 import com.avatar.android.core.dispatcher.FastDispatcher
 import com.avatar.android.core.dispatcher.RouteTarget
 import com.avatar.android.core.memory.MemoryVault
-import com.avatar.android.core.mockvehicle.MockVehicleEngine
 import com.avatar.android.core.state.SessionState
 import com.avatar.android.core.state.SessionStateMachine
 import com.avatar.android.core.state.TurnResult
@@ -28,7 +27,6 @@ class SessionStateMachineTest {
 
     private lateinit var tempDir: File
     private lateinit var dispatcher: FastDispatcher
-    private lateinit var vehicleEngine: MockVehicleEngine
     private lateinit var memoryVault: MemoryVault
     private lateinit var cloudClient: CloudClient
     private lateinit var playbackController: AudioPlaybackController
@@ -45,12 +43,10 @@ class SessionStateMachineTest {
         tempDir.delete()
         tempDir.mkdirs()
 
-        val logFile = File(tempDir, "mock_vehicle.log")
         val memFile = File(tempDir, "memory.json")
         val diagFile = File(tempDir, "diagnostics.log")
 
         dispatcher = FastDispatcher()
-        vehicleEngine = MockVehicleEngine(logFile)
         memoryVault = MemoryVault(memFile, "test_device")
         val mockSynthesizer = object : com.avatar.android.core.audio.SpeechSynthesizer {
             override val isAvailable: Boolean = true
@@ -73,7 +69,6 @@ class SessionStateMachineTest {
 
         stateMachine = SessionStateMachine(
             dispatcher = dispatcher,
-            vehicleEngine = vehicleEngine,
             memoryVault = memoryVault,
             cloudClient = cloudClient,
             playbackController = playbackController,
@@ -102,19 +97,13 @@ class SessionStateMachineTest {
     }
 
     @Test
-    fun testLocalFastPath_VehicleControl_ExecutionAndAudit() = testScope.runTest {
+    fun testLocalFastPath_MemoryCommand_Execution() = testScope.runTest {
         stateMachine.startSession(hasMicPermission = true)
-        stateMachine.submitUtterance("把空调调到24度")
+        stateMachine.submitUtterance("记住我喜欢喝美式")
 
         // Execution completes and returns to LISTENING
         assertEquals(SessionState.LISTENING, stateMachine.state.value)
-
-        // Check vehicle audit log
-        val logs = vehicleEngine.getAuditLogs()
-        assertEquals(1, logs.size)
-        assertEquals("climate.set_temperature", logs[0].intent)
-        assertEquals(24.0, logs[0].slots["target_temperature"])
-        assertTrue(logs[0].simulation)
+        assertEquals("我喜欢喝美式", memoryVault.pendingMemory?.content)
     }
 
     @Test
@@ -173,12 +162,10 @@ class SessionStateMachineTest {
     fun testOfflineDegradation_LocalPathStillAvailable() = testScope.runTest {
         stateMachine.isOnline = false
         stateMachine.startSession(hasMicPermission = true)
-
-        // 1. Vehicle command in offline mode works 100% locally
-        stateMachine.submitUtterance("打开车窗")
+        // 1. Memory command in offline mode works 100% locally
+        stateMachine.submitUtterance("帮我记一下买牛奶")
         assertEquals(SessionState.LISTENING, stateMachine.state.value)
-        assertEquals(1, vehicleEngine.getAuditLogs().size)
-
+        assertEquals("买牛奶", memoryVault.pendingMemory?.content)
         // 2. Open-ended conversational query in offline mode prompts offline warning, without queueing
         stateMachine.submitUtterance("今天天气怎么样？")
         // After notice, returns to LISTENING
@@ -189,7 +176,7 @@ class SessionStateMachineTest {
     fun testDiagnosticLogging_ZeroContentLeak() {
         stateMachine.startSession(hasMicPermission = true)
         autoDone = false
-        stateMachine.submitUtterance("把空调调到23度")
+        stateMachine.submitUtterance("帮我记一下买牛奶")
         stateMachine.interrupt(reason = "test_cancel")
         stateMachine.stopSession()
 
@@ -198,7 +185,7 @@ class SessionStateMachineTest {
 
         val eventNames = events.map { it.event }
         assertTrue(eventNames.contains("client_session_started"))
-        assertTrue(eventNames.contains("mock_action_recorded"))
+        assertTrue(eventNames.contains("local_memory_operation"))
         assertTrue(eventNames.contains("client_turn_cancelled"))
         assertTrue(eventNames.contains("client_session_interrupted"))
 

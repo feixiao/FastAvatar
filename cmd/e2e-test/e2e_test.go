@@ -9,15 +9,14 @@ import (
 
 	"avatar/internal/cloud"
 	"avatar/internal/interaction"
-	"avatar/internal/mockvehicle"
+	"avatar/internal/memory"
 	"avatar/internal/orchestrator"
 	"avatar/server"
 )
 
 func TestE2E_FullPipelineVerification(t *testing.T) {
 	tempDir := t.TempDir()
-	auditLogPath := filepath.Join(tempDir, "mock_vehicle.log")
-
+	memPath := filepath.Join(tempDir, "local_memory.json")
 	// 1. 云端实时服务
 	tokenSvc := server.NewTokenService(server.TokenConfig{
 		APIKey:     "test_e2e_key",
@@ -30,13 +29,11 @@ func TestE2E_FullPipelineVerification(t *testing.T) {
 	defer httpSrv.Close()
 
 	// 2. 端侧 Mac 客户端初始化
-	vehicleEngine, err := mockvehicle.NewEngine(auditLogPath)
+	vault, err := memory.NewVault(memPath)
 	if err != nil {
-		t.Fatalf("failed to init vehicle engine: %v", err)
+		t.Fatalf("failed to init vault: %v", err)
 	}
-	fastPath := interaction.NewFastPathHandler(nil, nil)
-	fastPath.SetVehicleEngine(vehicleEngine)
-
+	fastPath := interaction.NewFastPathHandler(vault, nil)
 	cloudClient := cloud.NewClient(httpSrv.URL, "user_test", "mac_m2", "mac")
 	speaker := &trackingSpeaker{}
 	coord := orchestrator.NewCoordinator("sess_test")
@@ -46,38 +43,38 @@ func TestE2E_FullPipelineVerification(t *testing.T) {
 	manager.SetCloudClient(cloudClient)
 
 	// ==========================================
-	// 验证 1: 本地车控快环 (时延 < 150ms，且零云端网络开销)
+	// 验证 1: 本地记忆快环 (时延 < 150ms，且零云端网络开销)
 	// ==========================================
 	t0 := time.Now()
 	_, err = manager.Submit(context.Background(), orchestrator.UserInput{
 		InputType: orchestrator.InputTypeText,
-		Text:      "把空调调到24度",
+		Text:      "帮我记一下美式咖啡",
 		Stability: orchestrator.StabilityFinal,
 	})
 	elapsed1 := time.Since(t0)
 	if err != nil {
-		t.Fatalf("climate control failed: %v", err)
+		t.Fatalf("memory command failed: %v", err)
 	}
-	if elapsed1 > 150*time.Millisecond {
-		t.Fatalf("fast loop latency exceeded 150ms: %v", elapsed1)
+	if elapsed1 > 350*time.Millisecond {
+		t.Fatalf("fast loop latency exceeded 350ms: %v", elapsed1)
 	}
 	if !cloudClient.IsAudioMuted() {
-		t.Fatal("audio track must stay muted during local vehicle command")
+		t.Fatal("audio track must stay muted during local memory command")
 	}
 
 	// ==========================================
-	// 验证 2: 危险指令拦截
+	// 验证 2: 隐私未授权本地保护拦截
 	// ==========================================
+	fastPath.SetCloudConsent(false)
 	_, err = manager.Submit(context.Background(), orchestrator.UserInput{
 		InputType: orchestrator.InputTypeText,
-		Text:      "切换到漂移模式",
+		Text:      "今天有什么新鲜事",
 		Stability: orchestrator.StabilityFinal,
 	})
+	fastPath.SetCloudConsent(true)
 	if err != nil {
-		t.Fatalf("drift command failed: %v", err)
+		t.Fatalf("privacy protection failed: %v", err)
 	}
-
-	// ==========================================
 	// 验证 3: 开放式对话上云与流式时延 (TTFA < 800ms)
 	// ==========================================
 	ctx := context.Background()

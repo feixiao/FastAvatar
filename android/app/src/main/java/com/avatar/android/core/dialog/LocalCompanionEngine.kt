@@ -104,7 +104,7 @@ object LocalCompanionEngine {
 
         // 8. 询问身份与能力
         if (text.contains("你是谁") || text.contains("你叫什么") || text.contains("你的名字") || text.contains("你能做什么")) {
-            return "我是 Avatar 智能语音伴侣！我可以陪你全双工语音聊天、倾听你的心声、帮你记录私人备忘记忆，还可以通过模拟车控调节空调和车窗。随时对我说话或者打断我，我都一直在哦！"
+            return "我是 Avatar 智能语音伴侣！我可以陪你全双工语音聊天、倾听你的心声、帮你记录私人备忘记忆。随时对我说话或者打断我，我都一直在哦！"
         }
 
         // 9. 询问时间/日期

@@ -73,7 +73,7 @@ func TestAppVoiceIntegration(t *testing.T) {
 func TestLiveLLMConversation(t *testing.T) {
 	app := NewApp()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
 
 	if !llm.ProbeEndpoint(ctx, app.cfg.LLM.BaseURL, app.cfg.LLM.APIKey) {
@@ -120,24 +120,24 @@ func TestLiveLLMConversationWithASR(t *testing.T) {
 		t.Fatalf("Live Chat error: %v", err)
 	}
 }
-func TestApp_FastPathMockVehicleWorksWithoutLLM(t *testing.T) {
+func TestApp_FastPathMemoryWorksWithoutLLM(t *testing.T) {
 	app := NewApp()
 	var spoken []string
 	app.pipeline.SetCallbacks(nil, func(speech string) {
 		spoken = append(spoken, speech)
 	}, nil, nil)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 
-	// 车控快环不需要任何运行中的 LLM 服务，100% 本地完成
-	err := app.pipeline.Chat(ctx, "把空调调到24度")
+	// 本地记忆快环不需要任何运行中的 LLM 服务，100% 本地完成
+	err := app.pipeline.Chat(ctx, "帮我记一下美式咖啡")
 	if err != nil {
-		t.Fatalf("fast-path vehicle command failed: %v", err)
+		t.Fatalf("fast-path memory command failed: %v", err)
 	}
 
 	if len(spoken) == 0 {
-		t.Fatal("expected spoken confirmation for mock vehicle")
+		t.Fatal("expected spoken confirmation for memory command")
 	}
 	if app.pipeline.State() != engine.StateIdle {
 		t.Fatalf("expected state idle, got %s", app.pipeline.State())

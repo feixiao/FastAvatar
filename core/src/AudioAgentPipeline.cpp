@@ -425,14 +425,7 @@ void AudioAgentPipeline::CognitionWorkerLoop() {
             // 若模型未生成任何回复（如超时或未吐字），自动合成口语安抚回复推入 TTS
             if (full_assistant_response.empty()) {
                 std::string reassurance;
-                if (fallback_tool_json.find("start_nav") != std::string::npos) {
-                    std::string dest = IntentArbiter::ExtractNavDestination(query);
-                    reassurance = "好的，马上为您规划前往" + dest + "的最佳路线。";
-                } else if (fallback_tool_json.find("set_ac_temp") != std::string::npos) {
-                    reassurance = "好的，已为您调整空调温度。";
-                } else if (fallback_tool_json.find("set_ac_power") != std::string::npos) {
-                    reassurance = "好的，已为您设置空调。";
-                } else if (fallback_tool_json.find("play_music") != std::string::npos) {
+                if (fallback_tool_json.find("play_music") != std::string::npos) {
                     if (fallback_tool_json.find("pause") != std::string::npos) {
                         reassurance = "好的，已为您暂停音乐播放。";
                     } else if (fallback_tool_json.find("next") != std::string::npos) {

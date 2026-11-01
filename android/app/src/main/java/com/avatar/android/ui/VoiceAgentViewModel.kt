@@ -11,8 +11,6 @@ import com.avatar.android.core.dispatcher.RouteTarget
 import com.avatar.android.core.memory.MemoryItem
 import com.avatar.android.core.memory.MemoryVault
 import com.avatar.android.core.memory.PendingMemory
-import com.avatar.android.core.mockvehicle.AuditLogEntry
-import com.avatar.android.core.mockvehicle.MockVehicleEngine
 import com.avatar.android.core.state.SessionState
 import com.avatar.android.core.state.SessionStateMachine
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,7 +37,6 @@ enum class MessageSender {
 class VoiceAgentViewModel(
     val stateMachine: SessionStateMachine,
     val memoryVault: MemoryVault,
-    val vehicleEngine: MockVehicleEngine,
     val playbackController: AudioPlaybackController,
     val privacyGuard: AudioPrivacyGuard,
     val cloudClient: CloudClient,
@@ -65,8 +62,6 @@ class VoiceAgentViewModel(
     private val _memories = MutableStateFlow<List<MemoryItem>>(emptyList())
     val memories: StateFlow<List<MemoryItem>> = _memories.asStateFlow()
 
-    private val _auditLogs = MutableStateFlow<List<AuditLogEntry>>(emptyList())
-    val auditLogs: StateFlow<List<AuditLogEntry>> = _auditLogs.asStateFlow()
 
     private val _activePersona = MutableStateFlow(stateMachine.activePersona)
     val activePersona: StateFlow<String> = _activePersona.asStateFlow()
@@ -87,7 +82,6 @@ class VoiceAgentViewModel(
 
     init {
         refreshMemories()
-        refreshAuditLogs()
 
         viewModelScope.launch {
             stateMachine.turnResults.collect { turn ->
@@ -117,7 +111,6 @@ class VoiceAgentViewModel(
                 _pendingMemory.value = memoryVault.pendingMemory
                 _activePersona.value = stateMachine.activePersona
                 refreshMemories()
-                refreshAuditLogs()
             }
         }
     }
@@ -266,17 +259,8 @@ class VoiceAgentViewModel(
         refreshMemories()
     }
 
-    fun clearAuditLogs() {
-        vehicleEngine.clearAuditLogs()
-        refreshAuditLogs()
-    }
-
     fun refreshMemories() {
         _memories.value = memoryVault.getAll()
-    }
-
-    fun refreshAuditLogs() {
-        _auditLogs.value = vehicleEngine.getAuditLogs()
     }
 
     fun clearMessages() {

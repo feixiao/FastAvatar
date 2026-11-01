@@ -5,7 +5,6 @@ import (
 
 	"avatar/internal/dispatcher"
 	"avatar/internal/memory"
-	"avatar/internal/mockvehicle"
 	"avatar/internal/persona"
 )
 
@@ -14,7 +13,6 @@ type FastPathHandler struct {
 	vault            *memory.Vault
 	personaMgr       *persona.Manager
 	dispatcher       *dispatcher.FastDispatcher
-	vehicleEngine    *mockvehicle.Engine
 	mu               sync.RWMutex
 	isCloudConsented bool
 	isOnline         bool
@@ -22,22 +20,13 @@ type FastPathHandler struct {
 
 // NewFastPathHandler creates a new fast path handler.
 func NewFastPathHandler(vault *memory.Vault, personaMgr *persona.Manager) *FastPathHandler {
-	vehicle, _ := mockvehicle.NewEngine("")
 	return &FastPathHandler{
 		vault:            vault,
 		personaMgr:       personaMgr,
 		dispatcher:       dispatcher.NewFastDispatcher(),
-		vehicleEngine:    vehicle,
 		isCloudConsented: true, // Default enabled for developer desktop, controllable via SetCloudConsent
 		isOnline:         true,
 	}
-}
-
-// SetVehicleEngine overrides default mock vehicle engine (useful for custom logs in tests).
-func (f *FastPathHandler) SetVehicleEngine(engine *mockvehicle.Engine) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.vehicleEngine = engine
 }
 
 // SetCloudConsent sets whether user has consented to cloud processing.
@@ -88,20 +77,11 @@ func (f *FastPathHandler) Evaluate(userInput string) (handled bool, confirmation
 				}
 			}
 
-		case dispatcher.RouteMockVehicle:
-			if f.vehicleEngine != nil {
-				res, err := f.vehicleEngine.Execute(route.IntentName, route.Slots)
-				if err == nil {
-					return true, res.Confirmation, nil
-				}
-				return true, "模拟车控处理异常：" + err.Error(), nil
-			}
-
 		case dispatcher.RouteLocalOnly:
-			return true, "云端实时服务尚未开启授权。为保护您的隐私，当前仅可在本地为您记录偏好与模拟车控。", nil
+			return true, "云端实时服务尚未开启授权。为保护您的隐私，当前仅可在本地为您记录偏好与回忆。", nil
 
 		case dispatcher.RouteOffline:
-			return true, "当前处于离线模式，云端对话暂时不可用。但您的本地记忆与模拟车控仍可正常响应。", nil
+			return true, "当前处于离线模式，云端对话暂时不可用。但您的本地记忆仍可正常响应。", nil
 
 		case dispatcher.RouteCloudChat:
 			// Let it pass to background task runner or LiveKit cloud realtime agent

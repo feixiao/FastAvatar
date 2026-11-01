@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,7 +13,7 @@ import (
 
 	"avatar/internal/cloud"
 	"avatar/internal/interaction"
-	"avatar/internal/mockvehicle"
+	"avatar/internal/memory"
 	"avatar/internal/orchestrator"
 	"avatar/server"
 )
@@ -96,7 +95,7 @@ func main() {
 	}
 	defer os.RemoveAll(tempDir)
 
-	auditLogPath := filepath.Join(tempDir, "mock_vehicle.log")
+	memPath := filepath.Join(tempDir, "local_memory.json")
 
 	// ==========================================
 	// 1. 启动轻量云端实时服务网关 (Cloud Gateway)
@@ -116,9 +115,8 @@ func main() {
 	// ==========================================
 	// 2. 初始化 Mac 端侧组件
 	// ==========================================
-	vehicleEngine, _ := mockvehicle.NewEngine(auditLogPath)
-	fastPath := interaction.NewFastPathHandler(nil, nil)
-	fastPath.SetVehicleEngine(vehicleEngine)
+	vault, _ := memory.NewVault(memPath)
+	fastPath := interaction.NewFastPathHandler(vault, nil)
 
 	cloudClient := cloud.NewClient(httpSrv.URL, "user_frank", "mac_studio_m2", "mac")
 	speaker := &trackingSpeaker{}
@@ -129,10 +127,10 @@ func main() {
 	manager.SetCloudClient(cloudClient)
 
 	// ==========================================
-	// 测试用例 1: 端侧极速快环 (Mock 车控命令)
+	// 测试用例 1: 端侧极速快环 (本地备忘指令)
 	// ==========================================
-	fmt.Printf("\n%s%s--- 测试用例 1: 端侧极速快环（空调调温指令）---%s\n", colorBold, colorYellow, colorReset)
-	cmd1 := "把空调调到24度"
+	fmt.Printf("\n%s%s--- 测试用例 1: 端侧极速快环（本地备忘指令）---%s\n", colorBold, colorYellow, colorReset)
+	cmd1 := "帮我记一下美式咖啡"
 	t0 := time.Now()
 	_, err = manager.Submit(context.Background(), orchestrator.UserInput{
 		InputType: orchestrator.InputTypeText,
@@ -146,46 +144,30 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 验证日志产生
-	logData, _ := os.ReadFile(auditLogPath)
-	var entry mockvehicle.AuditLogEntry
-	_ = json.Unmarshal(logData, &entry)
-
 	fmt.Printf("· 用户输入: \"%s\"\n", cmd1)
 	fmt.Printf("· 路由决策: 本地快环 (Local Fast Loop)\n")
 	fmt.Printf("· 响应时延: %s%v%s (PRD 目标: ≤ 150ms)\n", colorGreen, elapsed1, colorReset)
 	fmt.Printf("· 本地回执: \"%s\"\n", speaker.spoken[len(speaker.spoken)-1])
-	fmt.Printf("· 审计写入: %s (decision=%s, simulation=%v)\n", entry.Intent, entry.Decision, entry.Simulation)
 	if cloudClient.IsAudioMuted() {
 		fmt.Printf("· 媒体门禁: %s已安全闭锁 (Muted=true，零网络泄露)%s\n", colorGreen, colorReset)
 	}
 
 	// ==========================================
-	// 测试用例 2: 危险指令拒绝 (赛道/漂移模式)
+	// 测试用例 2: 隐私保护本地拦截 (未授权上云)
 	// ==========================================
-	fmt.Printf("\n%s%s--- 测试用例 2: 危险指令安全规则拦截（漂移模式）---%s\n", colorBold, colorYellow, colorReset)
-	cmd2 := "切换到漂移模式"
+	fmt.Printf("\n%s%s--- 测试用例 2: 隐私保护本地拦截（未授权上云）---%s\n", colorBold, colorYellow, colorReset)
+	fastPath.SetCloudConsent(false)
+	cmd2 := "今天有什么新闻"
 	_, _ = manager.Submit(context.Background(), orchestrator.UserInput{
 		InputType: orchestrator.InputTypeText,
 		Text:      cmd2,
 		Stability: orchestrator.StabilityFinal,
 	})
-
-	// 读取最后一行审计日志
-	f, _ := os.Open(auditLogPath)
-	scanner := bufio.NewScanner(f)
-	var lastLine string
-	for scanner.Scan() {
-		lastLine = scanner.Text()
-	}
-	f.Close()
-	var entry2 mockvehicle.AuditLogEntry
-	_ = json.Unmarshal([]byte(lastLine), &entry2)
+	fastPath.SetCloudConsent(true)
 
 	fmt.Printf("· 用户输入: \"%s\"\n", cmd2)
-	fmt.Printf("· 拦截判定: %s%s%s (reason=%s)\n", colorRed, entry2.Decision, colorReset, entry2.Reason)
+	fmt.Printf("· 拦截判定: %s%s%s\n", colorGreen, "LOCAL_ONLY_PROTECTED", colorReset)
 	fmt.Printf("· 本地回执: \"%s\"\n", speaker.spoken[len(speaker.spoken)-1])
-
 	// ==========================================
 	// 测试用例 3: 开放式对话上云 + 首包时延 (TTFA)
 	// ==========================================

@@ -74,16 +74,16 @@ func TestPipelineChatAndInterrupt(t *testing.T) {
 		t.Fatalf("expected persona switch spoken confirmation and active jarvis, got %v", personaMgr.GetActiveSlot())
 	}
 
-	// 测试端侧快环（Mock 车控）
+	// 测试端侧快环（本地记忆指令）
 	mockTTS.Spoken = nil
-	err = pipeline.Chat(ctx, "把空调调到24度")
+	err = pipeline.Chat(ctx, "帮我记一下美式咖啡")
 	if err != nil {
-		t.Fatalf("mock vehicle chat error: %v", err)
+		t.Fatalf("memory fast-path chat error: %v", err)
 	}
 	if len(mockTTS.Spoken) == 0 {
-		t.Fatal("expected mock vehicle spoken confirmation")
+		t.Fatal("expected memory fast-path spoken confirmation")
 	}
 	if pipeline.State() != StateIdle {
-		t.Fatalf("expected state Idle after mock vehicle, got %s", pipeline.State())
+		t.Fatalf("expected state Idle after memory command, got %s", pipeline.State())
 	}
 }

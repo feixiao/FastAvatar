@@ -5,8 +5,6 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
-import com.ai.audioagent.tools.impl.AirConditionerTool
-import com.ai.audioagent.tools.impl.AmapNavigationTool
 import com.ai.audioagent.tools.impl.MusicPlaybackTool
 import com.ai.audioagent.tools.impl.SystemAlarmTool
 import com.ai.audioagent.tools.impl.SystemPhoneDialTool
@@ -34,10 +32,8 @@ class SystemToolExecutor(private val context: Context) {
     }
 
     private fun registerDefaultTools() {
-        ToolRegistry.register(AmapNavigationTool(context))
         ToolRegistry.register(MusicPlaybackTool(context))
         ToolRegistry.register(SystemAlarmTool(context))
-        ToolRegistry.register(AirConditionerTool(context))
         ToolRegistry.register(WeatherQueryTool(context))
         ToolRegistry.register(SystemPhoneDialTool(context))
         Log.i(TAG, "Registered ${ToolRegistry.getAllTools().size} system tools in ToolRegistry.")

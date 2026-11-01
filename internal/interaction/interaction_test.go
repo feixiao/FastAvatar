@@ -3,14 +3,12 @@ package interaction
 import (
 	"context"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 
 	"avatar/internal/cloud"
 	"avatar/internal/memory"
-	"avatar/internal/mockvehicle"
 	"avatar/internal/orchestrator"
 	"avatar/internal/persona"
 	"avatar/server"
@@ -160,20 +158,17 @@ func TestInteractionInterrupt(t *testing.T) {
 	}
 }
 
-func TestFastPathMockVehicle(t *testing.T) {
+func TestFastPathMemoryCommand(t *testing.T) {
 	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "vehicle_audit.log")
+	memPath := filepath.Join(tmpDir, "mem.json")
+	vault, err := memory.NewVault(memPath)
+	if err != nil {
+		t.Fatalf("failed to create vault: %v", err)
+	}
 
 	mockTTS := &testTrackingSynth{}
 	coord := orchestrator.NewCoordinator("test-sess")
-	fp := NewFastPathHandler(nil, nil)
-
-	// Set test audit log path
-	vehicleEngine, err := mockvehicle.NewEngine(logPath)
-	if err != nil {
-		t.Fatalf("failed to create vehicle engine: %v", err)
-	}
-	fp.SetVehicleEngine(vehicleEngine)
+	fp := NewFastPathHandler(vault, nil)
 
 	player := NewSpeechPlayer(mockTTS)
 	runner := &mockTaskRunner{}
@@ -181,7 +176,7 @@ func TestFastPathMockVehicle(t *testing.T) {
 
 	input := orchestrator.UserInput{
 		InputType: orchestrator.InputTypeText,
-		Text:      "把空调调到24度",
+		Text:      "帮我记一下美式咖啡",
 		Stability: orchestrator.StabilityFinal,
 	}
 
@@ -195,21 +190,12 @@ func TestFastPathMockVehicle(t *testing.T) {
 
 	// Must NOT call TaskRunner (0% cloud or background cognitive overhead)
 	if runner.called {
-		t.Fatal("expected mock vehicle to be handled 100% locally by fast-path")
+		t.Fatal("expected memory command to be handled 100% locally by fast-path")
 	}
 
 	// Verify local voice confirmation was spoken
 	if len(mockTTS.spoken) == 0 {
-		t.Fatal("expected spoken confirmation for vehicle mock")
-	}
-
-	// Verify audit log exists and is populated
-	data, err := os.ReadFile(logPath)
-	if err != nil {
-		t.Fatalf("failed to read audit log: %v", err)
-	}
-	if len(data) == 0 {
-		t.Fatal("audit log must not be empty")
+		t.Fatal("expected spoken confirmation for local memory command")
 	}
 }
 

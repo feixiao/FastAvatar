@@ -8,7 +8,6 @@ import com.avatar.android.core.dialog.LocalCompanionEngine
 import com.avatar.android.core.dispatcher.FastDispatcher
 import com.avatar.android.core.dispatcher.RouteTarget
 import com.avatar.android.core.memory.MemoryVault
-import com.avatar.android.core.mockvehicle.MockVehicleEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,7 +32,6 @@ data class TurnResult(
 
 class SessionStateMachine(
     val dispatcher: FastDispatcher,
-    val vehicleEngine: MockVehicleEngine,
     val memoryVault: MemoryVault,
     val cloudClient: CloudClient,
     val playbackController: AudioPlaybackController,
@@ -173,29 +171,6 @@ class SessionStateMachine(
                     )
                 }
 
-                RouteTarget.MOCK_VEHICLE -> {
-                    _state.value = SessionState.LOCAL_PROCESSING
-                    val execResult = vehicleEngine.execute(
-                        intent = dispatchResult.intentName,
-                        slots = dispatchResult.slots
-                    )
-                    val elapsed = System.currentTimeMillis() - startTime
-
-                    diagnosticLogger.logEvent("mock_action_recorded", mapOf(
-                        "intent" to execResult.entry.intent,
-                        "decision" to execResult.entry.decision.name,
-                        "reason" to execResult.entry.reason,
-                        "simulation" to execResult.entry.simulation
-                    ))
-
-                    playAndEmitResult(
-                        turnId = turnId,
-                        userText = text,
-                        target = dispatchResult.target,
-                        response = execResult.confirmation,
-                        latencyMs = elapsed
-                    )
-                }
 
                 RouteTarget.LOCAL_PERSONA -> {
                     _state.value = SessionState.LOCAL_PROCESSING

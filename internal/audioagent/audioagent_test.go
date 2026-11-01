@@ -11,9 +11,6 @@ func TestArbitrateIntent_VehicleAndSystemCommands(t *testing.T) {
 		expectMatch bool
 		actionName  string
 	}{
-		{"把空调温度调到二十四度", true, "set_ac_temp"},
-		{"关闭空调", true, "set_ac_power"},
-		{"帮我导航到西湖断桥", true, "start_nav"},
 		{"播放周杰伦的稻香", true, "play_music"},
 		{"暂停播放", true, "play_music"},
 		{"帮我定一个明天早晨七点的闹钟", true, "set_alarm"},
@@ -57,13 +54,13 @@ func TestSentenceChunker_StreamingAndToolStripping(t *testing.T) {
 	})
 	defer chunker.Close()
 
-	// Push tokens with tool call: "好的，马上为您调温。<|tool_call|>{"action":"set_ac_temp","value":24}<|/tool_call|>已调节完成。"
-	tokens := []string{"好", "的", "，", "马", "上", "为", "您", "调", "温", "。"}
+	// Push tokens with tool call: "好的，马上为您设定闹钟。<|tool_call|>{"action":"set_alarm","time":"08:00"}<|/tool_call|>已设置完成。"
+	tokens := []string{"好", "的", "，", "马", "上", "为", "您", "设", "定", "。"}
 	for _, tok := range tokens {
 		chunker.Push(tok)
 	}
 
-	chunker.Push("<|tool_call|>{\"action\":\"set_ac_temp\",\"value\":24}<|/tool_call|>")
+	chunker.Push("<|tool_call|>{\"action\":\"set_alarm\",\"time\":\"08:00\"}<|/tool_call|>")
 	chunker.Push("已调节完成。")
 	chunker.Flush()
 
@@ -81,7 +78,7 @@ func TestSentenceChunker_StreamingAndToolStripping(t *testing.T) {
 	if len(tools) != 1 {
 		t.Fatalf("expected 1 tool call dispatched, got %d", len(tools))
 	}
-	if !strings.Contains(tools[0], "set_ac_temp") {
-		t.Errorf("expected set_ac_temp in tool call, got %s", tools[0])
+	if !strings.Contains(tools[0], "set_alarm") {
+		t.Errorf("expected set_alarm in tool call, got %s", tools[0])
 	}
 }

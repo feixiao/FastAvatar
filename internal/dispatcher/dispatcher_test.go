@@ -33,22 +33,6 @@ func TestDispatcher_EvaluationRoutes(t *testing.T) {
 			wantIntent: "memory.command",
 		},
 		{
-			name:       "mock vehicle - climate",
-			text:       "把空调调到24度",
-			consented:  true,
-			online:     true,
-			wantTarget: RouteMockVehicle,
-			wantIntent: "climate.set_temperature",
-		},
-		{
-			name:       "mock vehicle stays local even offline",
-			text:       "打开全车车窗",
-			consented:  false,
-			online:     false,
-			wantTarget: RouteMockVehicle,
-			wantIntent: "window.control",
-		},
-		{
 			name:       "open-ended not consented",
 			text:       "今天有什么新鲜事",
 			consented:  false,
@@ -92,13 +76,13 @@ func TestDispatcher_EvaluationRoutes(t *testing.T) {
 
 func TestDispatcher_BenchmarkLatency(t *testing.T) {
 	d := NewFastDispatcher()
-	text := "主驾空调温度调至25度"
+	text := "记住我明天要开会"
 
 	iterations := 10000
 	start := time.Now()
 	for i := 0; i < iterations; i++ {
 		res := d.Evaluate(text, true, true)
-		if res.Target != RouteMockVehicle {
+		if res.Target != RouteLocalMemory {
 			t.Fatalf("unexpected route: %v", res.Target)
 		}
 	}

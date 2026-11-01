@@ -259,7 +259,7 @@ static void TestThreeTierMemory() {
 
     // L3 fact retrieval
     mem.AddFact("用户常住城市为杭州");
-    mem.AddFact("用户空调习惯温度为24度");
+    mem.AddFact("用户喜欢喝冰美式");
 
     auto facts = mem.RetrieveRelevantFacts("杭州", 1);
     assert(!facts.empty());
@@ -635,8 +635,8 @@ static void TestPerceptionVAD() {
     assert(!vad.InSpeech());
     assert(vad.IsEndpointDetected());
 
-    vad.SetRecognized("把空调调到24度");
-    assert(vad.GetRecognizedText(true) == "把空调调到24度");
+    vad.SetRecognized("播放周杰伦的稻香");
+    assert(vad.GetRecognizedText(true) == "播放周杰伦的稻香");
     assert(!vad.IsEndpointDetected());
 
     vad.Reset();
@@ -668,27 +668,8 @@ public:
 
         if (query.find("几点") != std::string::npos || query.find("时间") != std::string::npos) {
             *out_stream << "现在是北京时间 " << time_buf << "。";
-        } else if (query.find("空调") != std::string::npos || query.find("温度") != std::string::npos) {
-            if (query.find("关") != std::string::npos) {
-                *out_stream << "好的，已为您关闭空调。<|tool_call|>{\"action\":\"set_ac_power\",\"state\":\"off\"}<|/tool_call|>";
-            } else {
-                int temp = 24;
-                std::regex num_reg(R"((\d{2}))");
-                std::smatch m;
-                if (std::regex_search(query, m, num_reg)) {
-                    int val = std::stoi(m[1].str());
-                    if (val >= 16 && val <= 32) temp = val;
-                }
-                *out_stream << "没问题，已调至" << temp << "度。<|tool_call|>{\"action\":\"set_ac_temp\",\"value\":" << temp << "}<|/tool_call|>";
-            }
-        } else if (query.find("导航") != std::string::npos || query.find("去") != std::string::npos) {
-            std::string dest = "杭州西湖文化广场";
-            size_t p = query.find("去");
-            if (p == std::string::npos) p = query.find("到");
-            if (p != std::string::npos && p + 3 < query.size()) {
-                dest = query.substr(p + 3);
-            }
-            *out_stream << "好的，马上为您规划前往" << dest << "的最佳路线。<|tool_call|>{\"action\":\"start_nav\",\"dest\":\"" << dest << "\"}<|/tool_call|>";
+        } else if (query.find("闹钟") != std::string::npos || query.find("叫我起床") != std::string::npos) {
+            *out_stream << "没问题，已为您设置明天早上八点的闹钟。<|tool_call|>{\"action\":\"set_alarm\",\"time\":\"08:00\"}<|/tool_call|>";
         } else if (query.find("放") != std::string::npos || query.find("听") != std::string::npos ||
                    query.find("音乐") != std::string::npos || query.find("歌") != std::string::npos) {
             std::string song = "晴天";
@@ -720,32 +701,14 @@ static void TestDynamicCognition() {
         assert(reply.find("点") != std::string::npos);
     }
 
-    // 2. Dynamic AC Temperature
+    // 2. Dynamic Alarm Tool Call
     {
         std::stringstream ss;
-        llm.ResponseStream("把空调调到28度", &ss);
+        llm.ResponseStream("定一个明天早上八点的闹钟", &ss);
         std::string reply = ss.str();
-        assert(reply.find("已调至28度") != std::string::npos);
-        assert(reply.find("{\"action\":\"set_ac_temp\",\"value\":28}") != std::string::npos);
+        assert(reply.find("八点") != std::string::npos);
+        assert(reply.find("{\"action\":\"set_alarm\",\"time\":\"08:00\"}") != std::string::npos);
     }
-
-    // 3. Dynamic AC Turn Off
-    {
-        std::stringstream ss;
-        llm.ResponseStream("把空调关掉", &ss);
-        std::string reply = ss.str();
-        assert(reply.find("{\"action\":\"set_ac_power\",\"state\":\"off\"}") != std::string::npos);
-    }
-
-    // 4. Dynamic Destination Navigation
-    {
-        std::stringstream ss;
-        llm.ResponseStream("导航去北京天安门广场", &ss);
-        std::string reply = ss.str();
-        assert(reply.find("北京天安门广场") != std::string::npos);
-        assert(reply.find("{\"action\":\"start_nav\",\"dest\":\"北京天安门广场\"}") != std::string::npos);
-    }
-
     // 5. Query Quoting Fallback
     {
         std::stringstream ss;
@@ -798,18 +761,18 @@ static void TestMultiTurnDialogue() {
 
     // Turn 2: AC tool call
     spoken_sentences.clear();
-    pipeline.SubmitUserQuery("把空调调到26度");
+    pipeline.SubmitUserQuery("播放周杰伦的晴天");
     std::this_thread::sleep_for(std::chrono::milliseconds(350));
     assert(!tool_calls.empty());
-    assert(tool_calls.back().find("26") != std::string::npos);
+    assert(tool_calls.back().find("晴天") != std::string::npos);
     assert(pipeline.GetMemory().GetActiveTurns().size() == 2);
 
-    // Turn 3: Navigation tool call
+    // Turn 3: Alarm tool call
     tool_calls.clear();
-    pipeline.SubmitUserQuery("导航去杭州西湖文化广场");
+    pipeline.SubmitUserQuery("定一个明天早上八点的闹钟");
     std::this_thread::sleep_for(std::chrono::milliseconds(350));
     assert(!tool_calls.empty());
-    assert(tool_calls.back().find("杭州西湖文化广场") != std::string::npos);
+    assert(tool_calls.back().find("set_alarm") != std::string::npos);
     assert(pipeline.GetMemory().GetActiveTurns().size() == 3);
 
     pipeline.Stop();
@@ -985,49 +948,13 @@ static void TestMnnLlmEngineAndCloudComparison() {
 static void TestIntentArbiterSuite() {
     LogTest("Intent Arbiter & Small-Model Tool Call Compensation");
 
-    // 1. User says "说从亚运动员导航到西湖" (User's exact real-world scenario)
+    // 1. Alarm: "帮我定一个明天早晨七点半的闹钟"
     {
-        std::string tool = IntentArbiter::ResolveToolCall("说从亚运动员导航到西湖");
+        std::string tool = IntentArbiter::ResolveToolCall("帮我定一个明天早晨七点半的闹钟");
         assert(!tool.empty());
-        assert(tool.find("start_nav") != std::string::npos);
-        assert(tool.find("西湖") != std::string::npos);
+        assert(tool.find("set_alarm") != std::string::npos);
+        assert(tool.find("07:30") != std::string::npos);
     }
-
-    // 2. "帮我把导航设到杭州西湖文化广场"
-    {
-        std::string tool = IntentArbiter::ResolveToolCall("帮我把导航设到杭州西湖文化广场");
-        assert(!tool.empty());
-        assert(tool.find("start_nav") != std::string::npos);
-        assert(tool.find("杭州西湖文化广场") != std::string::npos);
-    }
-
-    // 3. "从亚运村到西湖文化广场怎么走"
-    {
-        std::string tool = IntentArbiter::ResolveToolCall("从亚运村到西湖文化广场怎么走");
-        assert(!tool.empty());
-        assert(tool.find("start_nav") != std::string::npos);
-        assert(tool.find("西湖文化广场") != std::string::npos);
-    }
-
-    // 4. "导航去北京天安门广场"
-    {
-        std::string tool = IntentArbiter::ResolveToolCall("导航去北京天安门广场");
-        assert(!tool.empty());
-        assert(tool.find("start_nav") != std::string::npos);
-        assert(tool.find("北京天安门广场") != std::string::npos);
-    }
-
-    // 5. Air conditioner: "把空调温度调到二十四度" & "关空调"
-    {
-        std::string tool1 = IntentArbiter::ResolveToolCall("把空调温度调到二十四度");
-        assert(tool1.find("set_ac_temp") != std::string::npos);
-        assert(tool1.find("24") != std::string::npos);
-
-        std::string tool2 = IntentArbiter::ResolveToolCall("关闭空调");
-        assert(tool2.find("set_ac_power") != std::string::npos);
-        assert(tool2.find("off") != std::string::npos);
-    }
-
     // 6. Music: "放一首周杰伦的晴天" and media control commands
     {
         std::string tool = IntentArbiter::ResolveToolCall("放一首周杰伦的晴天");
@@ -1060,12 +987,6 @@ static void TestIntentArbiterSuite() {
     }
     // 7.1 Zero-Hallucination & Slot Missing Invariant: Never hallucinate fake slots!
     {
-        // Missing destination must NOT hallucinate "西湖文化广场"
-        auto nav_res = IntentArbiter::Arbitrate("我要去");
-        assert(nav_res.status == ArbiterStatus::SLOT_MISSING);
-        assert(nav_res.missing_slot == "destination");
-        assert(IntentArbiter::ResolveToolCall("我要去").empty());
-
         // Missing alarm time must NOT hallucinate "07:30"
         auto alarm_res = IntentArbiter::Arbitrate("帮我定个闹钟");
         assert(alarm_res.status == ArbiterStatus::SLOT_MISSING);
@@ -1079,16 +1000,6 @@ static void TestIntentArbiterSuite() {
         assert(IntentArbiter::ResolveToolCall("打电话").empty());
     }
 
-    // 7.2 Universal Chinese Number & Temperature Normalization (No hardcoded 16-32 vector)
-    {
-        std::string tool30 = IntentArbiter::ResolveToolCall("把空调温度调到三十度");
-        assert(tool30.find("set_ac_temp") != std::string::npos);
-        assert(tool30.find("30") != std::string::npos);
-
-        std::string tool16 = IntentArbiter::ResolveToolCall("把空调调到十六度");
-        assert(tool16.find("set_ac_temp") != std::string::npos);
-        assert(tool16.find("16") != std::string::npos);
-    }
 
     // 7.3 Dynamic Entity Registration (Decoupled from code)
     {
@@ -1124,11 +1035,11 @@ static void TestIntentArbiterSuite() {
 
     AudioAgentPipeline pipeline(perception, conv_llm, tts, observer);
     pipeline.Start();
-    pipeline.SubmitUserQuery("说从亚运动员导航到西湖");
+    pipeline.SubmitUserQuery("放一首周杰伦的晴天");
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
     assert(!compensated_tools.empty());
-    assert(compensated_tools.back().find("start_nav") != std::string::npos);
-    assert(compensated_tools.back().find("西湖") != std::string::npos);
+    assert(compensated_tools.back().find("play_music") != std::string::npos);
+    assert(compensated_tools.back().find("晴天") != std::string::npos);
     pipeline.Stop();
 
     LogPass("Intent Arbiter and Small-Model Tool Call Compensation passed all tests.");

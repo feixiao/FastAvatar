@@ -66,7 +66,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avatar.android.core.dispatcher.RouteTarget
 import com.avatar.android.core.state.SessionState
-import com.avatar.android.ui.components.AuditLogSheet
 import com.avatar.android.ui.components.AvatarPetOrb
 import com.avatar.android.ui.components.MemorySheet
 import com.avatar.android.ui.components.SettingsSheet
@@ -95,7 +94,6 @@ fun VoiceAgentScreen(
     val isOnline by viewModel.isOnline.collectAsState()
     val pendingMemory by viewModel.pendingMemory.collectAsState()
     val memories by viewModel.memories.collectAsState()
-    val auditLogs by viewModel.auditLogs.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val activePersona by viewModel.activePersona.collectAsState()
 
@@ -104,7 +102,6 @@ fun VoiceAgentScreen(
     val speechVolume by viewModel.speechVolume.collectAsState()
 
     var showMemorySheet by remember { mutableStateOf(false) }
-    var showAuditSheet by remember { mutableStateOf(false) }
     var showSettingsSheet by remember { mutableStateOf(false) }
     var showConsentDialog by remember { mutableStateOf(false) }
     var inputText by remember { mutableStateOf("") }
@@ -176,17 +173,6 @@ fun VoiceAgentScreen(
                         )
                     }
 
-                    // Audit sheet button
-                    IconButton(onClick = {
-                        viewModel.refreshAuditLogs()
-                        showAuditSheet = true
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.DirectionsCar,
-                            contentDescription = "车控审计",
-                            tint = AccentYellow
-                        )
-                    }
                 }
             )
         },
@@ -364,11 +350,6 @@ fun VoiceAgentScreen(
                     }
                 }
                 item {
-                    TestChip("把空调调到24度") {
-                        viewModel.submitUtterance("把空调调到24度")
-                    }
-                }
-                item {
                     TestChip("切换成猫娘人设") {
                         viewModel.submitUtterance("切换成猫娘人设")
                     }
@@ -540,14 +521,6 @@ fun VoiceAgentScreen(
         )
     }
 
-    // Audit Log BottomSheet
-    if (showAuditSheet) {
-        AuditLogSheet(
-            auditLogs = auditLogs,
-            onClearAll = { viewModel.clearAuditLogs() },
-            onDismiss = { showAuditSheet = false }
-        )
-    }
 }
 
 @Composable
@@ -620,7 +593,6 @@ fun MessageBubble(msg: MessageItem) {
                         ) {
                             val badgeColor = when (msg.routeTarget) {
                                 RouteTarget.LOCAL_MEMORY, RouteTarget.LOCAL_PERSONA -> AccentGreen
-                                RouteTarget.MOCK_VEHICLE -> AccentYellow
                                 RouteTarget.CLOUD_CHAT -> AccentPurple
                                 else -> TextMuted
                             }
@@ -628,7 +600,6 @@ fun MessageBubble(msg: MessageItem) {
                             val routeLabel = when (msg.routeTarget) {
                                 RouteTarget.LOCAL_MEMORY -> "本地记忆快环"
                                 RouteTarget.LOCAL_PERSONA -> "人设快环"
-                                RouteTarget.MOCK_VEHICLE -> "Mock车控快环"
                                 RouteTarget.CLOUD_CHAT -> "智能对话"
                                 RouteTarget.LOCAL_ONLY_PROMPT -> "未授权降级"
                                 RouteTarget.OFFLINE_PROMPT -> "离线降级"

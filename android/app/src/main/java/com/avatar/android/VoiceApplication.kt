@@ -13,7 +13,6 @@ import com.avatar.android.core.config.AppSettings
 import com.avatar.android.core.diagnostics.DiagnosticLogger
 import com.avatar.android.core.dispatcher.FastDispatcher
 import com.avatar.android.core.memory.MemoryVault
-import com.avatar.android.core.mockvehicle.MockVehicleEngine
 import com.avatar.android.core.state.SessionStateMachine
 import java.io.File
 import java.util.UUID
@@ -23,8 +22,6 @@ class VoiceApplication : Application() {
     lateinit var appSettings: AppSettings
         private set
     lateinit var dispatcher: FastDispatcher
-        private set
-    lateinit var vehicleEngine: MockVehicleEngine
         private set
     lateinit var memoryVault: MemoryVault
         private set
@@ -59,8 +56,6 @@ class VoiceApplication : Application() {
         appSettings = AppSettings(this)
 
         dispatcher = FastDispatcher()
-        val logFile = File(filesDir, "mock_vehicle.log")
-        vehicleEngine = MockVehicleEngine(logFile)
 
         val memoryFile = File(filesDir, "local_memory.json")
         memoryVault = MemoryVault(memoryFile, deviceId)
@@ -85,7 +80,6 @@ class VoiceApplication : Application() {
 
         stateMachine = SessionStateMachine(
             dispatcher = dispatcher,
-            vehicleEngine = vehicleEngine,
             memoryVault = memoryVault,
             cloudClient = cloudClient,
             playbackController = playbackController,

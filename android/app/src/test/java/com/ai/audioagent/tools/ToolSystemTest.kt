@@ -1,6 +1,5 @@
 package com.ai.audioagent.tools
 
-import com.ai.audioagent.tools.impl.AirConditionerTool
 import com.ai.audioagent.tools.impl.WeatherQueryTool
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -49,41 +48,6 @@ class ToolSystemTest {
     }
 
     @Test
-    fun testAirConditionerToolExecution() = runBlocking {
-        // Mock Context is not needed because AirConditionerTool does not access Android Context directly
-        val acTool = object : AgentTool {
-            override val name: String = "set_ac_temp"
-            override val description: String = "调节空调温度"
-            override val parametersSchema: JSONObject = JSONObject()
-            override suspend fun execute(params: JSONObject): ToolExecutionResult {
-                val temp = params.optInt("value", 24).coerceIn(16, 32)
-                val zone = params.optString("zone", "all")
-                return ToolExecutionResult(
-                    action = name,
-                    success = true,
-                    summary = "❄️ 空调温度已调至 ${temp}℃",
-                    rawJson = params.toString(),
-                    channel = "智能座舱 VHAL 车控通道",
-                    extras = mapOf("temp" to temp, "zone" to zone)
-                )
-            }
-        }
-
-        val params = JSONObject().apply {
-            put("value", 26)
-            put("zone", "driver")
-        }
-
-        val result = acTool.execute(params)
-        assertTrue(result.success)
-        assertEquals("set_ac_temp", result.action)
-        assertEquals("智能座舱 VHAL 车控通道", result.channel)
-        assertEquals(26, result.extras["temp"])
-        assertEquals("driver", result.extras["zone"])
-        assertTrue(result.summary.contains("26℃"))
-    }
-
-    @Test
     fun testWeatherQueryToolExecution() = runBlocking {
         val weatherTool = object : AgentTool {
             override val name: String = "query_weather"
@@ -112,24 +76,6 @@ class ToolSystemTest {
         assertEquals("云端 OpenAPI 天气网关", result.channel)
         assertEquals("上海", result.extras["city"])
         assertTrue(result.summary.contains("上海当前天气晴朗"))
-    }
-
-    @Test
-    fun testAmapNavigationToolSchemaAndMetadata() {
-        val navTool = com.ai.audioagent.tools.impl.AmapNavigationTool(
-            context = android.content.ContextWrapper(null)
-        )
-        assertEquals("start_nav", navTool.name)
-        assertEquals(RiskLevel.LOW, navTool.riskLevel)
-
-        val schema = navTool.parametersSchema
-        val props = schema.optJSONObject("properties")
-        assertNotNull(props)
-        assertTrue(props!!.has("dest"))
-        assertTrue(props.has("mode"))
-        val required = schema.optJSONArray("required")
-        assertNotNull(required)
-        assertEquals("dest", required!!.getString(0))
     }
 
     @Test

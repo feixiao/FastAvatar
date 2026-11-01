@@ -4,7 +4,6 @@ import (
 	"strings"
 	"time"
 
-	"avatar/internal/mockvehicle"
 )
 
 // RouteTarget defines where the conversational turn should be dispatched.
@@ -13,7 +12,6 @@ type RouteTarget string
 const (
 	RouteLocalMemory  RouteTarget = "LOCAL_MEMORY"
 	RouteLocalPersona RouteTarget = "LOCAL_PERSONA"
-	RouteMockVehicle  RouteTarget = "MOCK_VEHICLE"
 	RouteCloudChat    RouteTarget = "CLOUD_CHAT"
 	RouteLocalOnly    RouteTarget = "LOCAL_ONLY_PROMPT"
 	RouteOffline      RouteTarget = "OFFLINE_PROMPT"
@@ -56,15 +54,6 @@ func (d *FastDispatcher) Evaluate(text string, isCloudConsented bool, isOnline b
 		return res
 	}
 
-	// P2: Check mock vehicle intent (空调 / 车窗 / 驾驶模式等设备控制)
-	if intent, slots, matched := mockvehicle.ParseIntentFromText(clean); matched {
-		res.Target = RouteMockVehicle
-		res.IntentName = intent
-		res.Slots = slots
-		res.Latency = time.Since(start)
-		return res
-	}
-
 	// P3: Check local persona switch oral command
 	if isPersonaSwitchCommand(clean) {
 		res.Target = RouteLocalPersona
@@ -94,9 +83,6 @@ func (d *FastDispatcher) Evaluate(text string, isCloudConsented bool, isOnline b
 }
 
 func isPersonaSwitchCommand(text string) bool {
-	if strings.Contains(text, "驾驶") || strings.Contains(text, "漂移") || strings.Contains(text, "赛道") || strings.Contains(text, "省油") {
-		return false
-	}
 	return strings.HasPrefix(text, "切换成") ||
 		strings.HasPrefix(text, "切换为") ||
 		strings.HasPrefix(text, "变成") ||

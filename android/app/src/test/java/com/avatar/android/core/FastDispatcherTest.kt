@@ -35,25 +35,6 @@ class FastDispatcherTest {
     }
 
     @Test
-    fun testMockVehicleCommands_RoutedToMockVehicle() {
-        val climateCmd = "把空调调到24度"
-        val res1 = dispatcher.evaluate(climateCmd, isCloudConsented = true, isOnline = true)
-        assertEquals(RouteTarget.MOCK_VEHICLE, res1.target)
-        assertEquals("climate.set_temperature", res1.intentName)
-        assertEquals(24.0, res1.slots["target_temperature"])
-
-        val windowCmd = "打开副驾车窗"
-        val res2 = dispatcher.evaluate(windowCmd, isCloudConsented = true, isOnline = true)
-        assertEquals(RouteTarget.MOCK_VEHICLE, res2.target)
-        assertEquals("window.control", res2.intentName)
-
-        val modeCmd = "切换到运动模式"
-        val res3 = dispatcher.evaluate(modeCmd, isCloudConsented = true, isOnline = true)
-        assertEquals(RouteTarget.MOCK_VEHICLE, res3.target)
-        assertEquals("drive.switch_mode", res3.intentName)
-    }
-
-    @Test
     fun testPersonaSwitchCommands_RoutedToLocalPersona() {
         val cmd = "切换成高冷猫娘人设"
         val res = dispatcher.evaluate(cmd, isCloudConsented = true, isOnline = true)

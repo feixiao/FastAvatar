@@ -116,119 +116,6 @@ int IntentArbiter::ParseChineseNumber(const std::string& text) {
     return ParseChineseNumberToken(text);
 }
 
-int IntentArbiter::ParseChineseTemperature(const std::string& query) {
-    // 1. 阿拉伯数字匹配 (16 ~ 32)
-    static const std::regex num_reg(R"((\d{1,2})\s*度?)");
-    std::smatch m;
-    if (std::regex_search(query, m, num_reg)) {
-        try {
-            int val = std::stoi(m[1].str());
-            if (val >= 16 && val <= 32) {
-                return val;
-            }
-        } catch (...) {}
-    }
-
-    // 2. 通用中文数字匹配 (如 "二十四度", "十六度", "三十二度")
-    // UTF-8 多字节字符不能在 std::regex 的中括号字符集使用，必须使用多分支 alternation
-    static const std::regex cn_num_reg(R"(((?:一|二|两|三|四|五|六|七|八|九)?十(?:一|二|两|三|四|五|六|七|八|九)?|(?:一|二|两|三|四|五|六|七|八|九))\s*度?)");
-    if (std::regex_search(query, m, cn_num_reg)) {
-        int val = ParseChineseNumberToken(m[1].str());
-        if (val >= 16 && val <= 32) {
-            return val;
-        }
-    }
-
-    return -1;
-}
-
-std::string IntentArbiter::ExtractNavDestination(const std::string& query) {
-    std::string s = CleanPunctuationAndParticles(query);
-    if (s.empty()) return "";
-    std::string_view sv(s);
-    std::string_view dest;
-
-    // 场景 1：包含起点 "从...到/去/导航到/导航去..."
-    size_t from_pos = sv.find("从");
-    if (from_pos != std::string_view::npos) {
-        static constexpr std::string_view to_markers[] = {
-            "导航设到", "导航设去", "导航开到", "导航到", "导航去", "导航至",
-            "设到", "设去", "开到", "到", "去", "至"
-        };
-        for (const auto& marker : to_markers) {
-            size_t to_pos = sv.find(marker, from_pos + 3);
-            if (to_pos != std::string_view::npos) {
-                dest = sv.substr(to_pos + marker.size());
-                break;
-            }
-        }
-    }
-
-    // 场景 2：前置动作引导词
-    if (dest.empty()) {
-        static constexpr std::string_view prefix_markers[] = {
-            "帮我把导航设到", "帮我把导航设去", "把导航设到", "把导航设去", "导航设到", "导航设去",
-            "帮我把导航开到", "把导航开到", "导航开到",
-            "帮我导航到", "帮我导航去", "帮我导航至", "帮我导航",
-            "导航到", "导航去", "导航至",
-            "带我去", "带我到", "带我至", "送我去", "送我到",
-            "我要去", "我想去",
-            "查一下去", "查查去", "查去",
-            "去", "到"
-        };
-        for (const auto& marker : prefix_markers) {
-            size_t p = sv.find(marker);
-            if (p != std::string_view::npos) {
-                if (marker == "去" || marker == "到") {
-                    if (p > 9) continue; // 仅当动词在句首附近时视为导航触发词
-                }
-                dest = sv.substr(p + marker.size());
-                break;
-            }
-        }
-    }
-
-    // 场景 3：直接形如 "导航西湖"
-    if (dest.empty()) {
-        size_t p = sv.find("导航");
-        if (p != std::string_view::npos) {
-            dest = sv.substr(p + 6); // "导航" 占 6 字节
-        }
-    }
-
-    std::string final_dest = CleanPunctuationAndParticles(dest);
-
-    // 工业级严格校验：过滤无意义虚词与停用词，槽位缺失严格返回空串，严禁伪造虚假目的地
-    static constexpr std::string_view invalid_words[] = {
-        "一下", "走", "路", "导航", "路线", "那里", "地方", "哪儿", "哪里"
-    };
-    for (const auto& inv : invalid_words) {
-        if (final_dest == inv) {
-            return "";
-        }
-    }
-
-    return final_dest;
-}
-
-std::string IntentArbiter::ResolveAcAction(const std::string& query) {
-    std::string_view q(query);
-    if (q.find("关") != std::string_view::npos) {
-        return R"({"action":"set_ac_power","state":"off"})";
-    }
-    if (q.find("开") != std::string_view::npos &&
-        q.find("度") == std::string_view::npos &&
-        q.find("温") == std::string_view::npos) {
-        return R"({"action":"set_ac_power","state":"on"})";
-    }
-    int temp = ParseChineseTemperature(query);
-    if (temp > 0) {
-        char buf[64];
-        int len = snprintf(buf, sizeof(buf), R"({"action":"set_ac_temp","value":%d})", temp);
-        return std::string(buf, static_cast<size_t>(len));
-    }
-    return R"({"action":"set_ac_power","state":"on"})";
-}
 
 std::string IntentArbiter::ExtractMusicQuery(const std::string& query) {
     std::string s = CleanPunctuationAndParticles(query);
@@ -375,14 +262,6 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
         return res;
     }
 
-    // 2. 空调控制
-    if (q.find("空调") != std::string_view::npos) {
-        res.intent = "ac_control";
-        res.confidence = 1.0f;
-        res.payload_json = ResolveAcAction(query);
-        res.status = ArbiterStatus::MATCHED;
-        return res;
-    }
 
     // 3. 闹钟意图
     if (q.find("闹钟") != std::string_view::npos ||
@@ -507,40 +386,6 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
         return res;
     }
 
-    // 7. 导航意图
-    bool is_nav = false;
-    if (q.find("导航") != std::string_view::npos ||
-        q.find("路线") != std::string_view::npos ||
-        q.find("带我去") != std::string_view::npos ||
-        q.find("带我到") != std::string_view::npos ||
-        q.find("送我去") != std::string_view::npos ||
-        q.find("我要去") != std::string_view::npos ||
-        q.find("我想去") != std::string_view::npos ||
-        q.find("怎么走") != std::string_view::npos) {
-        is_nav = true;
-    } else if (q.find("从") != std::string_view::npos &&
-              (q.find("到") != std::string_view::npos || q.find("去") != std::string_view::npos)) {
-        is_nav = true;
-    } else if (q.rfind("去", 0) == 0 || q.rfind("到", 0) == 0) {
-        if (q.size() > 3) {
-            is_nav = true;
-        }
-    }
-
-    if (is_nav) {
-        std::string dest = ExtractNavDestination(query);
-        res.intent = "start_nav";
-        if (dest.empty()) {
-            res.status = ArbiterStatus::SLOT_MISSING;
-            res.missing_slot = "destination";
-        } else {
-            res.status = ArbiterStatus::MATCHED;
-            res.slots["dest"] = dest;
-            res.payload_json = R"({"action":"start_nav","dest":")" + dest + R"("})";
-            res.confidence = 0.98f;
-        }
-        return res;
-    }
 
     res.status = ArbiterStatus::UNMATCHED;
     return res;
