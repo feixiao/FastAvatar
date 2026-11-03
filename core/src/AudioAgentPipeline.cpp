@@ -372,6 +372,7 @@ void AudioAgentPipeline::CognitionWorkerLoop() {
         }
 
         std::string full_assistant_response;
+        full_assistant_response.reserve(256);
 
         // 构建流式断句器回调
         SentenceChunkerCallbacks callbacks;
