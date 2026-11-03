@@ -1,16 +1,15 @@
 # Avatar 系统工程架构文档 (System Architecture)
 
-> **版本**：v1.0 (Current Implementation)  
-> **适用范围**：macOS Desktop (Go + Wails + Swift Native ASR)、Android Mobile (Pixel 10 / Android 16)、Cloud Realtime Service (Go + LiveKit SFU)
+> **版本**：v2.0 (Dual-Loop Agent Harness Specification)  
+> **适用范围**：macOS Desktop (Go + Wails + Swift Native ASR)、Android Mobile / In-Vehicle AAOS (Pixel 参考样机 & 车规 QNX 抽象层)、C++17 跨平台高可靠核心运行时 (`core/`)、Cloud Realtime Agent Harness (Go + LiveKit SFU + Python Agent)
 
 ---
 
 ## 1. 系统全景架构图 (System Architecture Panorama)
 
-Avatar 采用**端云双环架构（Dual-Loop Architecture）**：
-- **端侧极速快环（Local Fast Loop ≤ 150ms）**：端侧感知、毫秒级意图分流路由器（Fast Dispatcher）、本地记忆底座（Memory Vault）、多模态人格引擎（Persona Engine）、离线发音与本地伴生模型（Sidecar SLM），断网物理隔离可用；
-- **云端认知慢环（Cloud Realtime Loop P50 ≤ 800ms）**：在用户显式授权的前提下，通过 LiveKit SFU 与 Go 网关建立全双工实时音视频通道，承接开放式多轮对话、深度推理与流式播报，并支持毫秒级协同打断（Barge-in）。
-
+Avatar 采用**端云双环 Agent Harness 架构（Dual-Loop Agent Harness Architecture）**：
+- **端侧极速快环 Harness（Local Fast Loop ≤ 150ms）**：端侧感知、毫秒级意图短路拦截与分流路由器（Intent Arbiter & Fast Dispatcher）、本地车控安全看门狗（Safety Guardrail）、三层分层记忆底座（Three-Tier Memory Vault）、多模态人格引擎（Persona Engine）、离线发音与端侧伴生模型（Sidecar SLM），断网物理隔离可用，深度适配车机算力与车规安全约束；
+- **云端认知慢环 Harness（Cloud Realtime Loop P50 ≤ 800ms）**：在用户显式授权前提下，通过 LiveKit SFU 与 Go 网关建立全双工实时音视频通道，结合 Python 云端 Agent 编排、工具 Skill 网关、系统提示词版本管理、安全护栏与多模型路由，承接开放式多轮推理与首句微切分流式播报，并支持毫秒级协同打断（Barge-in）。
 ```mermaid
 flowchart TB
     %% ======================= 端侧设备 =======================
@@ -132,37 +131,74 @@ Avatar (macOS Desktop)
     └── Client (Token 交换、云端实时打断同步、会话终止管理)
 ```
 
-### 2.2 Android 移动端架构 (Pixel 10 / Kotlin Jetpack Compose)
+### 2.2 Android 移动端与车机端架构 (Pixel 10 / AAOS 参考平台)
 
-Android 端面向 Android 16 (Pixel 10) 平台定制，采用单向数据流（UDF）与系统级前台服务。
+Android 端面向 Android 16 (Pixel 10) 平台定制，并作为车载信息娱乐系统（AAOS）与端侧 Harness 的参考原型平台。采用单向数据流（UDF）、系统级前台常驻服务与 JNI Native 桥接。
 
 ```
-Avatar (Android Client)
-├── UI & ViewModel Layer (com.avatar.android.ui)
+Avatar (Android / AAOS Client)
+├── UI & Presentation Layer (com.avatar.android.ui)
 │   ├── MainActivity (动态权限申请、沉浸式窗口)
 │   ├── VoiceAgentScreen / VoiceAgentViewModel (状态感知与事件分发)
+│   ├── AudioWaveformView / StateVisualizerView (波形与状态可视化)
 │   └── components/ (MemorySheet 记忆管理面板、BondSheet 人格与羁绊面板)
 │
-├── Background Service Layer (com.avatar.android.service)
-│   └── VoiceSessionService (Foreground Service: microphone | mediaPlayback)
+├── Background Service & IPC Layer (com.avatar.android.service & com.ai.audioagent.service)
+│   ├── VoiceSessionService (Foreground Service: microphone | mediaPlayback)
+│   ├── AudioAgentService (常驻系统服务，实现 IAudioAgentService AIDL IPC)
+│   └── AudioFocusHelper (系统电话/第三方音频抢占与释放)
+│
+├── Tool Skill Gateway & Safety Guardrail (com.ai.audioagent.tools)
+│   ├── ToolRegistry (动态管理整机已启用工具，导出符合 ChatML/OpenAI 的 Function Calling JSON Schema)
+│   ├── SystemToolExecutor (车控/系统动作前置参数校验与安全门禁拦截)
+│   └── impl/ (SystemAlarmTool, SystemPhoneDialTool, WeatherQueryTool, MusicPlaybackTool)
+│
+├── Native JNI Bridge (com.ai.audioagent.nativebridge)
+│   └── AudioAgentNative (通过 NDK JNI 桥接 C++17 原生高可靠 Harness 引擎 core/)
 │
 ├── Core State Machine (com.avatar.android.core.state)
 │   └── SessionStateMachine (11 状态严密状态机，杜绝非法状态跳跃)
 │
 ├── Routing & Local Loop (com.avatar.android.core)
-│   ├── FastDispatcher (dispatcher: 4 级优先级确定性分流器)
-│   └── MemoryVault (memory: 两阶段确认本地记忆隔离存储)
-│
-├── Audio & Privacy Safeguards (com.avatar.android.core.audio)
-│   ├── AudioPrivacyGuard (监听 ACTION_AUDIO_BECOMING_NOISY，拔耳机瞬时静音)
-│   ├── AudioFocusHelper (系统电话/第三方音频抢占与释放)
-│   └── AudioPlaybackController (媒体门禁 isAudioMuted 状态控制、Barge-in 截断)
+│   ├── FastDispatcher (dispatcher: 4 级优先级确定性分流器，< 1ms 决策)
+│   └── MemoryVault (memory: 两阶段口语确认本地隐私记忆隔离存储)
 │
 └── Cloud & Diagnostics (com.avatar.android.core)
     ├── CloudClient (cloud: LiveKit 媒体推流与 /api/v1/ 协同信令)
     └── DiagnosticLogger (diagnostics: 脱敏运行指标与错误审计 diagnostics.log)
 ```
 
+### 2.3 车规级 / 端侧 C++17 原生高可靠 Harness 运行时 (`core/`)
+
+针对车机算力受限（高通 8155/8295）、内存硬约束与车规安全要求，底座采用现代 ISO C++17 纯原生构建，杜绝 GC 停顿与内存泄漏：
+
+```
+core (C++17 High-Reliability Native Harness)
+├── Orchestration Pipeline (AudioAgentPipeline.cpp / .hpp)
+│   ├── 全双工交互编排流水线 (IDLE <-> LISTENING <-> THINKING <-> SPEAKING)
+│   ├── CpuAffinity: 线程 CPU 亲和性绑定 (Perception 绑能耗小核，Cognition/TTS 绑高性能大核)
+│   ├── LockFreeRingBuffer: 单生产者单消费者 (SPSC) 无锁环形缓冲，音频流零锁阻塞
+│   └── Barge-in 打断: 原子标记瞬间截断播放队列与 KV 状态回滚 (< 5ms)
+│
+├── Intent Short-Circuiting Engine (IntentArbiter.cpp / .hpp)
+│   ├── CleanPunctuationAndParticles: 毫秒级文本首尾语气助词与标点清洗
+│   ├── ParseChineseNumber: 鲁棒中文口语数字/时间解析 (如 "七点半" -> "07:30")
+│   ├── 系统动作抽槽与短路: 音乐播控 (暂停/继续/切歌/点歌)、闹钟设置、天气查询
+│   └── 冲突前置阻断: 严格过滤 "为什么"、"笑话" 等开放式问答，穿透放行至云端 LLM
+│
+├── Safety Watchdog & Loop Breaker (WatchdogAndRepetition.cpp / .hpp)
+│   ├── TTFT Watchdog: 3 秒首 Token 超时看门狗，超时强制触发降级口语安抚
+│   └── N-gram Repetition Breaker: 12 字节滑动窗口检测，瞬时打断大模型死循环吐字
+│
+├── Three-Tier Memory Subsystem (ThreeTierMemory.cpp / .hpp)
+│   ├── L1 Ring Working Memory: 固定系统提示词 + 最近 4 轮工作记忆滑动窗口
+│   ├── L2 Background Summarizer: 6 轮淘汰 + 10 秒空闲异步语义浓缩
+│   └── L3 Long-term Facts Store: 静态持久化事实库检索与 Prompt 动态注入
+│
+└── Inference & Perception Engines
+    ├── MnnLlmEngine: 阿里 MNN 端侧轻量级大模型推理接入
+    └── SherpaOnnxPerceptionEngine: 新一代 Kaldi/Sherpa-ONNX 流式本地离线感知
+```
 ---
 
 ## 3. 云端实时网关与基础设施架构 (Cloud Architecture)
