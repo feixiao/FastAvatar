@@ -1,247 +1,341 @@
-# AI Agent 端云协同 Harness 架构与技术实现白皮书
+# AI Agent 端云协同 Harness 架构通用知识科普白皮书
 
-> **适用范围**：智能座舱（AAOS/QNX/Linux）全双工语音智能体架构研究、端云协同 Runtime 体系设计、Avatar 项目代码实装与车规量产演进。
+> **文档定位**：本白皮书面向智能座舱（AAOS / QNX / Linux）与实时多模态系统领域，旨在系统性科普 **端云协同 AI Agent Harness（线束运行时）** 的行业标准、架构演进、核心技术栈与关键设计原语。  
+> **核心关键词体系**：`C/C++`、`Rust`、`Python`、`LangGraph`、`Llama-Index`、`系统级提示词设计`、`大模型/车控App/智能体低代码`、`云侧 Harness`（Agent 编排、提示词版本管理、Skill 网关、上下文管理、安全护栏、评测体系、多模型路由、分布式服务、灰度/AB实验）、`端侧 Harness (车机端 AAOS/QNX)`（车载本地提示词模板、本地规则、意图短路拦截、本地校验、端云上下文同步、车机算力/内存约束/车规安全适配）。
 
 ---
 
 ## 一、 核心概念：什么是 Agent 领域的 “Harness”？
 
-在传统软件工程中，Harness 指“测试夹具”（Test Harness）；但在大模型与智能体系统工程中，**Harness 借用了汽车工业中“电气线束（Wiring Harness）”的物理隐喻：它是承载模型运行的“控制底座、安全管线与线束运行时”（Agent Runtime & Middleware Framework）**。
+在传统软件工程中，Harness 指“测试夹具”（Test Harness）；但在大模型与具身/车载智能体系统工程中，**Harness 借用了汽车与航天工程中“电气线束（Wiring Harness）”的物理隐喻：它是承载并约束大模型运行的“控制底座、安全管线、中继运行时与系统外骨骼”（Agent Runtime & Middleware Framework）**。
 
-* **大模型本身只是无状态的“文本/概率预测引擎”**：
-  * 模型自身无法感知物理世界（无法感知车速、电量、挡位、音区定位）；
-  * 模型无法直接安全地调用车身总线（CAN/LIN/SOME/IP）或执行物理动作；
-  * 模型存在固有幻觉、非确定性延迟（TTFT 波动从几百毫秒到数秒不等），且面临隧道/地库断网即瘫痪的脆弱性。
-* **Harness 负责把“孤立的模型”约束、赋能为“高可靠的智能体”**：
-  * **装配感官与线束**：挂接全双工声学管线（AEC/VAD/音区拾音）、实时车身信号网关（VHAL）；
-  * **约束执行与安全**：构建车规物理互锁（Safety Interlock）、意图短路拦截、反死循环看门狗；
-  * **维护记忆与状态**：提供端侧分层短期/工作记忆、云端长期画像与会话状态持久化；
-  * **端云双环协同**：在端侧极速快环（<150ms 规则/端侧小模型）与云端认知慢环（P50 <800ms 多模态大模型）之间实现无感调度与竞态仲裁。
+```
++--------------------------------------------------------------------------+
+|                       大模型 (LLM / VLM / SLM)                           |
+|        本质：概率预测器、无状态纯计算单元、非确定性、高延迟、无直接执行权         |
++-----------------------------------+--------------------------------------+
+                                    | (输入 Token / 输出 Token)
++-----------------------------------v--------------------------------------+
+|                     AI Agent Harness (智能体线束运行时)                     |
+|  [感官装配: AEC/VAD/音区拾音]      [执行约束: 车规互锁/物理门禁/反死循环]   |
+|  [时延优化: 意图短路/微切句断词]    [记忆维系: 端侧工作记忆/云端画像/向量RAG] |
+|  [状态同步: 端云状态机/增量补齐]    [工程兜底: 阶梯降级/本地SLM/确定性规则]  |
++-----------------------------------+--------------------------------------+
+                                    | (安全信号 / 确定性总线指令)
++-----------------------------------v--------------------------------------+
+|                   物理世界与车载总线 (CAN / LIN / SOME/IP)                 |
++--------------------------------------------------------------------------+
+```
+
+### 1. 为什么“裸大模型”无法直接上车或直接用于生产级系统？
+1. **感知脱节**：模型自身无法实时感知物理世界（无法读取车速、电量、挡位、四音区定位与车门开闭状态）；
+2. **执行风险**：模型无法直接、安全地操作底层执行机构，极易产生“虚假参数”或在危险工况（如高速行车）执行致命操作；
+3. **延迟与可用性脆弱**：端到端网络往返与大模型首字延迟（TTFT）波动在数百毫秒到数秒，且在地库、隧道断网时直接瘫痪；
+4. **状态与幻觉不可控**：模型缺乏跨轮次确定性状态机约束，容易在非线性指令中发生逻辑漂移或文本复读死循环。
+
+### 2. Harness 的核心使命
+Harness 不参与底层神经网络参数的训练，而是专注于构建外围的**确定性工程管线**：
+* **装配感官与线束**：挂接全双工声学管线、车机属性总线与环境感知信号；
+* **约束执行与安全**：构建 ASIL 功能安全物理互锁、确定性短路过滤与反死循环看门狗；
+* **维护记忆与状态**：维护轻量端侧分层短期/工作记忆与云端长效画像上下文；
+* **端云双环协同**：在端侧极速快环（<150ms 规则/端侧小模型）与云端认知慢环（P50 <800ms 多模态大模型）之间实现无感调度与竞态仲裁。
 
 ---
 
-## 二、 【基础科普篇】工业级/车规级端云协同 Harness 架构全景
+## 二、 工业级/车规级端云协同 Harness 架构全景
 
 ```mermaid
 flowchart TB
     subgraph Edge_Harness["端侧 Harness (车机端 AAOS / QNX / Linux)"]
         direction TB
-        Perception["全双工声学感知 (AEC / VAD / 四音区拾音 / <80ms 打断)"] --> FastArbiter{"端侧意图短路仲裁器 (Intent Arbiter)"}
+        Perception["全双工声学感知 (AEC / VAD / 多音区定位 / <80ms 打断)"] --> FastArbiter{"本地规则与意图短路仲裁器"}
         
-        FastArbiter -- "高频系统/车控指令 (<150ms)" --> InterlockGate["车规功能安全互锁门禁 (ASIL-B Interlock)"]
-        InterlockGate --> MockVHAL["车身总线驱动 (VHAL / CAN / SOME/IP)"]
+        FastArbiter -- "高频车控/确定性指令 (<150ms)" --> InterlockGate["车规功能安全校验与互锁门禁"]
+        InterlockGate --> VHAL["车身总线驱动层 (VHAL / CAN / SOME/IP)"]
         
-        FastArbiter -- "端侧小模型兜底 (离线自然语言)" --> LocalSLM["端侧轻量小模型 (SLM 0.5B~3B / INT4)"]
+        FastArbiter -- "离线泛化语言理解" --> LocalSLM["端侧轻量小模型 (SLM 0.5B~3B / INT4)"]
         LocalSLM --> LocalTTS["本地 TTS 极速合成"]
         
-        FastArbiter -- "开放式/深度复杂推理" --> EdgeSync["端云协同与上下文同步桥梁"]
+        FastArbiter -- "开放式/深度复杂推理" --> EdgeSync["端云上下文同步与双向传输通道"]
         
-        ThreeTierMem["端侧三层记忆底座 (Working / Episodic / Semantic Vault)"] <--> FastArbiter
-        ThreeTierMem <--> LocalSLM
+        LocalPrompt["车载本地提示词模板 (动态槽位/极简开销)"] --> LocalSLM
+        LocalMemory["端侧工作记忆与本地画像 (SQLite WAL/加密落盘)"] <--> FastArbiter
+        LocalMemory <--> LocalSLM
     end
 
-    subgraph Collab_Layer["端云协同双环中枢 (Edge-Cloud Collaboration Middleware)"]
+    subgraph Collab_Layer["端云协同双环中枢 (Collaboration & Race Middleware)"]
         direction TB
-        ArbiterJudge["端云竞态仲裁器 (Race Arbiter: 快环响应 vs 慢环推流)"]
-        CascadeBargeIn["级联打断熔断器 (端侧打断 <50ms 穿透取消云端 LLM+TTS)"]
-        DegradeMatrix["自适应阶梯退化矩阵 (在线慢环 -> 离线SLM -> 规则短路 -> 本地固化)"]
-        StateSync["双向状态同步通道 (Protobuf / Vector Clock / SQLite WAL)"]
+        ArbiterJudge["端云双环竞态仲裁 (快环命中静默排空慢环推流)"]
+        CascadeBargeIn["级联打断熔断器 (端侧打断 <50ms 穿透取消云端生成)"]
+        DegradeMatrix["自适应阶梯退化矩阵 (在线慢环 -> 离线SLM -> 规则短路 -> 安全固化)"]
+        StateSync["双向状态同步 (Vector Clock / 差异合并 / 离线缓存重放)"]
     end
 
     subgraph Cloud_Harness["云侧 Harness (分布式实时认知基础设施)"]
         direction TB
-        CloudSFU["WebRTC SFU 流媒体集群 (LiveKit 全双工低时延推拉流)"] --> StreamSplitter["首句微断句器 (Sentence Splitter 4~6字断句, TTFA ≤ 800ms)"]
-        StreamSplitter --> AgentOrchestrator["Agent 编排引擎 (LangGraph / 异步 DAG / 循环反思)"]
+        CloudSFU["WebRTC SFU 流媒体集群 (全双工低时延推拉流)"] --> StreamSplitter["流式微切词断句器 (4~6字标点快切, TTFA ≤ 800ms)"]
+        StreamSplitter --> AgentOrchestrator["云端 Agent 编排引擎 (LangGraph / 异步 DAG / 反思纠偏)"]
         
         AgentOrchestrator <--> ModelRouter["多模型动态路由 (Semantic Router / 成本时延分流)"]
-        AgentOrchestrator <--> SkillGateway["工具 Skill 网关 (MCP / Function Calling / 安全沙箱)"]
-        AgentOrchestrator <--> CloudMemory["云端长效记忆与车主画像 (Graph RAG / 会话 Checkpoint)"]
+        AgentOrchestrator <--> SkillGateway["工具 Skill 网关 (MCP / OpenAPI / 容器沙箱)"]
+        AgentOrchestrator <--> ContextMgr["上下文管理 (Llama-Index / 滑动窗口 / 向量RAG)"]
+        AgentOrchestrator <--> PromptRegistry["系统提示词版本管理 (Prompt Registry / GitOps / 模板继承)"]
         
         AgentOrchestrator --> SafetyGuard["安全护栏 (防注入 / 越狱防御 / 幻觉过滤)"]
-        AgentOrchestrator --> Observability["全链路可观测性 (OpenTelemetry 贯穿 TTFT/TTFA 指标)"]
-        AgentOrchestrator --> DataFlywheel["数据飞轮与评测 (LLM-as-a-judge / Bad Case 自动回流)"]
+        AgentOrchestrator --> Observability["全链路可观测性 (OpenTelemetry 链路 / TTFT/TTFA 指标)"]
+        AgentOrchestrator --> ABTesting["灰度发布与 A/B 实验平台 (分流实验 / 差异评估)"]
+        AgentOrchestrator --> DataFlywheel["数据飞轮与评测体系 (LLM-as-a-judge / Bad Case 回流)"]
     end
 
-    EdgeSync <== "WebRTC Audio & gRPC Control Signaling" ==> Collab_Layer
-    Collab_Layer <== "分布式流式连接" ==> CloudSFU
+    EdgeSync <== "WebRTC Audio & gRPC Signaling" ==> Collab_Layer
+    Collab_Layer <== "分布式流式通道" ==> CloudSFU
 ```
 
-### 1. 端侧 Harness（车机端 AAOS/QNX）的七大核心能力
-
-| 核心能力 | 技术内涵与车规关键约束 | 行业典型方案与设计标准 |
-| :--- | :--- | :--- |
-| **1. 全双工声学管线与毫秒级打断** | 消除扬声器自激回声（AEC）、人声活动检测（VAD）、无锁环形缓冲（Lock-Free RingBuffer）；**用户发话时 < 80ms 清空本地音频输出队列**并向云端下发取消信号。 | Oboe / ALSA / QNX Audio Manager, Silero-VAD, SPSC RingBuffer |
-| **2. 多模态与多音区感知** | 区分主驾、副驾、后排音区，严格执行权限隔离（如副驾不可控制主驾车窗）；结合 DMS 驾驶员视线检测实现免唤醒注视交互；订阅车速、挡位、车门等车身总线信号。 | 麦克风阵列波束成形、DMS 视线追踪服务、Android CarPropertyManager |
-| **3. 毫秒级意图短路与槽位仲裁** | 对高频车控（开关空调、升降车窗、音乐播控）实施确定性短路拦截（< 150ms），**严禁走云端大模型**（避免弱网不可用与秒级延迟）；必须具备**槽位缺失追问机制**，严禁脑补虚假槽位。 | 正则状态机 + C++ 原生 NLU 解析器 + 动态实体字典（通讯录、城市、POI） |
-| **4. 端侧轻量小模型推理底座 (Edge SLM)** | 在高通 8295 / Orin 芯片 NPU 上部署 0.5B~3B 端侧小语言模型，在离线/弱网环境下提供自然语言理解与泛化意图提取，摆脱纯硬编码规则束缚。 | MNN-LLM, ONNX Runtime, llama.cpp, QNN / TensorRT-LLM (INT4 量化) |
-| **5. 车规功能安全物理互锁 (Safety Interlock)** | 任何模型或意图输出的控制指令严禁裸连底层执行，必须经过 **ASIL-B 级安全看门狗互锁**：例如车速 > 0 时强制拦截开后备箱/开门操作；高危指令要求“二次声纹确认”；具备执行超时与幂等性回滚机制。 | Vehicle Interlock Gate, 状态机守卫条件 (Guard Conditions) |
-| **6. 系统功耗隔离与生命周期管理** | 车机算力受仪表盘与 ADAS 挤压，AI 运行时必须支持 STR（Suspend-to-RAM 毫秒级休眠快起）；CPU 感知线程绑小核、渲染绑大核；设定常驻内存硬上限（防止触发 Android LMK / Linux OOM Killer）。 | CPU Affinity (pthread_setaffinity_np), 内存池零拷贝, 守护服务常驻白名单 |
-| **7. 端侧合规与 PII 隐私脱敏** | 车载语音与敏感信息上传前，必须在端侧执行身份脱敏；麦克风硬件指示灯物理合规联动；车主敏感记忆持久化须采用本地物理隔离存储。 | PII Masking, 本地二阶段授权落盘, SQLite WAL 本地加密 |
-
 ---
 
-### 2. 云侧 Harness（分布式实时认知中枢）的七大核心能力
+## 三、 云侧 Harness：分布式实时认知中枢深度科普
 
-| 核心能力 | 技术内涵与云端职责 | 行业典型方案与设计标准 |
-| :--- | :--- | :--- |
-| **1. 实时全双工流媒体网关** | 承接车载 WebRTC / 双向 gRPC 流式长连接；具备**首句微断句切词机制（4~6 字标点快速切句送流式 TTS）**，全力压降首字发音时延 **TTFA ≤ 800ms**。 | LiveKit SFU, mediasoup, 流式 Sentence Splitter |
-| **2. 复杂多步 Agent 编排引擎** | 解决深度车务问答、多轮出行规划等非线性任务，支持循环（Cycle）、条件分支、多工具并发规划与反思纠偏（Reflection）。 | LangGraph, 异步原生 DAG 编排引擎, Temporal |
-| **3. 多模型动态路由 (Routing)** | 意图、成本与时延动态分流：闲聊/短句走轻量小模型（MoE / 8B），复杂深度多步规划路由至旗舰推理模型（DeepSeek-R1 / GPT-4o / Claude 3.5 Sonnet）。 | Semantic Router, Token FinOps 算力配额网关, Prompt Cache 共享 |
-| **4. 工具 Skill 网关与安全沙箱** | 提供标准化 Tool Call 网关，对接第三方生态（高德/美团/车联网生态 API）；提供鉴权托管、并发限流、超时隔离与沙箱执行环境。 | MCP (Model Context Protocol), OpenAPI 3.0, Docker/Wasm 沙箱 |
-| **5. 动态分层记忆与车主画像** | 管理跨会话的长效记忆、车主偏好（驾驶风格、座椅/空调习惯、家庭成员画像）、行程上下文，并通过知识图谱/向量检索进行 RAG 增强。 | Graph RAG, Llama-Index, 向量数据库, 实体记忆图谱 |
-| **6. 全链路可观测性 (Observability)** | 全局 OpenTelemetry Trace ID 贯穿 `端侧拾音 -> 意图仲裁 -> 云网关 -> LLM 首字 (TTFT) -> 首句 TTS (TTFA) -> 端侧播放`；监控 P50/P99 延时与打断成功率。 | OpenTelemetry, Prometheus, Grafana, Jaeger |
-| **7. 数据飞轮与自动化评测闭环** | 生产链路自动捕获低置信度、用户打断、工具调用失败的“Bad Case”，自动脱敏清洗后回流到离线 Benchmark 自动化评测集与微调数据集。 | LLM-as-a-judge, Ragas, TruLens, 自动回归测试集 |
-
----
-
-### 3. 最深水区：端云协同三大机制
-
-在端云协同的 Agent 架构中，最复杂的不是单纯的端或云，而是两者动态交互的边界控制：
-
-1. **双环竞态仲裁（Race Arbiter）**：
-   * 端侧快环（Local Fast Loop ≤ 150ms）与云端慢环（Cloud Loop P50 ≤ 800ms）在收到用户语音后并发运行。
-   * **仲裁原则**：若端侧意图短路器判定命中系统指令（如“把空调开到24度”），端侧立即接管硬件执行与播报反馈；当云端大模型的推流数据在 500ms 后到达时，端侧通信层**静默排空丢弃（Drain & Discard）**，杜绝双重发音与状态冲突。
-2. **端云级联打断熔断（Cascade Cancellation Propagation）**：
-   * 当车主在 Agent 播报过程中突然说话，端侧声学管线在 **< 5ms** 内标记打断、瞬时清空本地扬声器 Buffer；
-   * 同时通过 WebRTC DataChannel / 高优先级 gRPC 通道向云端发送 `INTERRUPT` 信号；
-   * 云侧 Harness 收到信令后，**毫秒级强杀正在生成的 LLM 推理线程，并关闭下游流式 TTS 音频流**，阻止算力与网络带宽浪费。
-3. **自适应阶梯退化矩阵（Adaptive Fallback Matrix）**：
-   * 车载运行环境面对地库、深山、过隧道的常态化网络抖动与断连：
-     * `网络健康`：开放域全功能云端多模态慢环（旗舰大模型 + 生态工具网关）；
-     * `弱网/高延时 (RTT > 1200ms)`：平滑降级至端侧 SLM 本地推理；
-     * `完全离线/断网`：端侧确定性意图短路规则全权接管车控与本地多媒体；
-     * `系统异常/严重抖动`：看门狗触发固定兜底安全播报，保障确定性与安全底线。
-
----
-
-## 三、 硬件载体替代方案：使用 Google Pixel 替代车机端
-
-在缺乏高通车机台架（HIL）或处于敏捷研发期时，选用 **Google Pixel** 作为 AAOS/座舱开发板是业界标准做法。
-
-### 1. 替代可行性与优势
-* **纯正的 AOSP/AAOS 参考底座**：Google 官方将 Pixel 作为 Android Automotive OS 的参考平台，可直接刷入 Generic Automotive GSI 或运行车载服务栈。
-* **现代硬件架构**：Pixel 搭载 Google Tensor SoC，具备强大的 ARM64 CPU、GPU 与硬件级 Edge TPU/NPU，支持 Android NDK 与原生 Rust/C++ 工具链。
-* **开发调试极速循环**：对比车载台架慢速刷机、物理锁网等限制，Pixel 支持 adb、perf、ASan 内存分析，开发效率提升数倍。
-
-### 2. 核心架构适配策略：软硬件隔离解耦
+云侧 Harness 是整个智能体大脑的分布式宿主与编排底座，承担高复杂度推理、长程规划、生态工具调用与全生命周期运维保障。
 
 ```
-+------------------------------------------------------------+
-|                     Android UI / App                       |
-+------------------------------------------------------------+
-|        端侧 Harness 核心 (C++17 Native 跨平台共享运行时)      |
-|  [意图短路仲裁]  [全双工音频管线]  [三层记忆]  [看门狗防死循环] |
-+-----------------------------+------------------------------+
-                              |
-                [IVehicleSignalProvider 抽象接口]
-                              |
-            +-----------------+-----------------+
-            |                                   |
-    [Pixel 开发分支]                     [车机量产分支]
-   MockVHAL / 模拟控制台               SOME/IP / CAN / QNX IPC
-   (悬浮窗滑块/虚拟车速挡位)             (真实车身电子电气架构)
++--------------------------------------------------------------------------+
+|                     云侧 Harness (Cloud Agent Harness)                   |
++--------------------------------------------------------------------------+
+|  1. 云端 Agent 编排 (LangGraph / 异步 DAG / 循环反思 / 多智能体协作)       |
+|  2. 系统提示词版本管理 (Prompt Registry / 语义版本 SemVer / 模板继承回滚) |
+|  3. 工具 Skill 网关 (MCP 协议 / Function Calling 规范 / 权限隔离沙箱)     |
+|  4. 上下文管理 (Llama-Index 架构 / 动态压缩 / Token 配额管理)             |
+|  5. 安全护栏 (Guardrails / 越狱与注入拦截 / 幻觉清洗 / PII 脱敏)          |
+|  6. 评测体系 (LLM-as-a-judge / Ragas / Bad Case 回流与闭环演进)          |
+|  7. 多模型路由 (Semantic Router / 意图与时延成本分流 / Prompt Cache 共享) |
+|  8. 分布式服务 (WebRTC SFU / gRPC / 跨区域集群 / 低抖动弹性扩缩)          |
+|  9. 灰度发布与 A/B 实验平台 (提示词对比实验 / 模型 Traffic Splitting)    |
++--------------------------------------------------------------------------+
 ```
 
-1. **抽象硬件访问层（Mock VHAL）**：
-   * 定义 `IVehicleSignalProvider`（状态读取）与 `IVehicleCommandExecutor`（控制执行）纯虚接口。
-   * **在 Pixel 上**：实现 `MockVehicleAdapter`，通过应用内悬浮窗、Web 调试控制台手动模拟“车速 80km/h”、“主驾门未关”等车况。
-   * **上量产车机时**：无缝切换为 Android CarService（`CarPropertyManager`）或 QNX IPC 驱动层，上层 Harness 核心逻辑零修改。
-2. **警惕三大算力与运行假象**：
-   * **算力倒挂**：Pixel Tensor CPU 性能优于老款高通 8155。在 Pixel 上开发必须主动压测 CPU 占用（单核 < 30%）与内存常驻（< 200MB），防止上车机发生 OOM。
-   * **生命周期差异**：Pixel 默认电池优化会积极杀死后台服务，而车机需要开机常驻守护。需采用 Android `Foreground Service` 与系统白名单保活。
-   * **弱网与断网模拟**：利用 Pixel 开发者选项主动注入弱网延迟与丢包，验证在地库场景下的离线短路兜底与网络恢复上下文补齐。
+### 1. 云端 Agent 编排引擎 (LangGraph / 异步 DAG)
+* **从线性 Chain 到图状态机（StateGraph）**：
+  * 早期的智能体多采用线性的 ReAct 或 Chain 范式，无法应对复杂的非线性任务；
+  * 现代云侧 Harness 普遍采用 **LangGraph** 或基于异步 DAG 的图状态机架构，原生支持**条件分支（Conditional Edges）、循环迭代（Cycles）与反思纠偏（Reflection）**；
+* **人机共驾与中断恢复（Human-in-the-loop & Checkpointing）**：
+  * 在涉及支付、车辆越权控制或敏感出行变更时，编排图可主动持久化当前 State Checkpoint 并进入挂起状态，等待外部授权事件唤醒恢复。
+
+### 2. 系统提示词版本管理 (System Prompt Version Management)
+* **Prompt as Code & 提示词注册中心 (Prompt Registry)**：
+  * 杜绝将提示词散落硬编码在业务代码中；建立集中的 Prompt Registry（如基于 GitOps 或专有配置中心）；
+  * 引入语义化版本规范（如 `v1.2.0-rc1`），将系统提示词、少样本（Few-shot）示例、工具描述解耦为不同组件；
+* **模板继承与动态装配**：
+  * 基础层（System Base Persona）+ 业务插件层（Domain Skill Rules）+ 车辆状态动态插槽（Car Status Injection）；
+  * 提供完善的 Diff 对比工具与秒级一键回滚能力，保障生产环境提示词更新风险可控。
+
+### 3. 工具 Skill 网关与安全沙箱 (Tool Skill Gateway)
+* **模型上下文协议（MCP, Model Context Protocol）与 Function Calling**：
+  * 标准化统一工具接口定义，通过 OpenAPI 3.0 或 JSON Schema 动态导出工具契约；
+  * 无论是车联网服务（远程寻车、充电规划）、生活服务（高德导航、美团外卖）还是系统查询，均通过标准网关中继；
+* **安全沙箱隔离与并发限流**：
+  * 第三方或动态代码工具必须在沙箱容器（如 Wasm 沙箱或轻量 Docker/gVisor）中运行；
+  * 网关强制施加超时熔断（默认 ≤ 2.5s）、频次限流与鉴权校验，防止恶意或故障工具拖垮整个推理链路。
+
+### 4. 深度上下文管理 (Context Management & Llama-Index)
+* **分层上下文治理与 Token 预算控制**：
+  * 面对有限的上下文窗口与高并发成本，采用类似 **Llama-Index** 的数据索引与检索结构；
+  * 将上下文严格划分为：核心角色定义（固定缓存）、实时车辆/会话状态（动态更新）、最近 N 轮对话历史（滑动窗口）、长效用户偏好与知识库（向量 RAG 检索按需召回）；
+* **动态语义浓缩与修剪**：
+  * 当会话轮次超过阈值时，后台异步触发摘要模型提取“关键事实表”，并丢弃冗余寒暄，始终将上下文控制在最优 Token 成本区间。
+
+### 5. 安全护栏与合规过滤 (Safety Guardrails)
+* **输入侧防注入与越狱防御**：
+  * 在用户输入进入大模型前，通过轻量级分类器或 Guardrail 规则库检测“忽略之前指令”、“System Prompt 泄露尝试”等恶意 Prompt 注入；
+* **输出侧幻觉检测与 PII 合规脱敏**：
+  * 对模型生成的工具调用参数实施强类型断言校验；
+  * 对涉及用户隐私（手机号、车牌号、实时精准坐标）的敏感信息进行自动化掩码脱敏（Masking），杜绝违规出境或违规留存。
+
+### 6. 自动化评测体系与数据飞轮 (Evaluation & Data Flywheel)
+* **综合指标评测矩阵**：
+  * 结合 **LLM-as-a-judge**（利用 GPT-4/Claude 等顶尖模型对生成质量打分）与确定性指标（工具调用准确率、槽位抽取召回率、意图识别准确率）；
+  * 结合 **Ragas / TruLens** 评估检索上下文的相关性（Context Relevance）与答案忠实度（Faithfulness）；
+* **Bad Case 闭环流转**：
+  * 生产环境被用户打断、工具调用报错、置信度低于阈值的请求自动打标流入 Bad Case 队列；
+  * 经过脱敏与标注后，自动注入离线回归测试集与微调训练集，驱动模型与提示词持续演进。
+
+### 7. 多模型动态路由 (Multi-Model Routing)
+* **语义路由器（Semantic Router）与分流策略**：
+  * 闲聊与通用寒暄（“你好”、“今天天气真好”）路由至轻量高并发小模型（如 MoE 架构或开源 8B 级别模型），首字延迟压降至 300ms 以内，成本降低 90%；
+  * 深度长程推理与复杂多工具编排（如跨城多节点自驾游规划）路由至旗舰推理大模型（DeepSeek-R1 / GPT-4o / Claude 3.5 Sonnet）；
+* **Prompt Cache 最大化利用**：
+  * 统一路由调度器对齐 System Prompt 头部格式，提高云端推理引擎（vLLM / TensorRT-LLM）的 KV Cache 命中率。
+
+### 8. 高并发分布式服务架构 (Distributed Services)
+* **双通道分离架构**：
+  * **流媒体通道**：基于 WebRTC SFU 集群（如 LiveKit）实现全双工双向音频流传输，抗弱网抖动能力达 40% 丢包；
+  * **信令与控制通道**：基于 gRPC 双向流或 WebSocket 承载毫秒级打断、状态同步与元数据交互；
+* **分布式状态解耦与微服务编排**：
+  * 无状态 Gateway + 分布式会话缓存（Redis Sentinel）+ 事件流总线（Kafka），支持横向线性扩容与故障自动迁移。
+
+### 9. 灰度发布与 A/B 实验平台 (Canary & A/B Testing)
+* **细粒度流量切分（Traffic Splitting）**：
+  * 支持按用户 ID、车系车型、地域或百分比进行灰度分流；
+* **多维对比实验验证**：
+  * 针对“新版系统提示词 vs 老版提示词”、“模型 A vs 模型 B”进行正交 A/B 实验；
+  * 实时对比两个分流组的核心指标：任务完成率、平均首字响应时延（TTFT）、用户发话打断率及单次会话 Token 成本。
 
 ---
 
-## 四、 【项目实战篇】Avatar 架构在本项目中的工程落地映射
+## 四、 端侧 Harness：车机端 (AAOS/QNX) 嵌入式运行时深度科普
 
-当前 Avatar 项目已经完整落地了上述“端云双环”与“高可靠 Native Harness”的核心工程体系。以下为各核心模块在代码仓库中的具体实现映射：
+智能座舱与车机环境面临严苛的硬件算力制约、车规功能安全标准与断网高可用要求。端侧 Harness 必须完全由高性能系统级语言（**C/C++** 或 **Rust**）打造，深度适配 Android Automotive OS (AAOS) 或 QNX Neutrino RTOS。
+
+```
++--------------------------------------------------------------------------+
+|                  端侧 Harness (In-Vehicle AAOS / QNX)                    |
++--------------------------------------------------------------------------+
+|  1. 车载本地提示词模板 (动态槽位高效填装 / 离线微提示词 / 低开销)           |
+|  2. 本地确定性规则引擎 (正则状态机 / 零幻觉 / 绝对确定性执行)              |
+|  3. 毫秒级意图短路拦截 (<150ms 本地快环 / 严禁无意义上云 / 高频车控秒开)     |
+|  4. 本地强类型参数校验与车规安全门禁 (ASIL-B 物理互锁 / 车速挡位门禁)       |
+|  5. 端云上下文双向增量同步 (Vector Clock / 差异合并 / 离线缓存与断网对齐)   |
+|  6. 车机软硬件约束适配 (高通 8155/8295 算力适配 / 内存零泄漏 / 绑核防抖)  |
++--------------------------------------------------------------------------+
+```
+
+### 1. 车载本地提示词模板设计 (In-Vehicle Prompt Templates)
+* **轻量级与结构化占位**：
+  * 车载端侧小模型（0.5B~3B）显存与算力极度受限，严禁堆砌长篇大论的云端提示词；
+  * 采用针对小模型量身定制的**微系统提示词（Micro-Prompts）**，结合清晰的结构化标签（如 `<system>`, `<context>`, `<tools>`）；
+* **动态槽位填装与上下文修剪**：
+  * 仅注入当前必须的车况槽位（如 `speed: 65km/h`, `gear: D`, `zone: DRIVER`），杜绝全量广播导致 Token 爆炸与推理降速。
+
+### 2. 本地确定性规则引擎 (Local Deterministic Rules)
+* **纯确定性状态机**：
+  * 对于音乐播控（播放、暂停、下一首）、基础车窗升降等原子操作，使用高效的正则匹配器与有限状态机（FSM）直接决策；
+* **零幻觉与零网络依赖**：
+  * 规避大模型固有概率误差与网络抖动，做到按键级/口令级的绝对确定性与极低资源消耗。
+
+### 3. 毫秒级意图短路拦截 (Intent Short-Circuiting)
+* **端侧极速快环（Local Fast Loop ≤ 150ms）**：
+  * 当声学 ASR 识别出明确车控意图时，端侧短路器立刻切断后续上云流程，直接在端侧下发执行指令；
+* **槽位缺失主动追问与防冲突过滤**：
+  * 若车主发出“帮我设个闹钟”，短路器识别到时间槽位缺失，必须立即发起本地追问（“请问设置几点的闹钟？”），**严禁擅自脑补虚假参数**；
+  * 严格过滤“为什么”、“你是谁”等泛化问答与闲聊语气，穿透放行给云端大模型，实现快慢分流。
+
+### 4. 本地强类型参数校验与车规功能安全门禁 (Local Safety Interlock)
+* **ASIL-B/D 级物理互锁门禁（Vehicle Safety Interlock）**：
+  * 任何源自大模型、小模型或本地意图的动作指令，**严禁直连底层车身执行机构**；
+  * 必须通过安全门禁检查车身物理状态：
+    * 示例 1：车速 `speed > 0 km/h` 时，强制拦截“开启后备箱”、“打开车门”指令；
+    * 示例 2：副驾或后排音区发起的指令，物理隔离主驾驶座椅调节与核心驾驶辅助配置；
+    * 示例 3：高危操作（如系统恢复出厂设置）强制要求声纹二次身份确认；
+* **参数边界强类型断言**：
+  * 空调温度强制截断在 16°C~32°C 之间，风量限制在 1~7 档，杜绝异常数值引发硬件执行错误。
+
+### 5. 端云上下文双向增量同步 (Edge-Cloud Context Sync)
+* **弱网与断网环境下的离线保证**：
+  * 在地库、深山或隧道中，端侧所有对话记录与用户偏好修改写入本地 **SQLite WAL 模式持久化**（支持物理加密）；
+* **基于矢量时钟（Vector Clock）的增量对齐**：
+  * 网络恢复后，端侧通信模块与云端建立增量对齐握手，采用差异合并（Delta Merge）策略同步会话树，既不丢失离线期间的交互事实，又避免重复覆盖云端长期记忆。
+
+### 6. 车机软硬件约束适配与系统工程 (Compute & Memory Constraints)
+* **算力适配与端侧 SLM 量化**：
+  * 车载主力芯片（高通 8155 / 8295 / Orin）的 CPU 算力需优先保障仪表与安全功能，AI 运行时必须通过 **INT4/W4A16 量化** 运行 0.5B~3B 小模型，并调用 NPU/DSP 加速；
+* **内存硬约束与防 OOM 设计**：
+  * Android Automotive OS 具有严厉的低内存查杀机制（LMK, Low Memory Killer）；
+  * 端侧 Harness 核心代码采用 **C++17 / Rust** 编写，使用**内存池预分配与 SPSC 无锁环形队列（Lock-Free RingBuffer）**，避免频繁动态内存分配导致的堆碎片化与 GC 停顿；
+* **CPU 亲和性隔离与快速休眠恢复（STR）**：
+  * 线程级 CPU Affinity 绑定：音频感知与 VAD 线程绑定能效小核（LITTLE Cores）实现超低功耗常驻；TTS 合成与模型推理绑定高性能大核（BIG Cores）；
+  * 深度支持车机快速唤醒（STR, Suspend-to-RAM），在整车下电挂起时毫秒级释放资源，上电瞬时热恢复。
+
+---
+
+## 五、 端云协同三大最深水区机制
+
+端云协同体系的核心难点在于“端”与“云”动态交互时的边界竞态控制。
 
 ```mermaid
-flowchart LR
-    subgraph NativeCore["C++17 跨平台高可靠核心 (core/)"]
-        Arbiter["IntentArbiter.cpp<br/>(防冲突/槽位追问/零幻觉)"]
-        Pipeline["AudioAgentPipeline.cpp<br/>(状态机/绑核调度)"]
-        RingBuf["LockFreeRingBuffer.hpp<br/>(SPSC 零拷贝音频流)"]
-        Mem["ThreeTierMemory.cpp<br/>(L1滑动/L2浓缩/L3持久化)"]
-        Watchdog["WatchdogAndRepetition.hpp<br/>(3s超时降级/N-gram破圈)"]
-        Chunker["StreamingSentenceChunker.hpp<br/>(流式首句切分)"]
-        SLM["MnnLlmEngine.hpp<br/>(本地小模型轻量 Runtime)"]
-    end
+sequenceDiagram
+    autonumber
+    actor Driver as 车主驾驶员
+    participant EdgeAudio as 端侧声学管线 (AEC/VAD)
+    participant EdgeArbiter as 端侧意图短路器
+    participant EdgeVehicle as 车身硬件 (VHAL/CAN)
+    participant CollabLayer as 端云协同中间件
+    participant CloudHarness as 云侧多模态 Harness
 
-    subgraph AndroidEdge["Android / AAOS 平台层 (android/)"]
-        FastDisp["FastDispatcher.kt<br/>(<1ms 四级优先级路由)"]
-        ToolReg["ToolRegistry.kt & SystemToolExecutor.kt<br/>(Schema 导出与参数拦截校验)"]
-        OboeAudio["FullDuplexAudioIO (Oboe/AAudio)"]
+    Note over Driver,CloudHarness: 场景 1：双环竞态仲裁 (Race Arbiter)
+    Driver->>EdgeAudio: "打开空调并调到24度"
+    EdgeAudio->>EdgeArbiter: 本地 ASR 转写文本
+    par 端侧极速快环 (≤ 150ms)
+        EdgeArbiter->>EdgeVehicle: 命中确定性意图 -> 下发 VHAL 执行
+        EdgeArbiter-->>Driver: 本地 TTS 极速播报 "空调已开至24度"
+    and 云端并发推流 (P50 ≤ 800ms)
+        EdgeAudio->>CollabLayer: 上行音频流
+        CollabLayer->>CloudHarness: 云端大模型推理中...
+        CloudHarness-->>CollabLayer: 延迟下发云端回复音轨
     end
+    Note over CollabLayer: 仲裁器判定端侧快环已接管，静默排空丢弃云端音频包 (Drain & Discard)
 
-    subgraph CloudInfra["云端实时集群 (server/)"]
-        GoGW["server.go (:8088)<br/>(会话状态机/打断协同/零保留遥测)"]
-        LiveKitSFU["LiveKit SFU (:7880)<br/>(WebRTC 低时延全双工音轨)"]
-        PyWorker["worker.py<br/>(Silero VAD + LLM + TTS 级联)"]
-    end
-
-    AndroidEdge <--> NativeCore
-    AndroidEdge <== "WebRTC + REST Signaling" ==> CloudInfra
+    Note over Driver,CloudHarness: 场景 2：级联毫秒级打断 (Cascade Barge-In)
+    CloudHarness->>CollabLayer: 正在播放云端长语音 "明天从上海自驾去杭州建议路线..."
+    Driver->>EdgeAudio: 突然插话打断 "算了不用了"
+    EdgeAudio->>EdgeArbiter: VAD 能量检测到新发话 (< 5ms)
+    EdgeArbiter->>EdgeAudio: 瞬时清空扬声器 PCM 缓存 (立即静音)
+    EdgeArbiter->>CollabLayer: 发送高优先级 INTERRUPT 信号
+    CollabLayer->>CloudHarness: 毫秒级强杀云端生成线程 & 关闭 TTS 推流
 ```
 
-### 1. 毫秒级意图短路与槽位仲裁器 (Fast-Path Intent Arbiter)
-* **核心代码**：[`core/src/IntentArbiter.cpp`](../core/src/IntentArbiter.cpp) 与 [`core/include/IntentArbiter.hpp`](../core/include/IntentArbiter.hpp)
-* **关键实现逻辑**：
-  * **三态决策输出契约**：定义 `ArbiterStatus::MATCHED`（槽位完整直接执行）、`SLOT_MISSING`（命中意图但关键槽位缺失）、`UNMATCHED`（非确定性意图，交由大模型）；
-  * **零虚假兜底（Zero Hallucination）**：当用户下达“设置闹钟”但未给出时间时，返回 `SLOT_MISSING` 并标记 `missing_slot = "time"`，驱动系统发起定向追问澄清，杜绝私自生成虚假默认参数；
-  * **防冲突高专属性前置过滤**：严密过滤常识问答与闲聊语气（“为什么”、“是什么”、“笑话”、“你是谁”），自动漏斗穿透交由 LLM 处理，兼顾确定性车控与开放式拟人智能；
-  * **中英文泛化规整 (Universal Normalizer)**：通过 `ChineseDigitToVal` 与口语助词剥离逻辑（`CleanPunctuationAndParticles`），高效规整时间、数字、歌曲与城市槽位。
-* **平台分流层**：[`android/app/src/main/java/com/avatar/android/core/dispatcher/FastDispatcher.kt`](../android/app/src/main/java/com/avatar/android/core/dispatcher/FastDispatcher.kt)
-  * 实现 **4 级优先级、< 1ms 确定性分流**：
-    * `P1: LOCAL_MEMORY`（“帮我记一下” -> 拦截到本地隐私数据库）；
-    * `P3: LOCAL_PERSONA`（“切换为伴侣模式” -> 驱动本地人格状态机）；
-    * `P4: CLOUD_CHAT`（开放式对话 -> 穿透至云端实时长连接）。
+### 1. 双环竞态仲裁机制 (Dual-Loop Race Arbiter)
+* **并发探针机制**：用户发话后，端侧快环与云端慢环并行监听；
+* **仲裁与排空原则**：一旦端侧快环在 150ms 内确认指令命中车控短路，立即锁定播报权与控制权。当云端推理在 600ms 后返回长文本或音频时，端侧通信门禁执行**静默排空（Drain & Discard）**，坚决杜绝“双重发音”与“状态错乱”。
 
-### 2. 车规级高可靠 Native 运行时 (AudioAgentPipeline & Hardware Affinity)
-* **核心代码**：[`core/src/AudioAgentPipeline.cpp`](../core/src/AudioAgentPipeline.cpp) 与 [`core/include/AudioAgentPipeline.hpp`](../core/include/AudioAgentPipeline.hpp)
-* **关键实现逻辑**：
-  * **CPU 亲和性硬隔离**：调用 [`core/include/CpuAffinity.hpp`](../core/include/CpuAffinity.hpp) 中的 `BindToLittleCores`（感知与 VAD 线程绑定能效小核，低功耗常驻）与 `BindToBigCores`（认知与音频合成绑定大核，抑制时延抖动）；
-  * **无锁音频环形缓冲**：[`core/include/LockFreeRingBuffer.hpp`](../core/include/LockFreeRingBuffer.hpp) 实现单生产者单消费者（SPSC）无锁环形队列，消除声学 AEC 与播放渲染之间的线程锁争死锁隐患；
-  * **极速声学打断控制器 (Barge-in < 5ms)**：`TriggerBargeIn()` 采用原子标记（`std::atomic<bool> is_speaking_`），瞬间清空扬声器 PCM 缓冲队列并重置状态机；
-  * **看门狗与死循环破圈器**：[`core/include/WatchdogAndRepetition.hpp`](../core/include/WatchdogAndRepetition.hpp) 实现 **3 秒 TTFT 超时强制降级兜底** 与 **12 字节 N-gram 文本死循环破圈器**，杜绝车载交互界面卡死无响应。
+### 2. 级联打断与算力熔断 (Cascade Cancellation Propagation)
+* **端侧即刻静音（Barge-In < 5ms）**：声学管线一旦检测到用户打断，原子变量切断本地播放并丢弃缓冲队列；
+* **云端级联强杀**：通过 DataChannel 发送高优先级中断报文，云端网关收到后立即取消上下文上下文（`context.Cancel()`），强杀正在执行的 LLM 推理与 TTS 合成，避免昂贵云端算力与车机下行流量的无效浪费。
 
-### 3. 三层分层记忆底座 (Three-Tier Memory Subsystem)
-* **核心代码**：[`core/src/ThreeTierMemory.cpp`](../core/src/ThreeTierMemory.cpp) 与 [`core/include/ThreeTierMemory.hpp`](../core/include/ThreeTierMemory.hpp)
-* **关键实现逻辑**：
-  * **L1 环形工作记忆**：维护 System Prompt + 最近 4 轮高频对话滑动窗口，严格把控端侧/云端实时推理的 Token 开销；
-  * **L2 空闲时段语义浓缩**：当累积轮次达阈值且系统检测到空闲时，后台线程自动触发异步多轮对话浓缩摘要（Summarization）；
-  * **L3 事实库增强检索**：持久化长期偏好（如驾驶习惯、常听音乐风格），在对话启动时按需组装注入；
-  * **端侧隐私合规保护**：`MemoryVault` 采用二阶段语音确认机制（“确定要我记住吗？”），数据物理隔离落盘于本地设备 JSON，严格满足车载隐私合规要求。
+### 3. 自适应阶梯退化矩阵 (Adaptive Degradation Matrix)
 
-### 4. 工具 Skill 网关与车规防呆门禁 (Tool Gateway & Safe Interlock)
-* **核心代码**：[`android/app/src/main/java/com/ai/audioagent/tools/ToolRegistry.kt`](../android/app/src/main/java/com/ai/audioagent/tools/ToolRegistry.kt) 与 [`SystemToolExecutor.kt`](../android/app/src/main/java/com/ai/audioagent/tools/SystemToolExecutor.kt)
-* **关键实现逻辑**：
-  * **动态 Schema 导出**：`ToolRegistry.exportSchemaJson()` 动态生成符合标准 Function Calling 规范的 JSON Schema；
-  * **强类型校验与安全前置拦截**：通过 `SystemAlarmTool`、`MusicPlaybackTool`、`WeatherQueryTool` 拦截解析参数；
-  * **VHAL 抽象互锁**：在调用底层硬件动作前，检查车辆物理信号状态（车速、挡位），杜绝行车过程中执行高危控制指令。
+面对地库、深山、过隧道的常态化网络抖动与断连，系统根据网络探测器实时 RTT 自动执行阶梯降级：
 
-### 5. 云端全双工实时网关与端云协同打断 (Cloud Gateway & LiveKit SFU)
-* **核心代码**：[`server/server.go`](../server/server.go) 与 [`server/agent/worker.py`](../server/agent/worker.py)
-* **关键实现逻辑**：
-  * **Go 实时控制网关（`:8088`）**：负责端侧授权验证（`cloud_consented`）、会话生命周期流转（`NEW -> READY -> PROCESSING -> STREAMING -> CLOSED`）、协同打断接口（`POST /api/v1/session/interrupt`）；
-  * **LiveKit SFU（`:7880`）**：承载全双工 WebRTC 上下行音频流，实现弱网抗抖动与流媒体极速转发；
-  * **Python Agent Worker**：利用 LiveKit Agent 框架串联 Silero VAD、流式 STT/LLM、TTS，并在端侧触发打断时，即刻级联取消云端下游推流。
+| 网络环境与指标 | 运行模式 | 承接能力与表现 | 降级与切换策略 |
+| :--- | :--- | :--- | :--- |
+| **优良网络 (RTT < 300ms)** | **云端全功能慢环** | 开放式多轮对话、复杂长程规划、实时多模态识别、丰富生态工具调用 | 优先发挥旗舰大模型智力上限 |
+| **弱网/高延时 (300ms ≤ RTT < 1500ms)** | **云端降级/快切断句** | 压缩 Prompt、调低生成 Token 长度、开启激进微切词（4 字符切句送 TTS） | 优先保障首字发音时延 (TTFA ≤ 800ms) |
+| **严重恶化 (RTT ≥ 1500ms / 持续丢包)** | **端侧 SLM 本地推理** | 切换至本地 1.5B 伴生模型，支持中等自然语言泛化理解与本地工具控制 | 物理切断云端长连接，杜绝界面假死转圈 |
+| **完全断网/离线 (Offline)** | **本地规则短路引擎** | 高频车控、系统设置、本地音乐、已缓存事实检索 | 100% 确定性保证，零幻觉、零延迟 |
+| **极端故障/异常死循环** | **看门狗安全固化兜底** | 3 秒超时看门狗自动介入，播报固定安抚语或执行安全复位 | 触发安全看门狗破圈，杜绝界面冻结 |
 
 ---
 
-## 五、 从 Pixel 原型到车规量产落地的演进 Checklist
+## 六、 跨领域人才画像与关键工程能力要求
 
-若后续正式对接车企 QNX / 高通 8295 硬件平台，当前项目需按以下规范进行演进切换：
+在端云协同 Harness 这一新兴复合领域，顶尖系统工程人选往往具备跨界知识背景：
 
-1. **跨平台构建与 QNX 工具链对齐**：
-   * 当前 C++ 核心库（`core/`）严格遵循 ISO C++17 标准，杜绝任何平台私有扩展；
-   * 配置针对 QNX Neutrino RTOS 交叉编译工具链（`aarch64-unknown-nto-qnx`），将 `core/` 打包为 `libavatar_harness.so`，供车载中间件加载。
-2. **车身总线与 ASIL 功能安全驱动接入**：
-   * 将 `MockVehicleAdapter` 切换为生产级 `CarPropertyManager`（Android CarService）或 QNX SOME/IP 适配层；
-   * 在天窗、车门、座椅等执行动作前，强制增加硬件电源状态（IGN ON/OFF）和行车速度（Speed > 0）的硬件级 Interlock 校验。
-3. **断网缓存与增量同步升级**：
-   * 将端侧会话缓存全面迁移至 SQLite WAL 模式并开启本地加密；
-   * 设计针对地库/隧道重连的增量同步协议（基于 gRPC 流式通道），断网时端侧产生本地日志，回网时自动批量推送至云端审计并完成状态树对齐。
-4. **端侧 SLM 本地化部署**：
-   * 将 [`core/include/MnnLlmEngine.hpp`](../core/include/MnnLlmEngine.hpp) 对接至高通 QNN / NPU 专用推理加速后端，实现端侧 1.5B 级别小模型在车机本地的高性能常驻推理。
+```
+                    ┌───────────────────────────────┐
+                    │    AI Agent Harness 复合人才   │
+                    └───────────────┬───────────────┘
+            ┌───────────────────────┼───────────────────────┐
+            │                       │                       │
+┌───────────▼───────────┐ ┌─────────▼───────────┐ ┌─────────▼───────────┐
+│     大模型背景        │ │     车控 App 背景     │ │   AI 智能体低代码背景  │
+├───────────────────────┤ ├─────────────────────┤ ├─────────────────────┤
+│* 系统级提示词工程设计   │ │* 车规功能安全 (ASIL) │ │* 图编排 / DAG 状态机  │
+│* 模型动态路由与评测   │ │* 车身总线与 VHAL 驱动 │ │* MCP 工具标准化网关  │
+│* Token 成本与时延优化 │ │* 严格内存/算力/LMK 规约│ │* 低代码 DSL 与沙箱设计│
+└───────────────────────┘ └─────────────────────┘ └─────────────────────┘
+```
+
+### 1. 核心编程语言与技术栈分工
+* **C / C++ (ISO C++17/C++20)**：端侧车机高可靠核心、音频管线、无锁环形队列、CPU 绑核、车规中间件与 JNI/NDK 原生桥接；
+* **Rust**：下一代内存安全端侧运行时、高性能流式数据代理、低延迟安全沙箱；
+* **Python**：云端 Agent 原型快速验证、复杂 DAG 编排（LangGraph）、评测流（Ragas）与算法数据飞轮；
+* **Go / Java (Kotlin)**：高并发分布式实时网关、WebRTC SFU 信令交互、Android Automotive 系统级常驻服务开发。
+
+### 2. 必备的核心工程设计能力
+1. **系统级提示词工程（System-level Prompt Engineering）**：不仅是撰写用户 Prompt，而是设计带有动态插槽、结构化防注入防御、少样本对齐与版本继承的系统级 Prompt 资产；
+2. **确定性状态机设计**：严密的生命周期管理，杜绝状态竞争、并发死锁与孤儿线程；
+3. **软硬件抽象解耦（Hardware Abstraction）**：
+   * 在台架匮乏阶段，能熟练使用 Android 原生平台（如 Google Pixel）构建 Mock VHAL 与悬浮调试控制台进行高保真敏捷迭代；
+   * 在量产阶段，能无缝切换至 QNX Neutrino RTOS、高通 8295 芯片与车身 CAN / SOME/IP 总线生态。
+
+---
+
+> **结语**：大模型决定了智能体“思考的上限”，而端云协同 Harness 则决定了智能体在物理世界落地时“安全、实时、稳定与可靠的底线”。

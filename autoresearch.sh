@@ -4,7 +4,13 @@ set -euo pipefail
 # Canonical Benchmark Harness for FastAvatar Full-Duplex Audio Agent
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
-export ANDROID_HOME="/Users/fx/Library/Android/sdk"
+if [ -d "/Users/frank/Library/Android/sdk" ]; then
+    export ANDROID_HOME="/Users/frank/Library/Android/sdk"
+elif [ -d "/Users/fx/Library/Android/sdk" ]; then
+    export ANDROID_HOME="/Users/fx/Library/Android/sdk"
+elif [ -d "${HOME}/Library/Android/sdk" ]; then
+    export ANDROID_HOME="${HOME}/Library/Android/sdk"
+fi
 
 # 1. Verify Native C++ Unit Test Suite (14 test suites)
 CORE_DIR="${ROOT_DIR}/core"

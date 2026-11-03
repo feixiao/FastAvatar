@@ -170,7 +170,7 @@ Avatar (Android / AAOS Client)
 
 ### 2.3 车规级 / 端侧 C++17 原生高可靠 Harness 运行时 (`core/`)
 
-针对车机算力受限（高通 8155/8295）、内存硬约束与车规安全要求，底座采用现代 ISO C++17 纯原生构建，杜绝 GC 停顿与内存泄漏：
+针对车机算力受限（高通 8155/8295）、内存硬约束与车规功能安全要求，底座采用现代 ISO C++17 纯原生构建，杜绝 GC 停顿与内存泄漏：
 
 ```
 core (C++17 High-Reliability Native Harness)
@@ -197,8 +197,34 @@ core (C++17 High-Reliability Native Harness)
 │
 └── Inference & Perception Engines
     ├── MnnLlmEngine: 阿里 MNN 端侧轻量级大模型推理接入
-    └── SherpaOnnxPerceptionEngine: 新一代 Kaldi/Sherpa-ONNX 流式本地离线感知
+    ├── SherpaOnnxPerceptionEngine: 新一代 Kaldi/Sherpa-ONNX 流式本地离线感知
+    └── FullDuplexAudioIO: 跨平台原生全双工音频抽象 (Oboe/AAudio & CoreAudio)
 ```
+
+#### 2.3.1 毫秒级意图短路与槽位仲裁器 (IntentArbiter)
+* **实现文件**：`core/src/IntentArbiter.cpp` 与 `core/include/IntentArbiter.hpp`
+* **核心决策契约**：
+  * `ArbiterStatus::MATCHED`：完全命中确定性意图且槽位完整，端侧就地执行（< 150ms），绝对不上云；
+  * `ArbiterStatus::SLOT_MISSING`：命中意图但关键必要槽位缺失（例如用户发话“设个闹钟”但未提及时间），返回 `missing_slot` 驱动定向口语追问，**杜绝生成虚假默认参数（Zero Hallucination）**；
+  * `ArbiterStatus::UNMATCHED`：开放式闲聊或非确定性意图，穿透放行至云端大模型慢环；
+* **口语归一化 (Universal Normalizer)**：
+  * `CleanPunctuationAndParticles`：剥离“啊、呢、吧、哈”等语气助词与首尾标点；
+  * `ParseChineseNumber` & `ChineseDigitToVal`：将“七点半”、“二十度”等口语数值转换为强类型标准格式；
+* **高专属性前置阻断**：严密识别并放行“为什么”、“是什么”、“讲个笑话”等泛化知识问答，杜绝短路器误拦截。
+
+#### 2.3.2 车规级高可靠调度流水线 (AudioAgentPipeline & Hardware Affinity)
+* **实现文件**：`core/src/AudioAgentPipeline.cpp` 与 `core/include/AudioAgentPipeline.hpp`
+* **CPU 亲和性物理隔离**：调用 `CpuAffinity.hpp`，将感知、AEC 与 VAD 线程绑定至节能小核（LITTLE Cores）实现毫秒级超低功耗常驻；将 TTS 合成与小模型推理绑定至高性能大核（BIG Cores），杜绝计算抖动；
+* **无锁音频环形缓冲**：`LockFreeRingBuffer.hpp` 采用单生产者单消费者（SPSC）无锁环形队列，消除声学采集与播放渲染之间的互斥锁争死锁隐患；
+* **极速声学打断控制器 (Barge-in < 5ms)**：`TriggerBargeIn()` 采用 `std::atomic<bool> is_speaking_` 标志，瞬时清空扬声器 PCM 缓存并原子通知状态机切换；
+* **看门狗与死循环破圈器**：`WatchdogAndRepetition.hpp` 实施 3 秒首 Token 超时看门狗降级与 12 字节 N-gram 文本复读死循环破圈。
+
+#### 2.3.3 三层分层记忆底座 (ThreeTierMemory)
+* **实现文件**：`core/src/ThreeTierMemory.cpp` 与 `core/include/ThreeTierMemory.hpp`
+* **L1 环形工作记忆**：维护固定 System Prompt 与最近 4 轮高频对话滑动窗口，严格控制实时推理 Token 消耗；
+* **L2 异步语义浓缩**：累积对话达到 6 轮且系统空闲超过 10 秒时，后台线程自动触发异步多轮摘要浓缩；
+* **L3 事实库增强检索**：静态持久化长期偏好（驾驶偏好、音乐品味），按需动态组装注入上下文；
+* **隐私合规**：端侧配合 `MemoryVault` 实行二阶段口语确认（“确定要我记住吗？”），数据物理隔离落盘于本地设备 JSON/SQLite WAL。
 ---
 
 ## 3. 云端实时网关与基础设施架构 (Cloud Architecture)
@@ -418,8 +444,39 @@ stateDiagram-v2
 
 ## 7. 代码模块与目录物理映射表 (Codebase Mapping)
 
+```mermaid
+flowchart LR
+    subgraph NativeCore["C++17 跨平台高可靠核心 (core/)"]
+        Arbiter["IntentArbiter.cpp<br/>(防冲突/槽位追问/零幻觉)"]
+        Pipeline["AudioAgentPipeline.cpp<br/>(状态机/绑核调度)"]
+        RingBuf["LockFreeRingBuffer.hpp<br/>(SPSC 零拷贝音频流)"]
+        Mem["ThreeTierMemory.cpp<br/>(L1滑动/L2浓缩/L3持久化)"]
+        Watchdog["WatchdogAndRepetition.hpp<br/>(3s超时降级/N-gram破圈)"]
+        Chunker["StreamingSentenceChunker.hpp<br/>(流式首句切分)"]
+        SLM["MnnLlmEngine.hpp<br/>(本地小模型轻量 Runtime)"]
+    end
+
+    subgraph AndroidEdge["Android / AAOS 平台层 (android/)"]
+        FastDisp["FastDispatcher.kt<br/>(<1ms 四级优先级路由)"]
+        ToolReg["ToolRegistry.kt & SystemToolExecutor.kt<br/>(Schema 导出与参数拦截校验)"]
+        OboeAudio["FullDuplexAudioIO (Oboe/AAudio)"]
+    end
+
+    subgraph CloudInfra["云端实时集群 (server/)"]
+        GoGW["server.go (:8088)<br/>(会话状态机/打断协同/零保留遥测)"]
+        LiveKitSFU["LiveKit SFU (:7880)<br/>(WebRTC 低时延全双工音轨)"]
+        PyWorker["worker.py<br/>(Silero VAD + LLM + TTS 级联)"]
+    end
+
+    AndroidEdge <--> NativeCore
+    AndroidEdge <== "WebRTC + REST Signaling" ==> CloudInfra
+```
+
 | 架构层级 | 核心模块 | 对应源码路径 | 核心职责与关键符号 |
 | :--- | :--- | :--- | :--- |
+| **跨平台原生核心** | 高可靠 C++17 运行时 | `core/src/`, `core/include/` | `IntentArbiter`, `AudioAgentPipeline`, `LockFreeRingBuffer`, `ThreeTierMemory`, `WatchdogAndRepetition` |
+| **原生端侧感知推理**| 端侧 SLM 与 ASR | `core/src/MnnLlmEngine.cpp`, `SherpaOnnxPerceptionEngine.cpp` | MNN-LLM INT4 推理、Sherpa-ONNX 离线语音流感知 |
+| **跨平台原生音频** | 全双工音频抽象 | `core/src/FullDuplexAudioIO.cpp` | Oboe/AAudio/CoreAudio 原生声学缓冲与打断触发 |
 | **桌面端表现层** | 前端界面 | `frontend/src/` | `index.html`, `main.js`, `sprite-orb.js`, `pet-renderer.js` |
 | **桌面端应用胶水** | Wails 绑定 | `app.go`, `main.go` | `App.startup()`, `App.Chat()`, 事件广播 `runtime.EventsEmit` |
 | **桌面端感知层** | Swift 原生 ASR | `cmd/avatar-asr/main.swift`, `internal/asr/` | `NativeMacEngine`, `SFSpeechRecognizer`, `AVAudioEngine` |
@@ -428,12 +485,14 @@ stateDiagram-v2
 | **桌面编排核心** | 协调状态机 | `internal/orchestrator/`, `internal/engine/` | `Coordinator`, `Pipeline`, `Manager`, `TaskRunner` |
 | **微切词断句** | 流式断句器 | `internal/splitter/splitter.go` | `SentenceSplitter.Feed()`, 4 字符首句快速切割 |
 | **移动端应用** | Android 整体 | `android/app/src/main/java/com/avatar/android/` | 原生 Pixel 10 实现，Compose UI + Foreground Service |
+| **移动端工具系统** | Tool Skill 网关 | `android/app/.../tools/` | `ToolRegistry.kt`, `SystemToolExecutor.kt`, `SystemAlarmTool`, `WeatherQueryTool` |
+| **移动端原生桥接** | JNI Native Bridge | `android/app/.../nativebridge/`, `core/src/NativeJniBridge.cpp` | `AudioAgentNative.kt`, `NativeJniBridge.hpp` 原生方法透传 |
 | **移动端状态机** | 11 状态机 | `android/.../core/state/SessionStateMachine.kt` | `SessionState`, 严格状态校验与转移监听 |
 | **移动端隐私** | 音频隐私防护 | `android/.../core/audio/` | `AudioPrivacyGuard`, `AudioFocusHelper`, `AudioPlaybackController` |
 | **云端实时网关** | 实时服务 | `server/server.go`, `server/auth.go` | `CloudServer`, `TokenService`, `/api/v1/session/interrupt` |
 | **云端基础设施** | LiveKit 容器编排 | `server/docker-compose.yaml` | LiveKit SFU (端口 7880/7881/7882) |
+| **云端智能体编排** | 流式 Agent Worker | `server/agent/worker.py` | LiveKit Agent, Silero VAD, OpenAI SSE, 协同级联打断 |
 | **集成验收套件** | 端到端打断测试 | `cmd/e2e-test/main.go`, `server/server_test.go` | 验证双环时延、Barge-in 打断与合规护栏 |
-
 ---
 
 ## 8. 云端服务接口规范与信令协议 (Cloud Gateway API & Signaling Specifications)
@@ -630,3 +689,32 @@ type ServerEvent struct {
   - `思考 (Thinking) 💭`：内部双环光点交替旋转，反馈计算中；
   - `说话 (Speaking) 🔊`：根据下发音频能量波形动态共振跳动。
 
+
+---
+
+## 10. 从 Pixel 原型到车规量产落地的演进 Checklist (Production Evolution Checklist)
+
+当 Avatar 系统从 Pixel 10 参考样机向车企 QNX Neutrino RTOS 或高通 8295 智能座舱硬件平台量产演进时，遵循以下工程落地清单：
+
+```
++-------------------------------------------------------------------------+
+|                 Avatar 车规量产演进路径 (Production Checklist)           |
++-------------------------------------------------------------------------+
+| 1. 跨平台构建与 QNX 工具链对齐 (ISO C++17 -> libavatar_harness.so)       |
+| 2. 车身总线与 ASIL 功能安全驱动接入 (MockVehicleAdapter -> SOME/IP / CAN) |
+| 3. 断网缓存与增量同步升级 (SQLite WAL 加密 -> 基于 Vector Clock 的增量对齐)|
+| 4. 端侧 SLM 本地化部署 (MnnLlmEngine -> 高通 QNN / NPU 专用算力加速)     |
++-------------------------------------------------------------------------+
+```
+
+1. **跨平台构建与 QNX 工具链对齐**：
+   * 当前 C++ 核心库（`core/`）严格遵循 ISO C++17 标准，杜绝任何平台私有扩展；
+   * 配置针对 QNX Neutrino RTOS 交叉编译工具链（`aarch64-unknown-nto-qnx`），将 `core/` 编译打包为 `libavatar_harness.so`，供车载中间件动态加载。
+2. **车身总线与 ASIL 功能安全驱动接入**：
+   * 将 `MockVehicleAdapter`（应用内悬浮窗调试模式）平滑切换为生产级 `CarPropertyManager`（Android CarService）或 QNX SOME/IP / CAN 适配驱动层；
+   * 在天窗、车门、后备箱与座椅等物理执行动作前，强制增加硬件电源状态（IGN ON/OFF）和行车速度（Speed > 0）的硬件级 Interlock 安全校验。
+3. **断网缓存与增量同步升级**：
+   * 将端侧会话缓存与状态持久化全面迁移至 SQLite WAL 模式并开启本地加密（SQLCipher）；
+   * 设计针对地库/隧道重连的增量同步协议（基于 gRPC 双向流式通道），断网时端侧产生本地日志，回网时自动批量推送至云端审计并完成状态树对齐。
+4. **端侧 SLM 本地化部署**：
+   * 将 [`core/include/MnnLlmEngine.hpp`](../core/include/MnnLlmEngine.hpp) 对接至高通 QNN (Qualcomm Neural Network) / NPU 专用推理加速后端，实现端侧 1.5B 级别小模型在车机本地的高性能常驻推理（TTFT < 200ms）。
