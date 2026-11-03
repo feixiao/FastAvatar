@@ -92,8 +92,12 @@ void ThreeTierMemory::RollbackLastAssistantTurn(const std::string& actually_spok
 std::string ThreeTierMemory::FormatPromptContext(const std::string& current_query) const {
     std::lock_guard<std::mutex> lock(mtx_);
 
+    size_t est_size = system_prompt_.size() + current_query.size() + 80;
+    for (const auto& turn : l1_active_turns_) {
+        est_size += turn.user_query.size() + turn.assistant_response.size() + 64;
+    }
     std::string prompt;
-    prompt.reserve(system_prompt_.size() + current_query.size() + 256 + l1_active_turns_.size() * 128);
+    prompt.reserve(est_size);
 
     // 1. 系统提示词
     prompt += "<|im_start|>system\n";
