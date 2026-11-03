@@ -8,10 +8,10 @@ TTFTWatchdog::TTFTWatchdog() {
 }
 
 TTFTWatchdog::~TTFTWatchdog() {
-    Stop();
     {
         std::lock_guard<std::mutex> lock(mtx_);
         is_running_.store(false, std::memory_order_release);
+        is_armed_.store(false, std::memory_order_release);
     }
     cv_.notify_all();
     if (worker_thread_.joinable()) {
@@ -27,35 +27,29 @@ TTFTWatchdog::~TTFTWatchdog() {
  * 复用持久化后台定时线程，避免单次查询频繁创建和销毁 OS 线程带来的系统调用开销。
  */
 void TTFTWatchdog::Start(int timeout_ms, std::function<void()> on_timeout) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    on_timeout_ = std::move(on_timeout);
-    deadline_ = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
-    fed_.store(false, std::memory_order_release);
-    is_armed_.store(true, std::memory_order_release);
-    cv_.notify_all();
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        on_timeout_ = std::move(on_timeout);
+        deadline_ = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+        fed_.store(false, std::memory_order_release);
+        is_armed_.store(true, std::memory_order_release);
+    }
+    cv_.notify_one();
 }
 
 /**
- * @brief 喂狗操作：当第一句有效文本成功产出时解除定时器
+ * @brief 喂狗操作：纯原子无锁操作，消除中间态锁竞争与不必要线程唤醒
  */
 void TTFTWatchdog::Feed() {
-    {
-        std::lock_guard<std::mutex> lock(mtx_);
-        fed_.store(true, std::memory_order_release);
-        is_armed_.store(false, std::memory_order_release);
-    }
-    cv_.notify_all();
+    fed_.store(true, std::memory_order_release);
+    is_armed_.store(false, std::memory_order_release);
 }
 
 /**
- * @brief 停止看门狗
+ * @brief 停止看门狗：纯原子标记，解除激活态
  */
 void TTFTWatchdog::Stop() {
-    {
-        std::lock_guard<std::mutex> lock(mtx_);
-        is_armed_.store(false, std::memory_order_release);
-    }
-    cv_.notify_all();
+    is_armed_.store(false, std::memory_order_release);
 }
 
 /**
