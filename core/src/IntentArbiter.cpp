@@ -359,8 +359,8 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
             res.missing_slot = "time";
         } else {
             res.status = ArbiterStatus::MATCHED;
-            res.slots["time"] = alarm_time;
             res.payload_json = R"({"action":"set_alarm","time":")" + alarm_time + R"("})";
+            res.slots.emplace("time", std::move(alarm_time));
             res.confidence = 1.0f;
         }
         return res;
@@ -428,8 +428,8 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
         if (song.empty()) {
             res.payload_json = R"({"action":"play_music","command":"play"})";
         } else {
-            res.slots["query"] = song;
             res.payload_json = R"({"action":"play_music","query":")" + song + R"("})";
+            res.slots.emplace("query", std::move(song));
         }
         return res;
     }
@@ -464,8 +464,8 @@ ArbitrationResult IntentArbiter::Arbitrate(const std::string& query) {
             res.missing_slot = "phone_number";
         } else {
             res.status = ArbiterStatus::MATCHED;
-            res.slots["phone_number"] = target;
             res.payload_json = R"({"action":"make_phone_call","phone_number":")" + target + R"("})";
+            res.slots.emplace("phone_number", std::move(target));
             res.confidence = 1.0f;
         }
         return res;
