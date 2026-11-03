@@ -163,6 +163,7 @@ bool AudioAgentPipeline::ResumeAudioIO() {
  * @brief 原子切换状态机状态并通知上层观察者（UI 动效波形与状态球）
  */
 void AudioAgentPipeline::SetState(AgentState new_state) {
+    if (state_.load(std::memory_order_relaxed) == new_state) return;
     AgentState old_state = state_.exchange(new_state, std::memory_order_acq_rel);
     if (old_state != new_state && observer_.on_state_changed) {
         observer_.on_state_changed(new_state, old_state);
@@ -368,13 +369,9 @@ void AudioAgentPipeline::CognitionWorkerLoop() {
         {
             std::lock_guard<std::mutex> lock(spoken_mtx_);
             spoken_text_accumulator_.clear();
-            current_user_query_ = query;
         }
 
         std::string full_assistant_response;
-        // 意图仲裁器前置分析：提前提取确定性的端侧系统控制意图
-        std::string fallback_tool_json = IntentArbiter::ResolveToolCall(query);
-
 
         // 构建流式断句器回调
         SentenceChunkerCallbacks callbacks;
@@ -419,32 +416,33 @@ void AudioAgentPipeline::CognitionWorkerLoop() {
         chunker.Flush();
         watchdog_.Stop();
         // 意图补偿防漏调：若端侧小模型未能吐出 <|tool_call|>，而该 Query 包含明确的系统控制指令
-        if (!chunker.HasDispatchedToolCall() && !fallback_tool_json.empty() && !IsBargeInAborted()) {
-            DispatchAsyncToolCall(fallback_tool_json);
-
-            // 若模型未生成任何回复（如超时或未吐字），自动合成口语安抚回复推入 TTS
-            if (full_assistant_response.empty()) {
-                std::string reassurance;
-                if (fallback_tool_json.find("play_music") != std::string::npos) {
-                    if (fallback_tool_json.find("pause") != std::string::npos) {
-                        reassurance = "好的，已为您暂停音乐播放。";
-                    } else if (fallback_tool_json.find("next") != std::string::npos) {
-                        reassurance = "好的，已为您切到下一首。";
-                    } else if (fallback_tool_json.find("previous") != std::string::npos) {
-                        reassurance = "好的，已为您切回上一首。";
-                    } else if (fallback_tool_json.find("resume") != std::string::npos) {
-                        reassurance = "好的，继续播放音乐。";
-                    } else {
-                        reassurance = "好的，为您播放音乐。";
+        if (!chunker.HasDispatchedToolCall() && !IsBargeInAborted()) {
+            std::string fallback_tool_json = IntentArbiter::ResolveToolCall(query);
+            if (!fallback_tool_json.empty()) {
+                DispatchAsyncToolCall(fallback_tool_json);
+                if (full_assistant_response.empty()) {
+                    std::string reassurance;
+                    if (fallback_tool_json.find("play_music") != std::string::npos) {
+                        if (fallback_tool_json.find("pause") != std::string::npos) {
+                            reassurance = "好的，已为您暂停音乐播放。";
+                        } else if (fallback_tool_json.find("next") != std::string::npos) {
+                            reassurance = "好的，已为您切到下一首。";
+                        } else if (fallback_tool_json.find("previous") != std::string::npos) {
+                            reassurance = "好的，已为您切回上一首。";
+                        } else if (fallback_tool_json.find("resume") != std::string::npos) {
+                            reassurance = "好的，继续播放音乐。";
+                        } else {
+                            reassurance = "好的，为您播放音乐。";
+                        }
+                    } else if (fallback_tool_json.find("set_alarm") != std::string::npos) {
+                        reassurance = "好的，已为您设定闹钟。";
+                    } else if (fallback_tool_json.find("query_weather") != std::string::npos) {
+                        reassurance = "好的，正在为您查询天气。";
                     }
-                } else if (fallback_tool_json.find("set_alarm") != std::string::npos) {
-                    reassurance = "好的，已为您设定闹钟。";
-                } else if (fallback_tool_json.find("query_weather") != std::string::npos) {
-                    reassurance = "好的，正在为您查询天气。";
-                }
-                if (!reassurance.empty()) {
-                    full_assistant_response = reassurance;
-                    EnqueueTtsSentence(reassurance);
+                    if (!reassurance.empty()) {
+                        full_assistant_response = reassurance;
+                        EnqueueTtsSentence(reassurance);
+                    }
                 }
             }
         }
