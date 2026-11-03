@@ -31,19 +31,14 @@ void IntentArbiter::RegisterContacts(const std::vector<std::string>& contacts) {
     s_registered_contacts = contacts;
 }
 
-/**
- * @brief 清理文本首尾标点、空白与中文语气助词
- */
-std::string IntentArbiter::CleanPunctuationAndParticles(std::string_view sv) {
-    if (sv.empty()) return "";
+static std::string_view StripParticlesView(std::string_view sv) {
+    if (sv.empty()) return {};
 
-    // 清理首尾空白
     size_t start = sv.find_first_not_of(" \t\r\n");
-    if (start == std::string_view::npos) return "";
+    if (start == std::string_view::npos) return {};
     size_t end = sv.find_last_not_of(" \t\r\n");
     sv = sv.substr(start, end - start + 1);
 
-    // 剥离末尾常见的导航疑问词、语气词与标点
     static constexpr std::string_view trailing_particles[] = {
         "怎么走", "怎么去", "的最佳路线", "的最优路线", "推荐路线", "的路线", "路线",
         "一下吧", "一下呀", "一下啊", "一下",
@@ -65,9 +60,16 @@ std::string IntentArbiter::CleanPunctuationAndParticles(std::string_view sv) {
     }
 
     start = sv.find_first_not_of(" \t\r\n");
-    if (start == std::string_view::npos) return "";
+    if (start == std::string_view::npos) return {};
     end = sv.find_last_not_of(" \t\r\n");
-    return std::string(sv.substr(start, end - start + 1));
+    return sv.substr(start, end - start + 1);
+}
+
+/**
+ * @brief 清理文本首尾标点、空白与中文语气助词
+ */
+std::string IntentArbiter::CleanPunctuationAndParticles(std::string_view sv) {
+    return std::string(StripParticlesView(sv));
 }
 
 int IntentArbiter::ChineseDigitToVal(std::string_view d) {
@@ -118,8 +120,8 @@ int IntentArbiter::ParseChineseNumber(const std::string& text) {
 
 
 std::string IntentArbiter::ExtractMusicQuery(const std::string& query) {
-    std::string s = CleanPunctuationAndParticles(query);
-    if (s.empty()) return "";
+    std::string_view sv = StripParticlesView(query);
+    if (sv.empty()) return "";
 
     static constexpr std::string_view music_prefixes[] = {
         "放一首", "放首", "播放一首", "播放首", "播放", "听一首", "听听",
@@ -127,7 +129,6 @@ std::string IntentArbiter::ExtractMusicQuery(const std::string& query) {
         "我想听", "我要听", "帮我放", "来一首", "来首", "放"
     };
 
-    std::string_view sv(s);
     std::string_view song_view;
     for (const auto& pre : music_prefixes) {
         size_t p = sv.find(pre);
@@ -137,7 +138,7 @@ std::string IntentArbiter::ExtractMusicQuery(const std::string& query) {
         }
     }
 
-    return CleanPunctuationAndParticles(song_view);
+    return std::string(StripParticlesView(song_view));
 }
 
 std::string IntentArbiter::ExtractAlarmTime(const std::string& query) {
@@ -276,9 +277,11 @@ std::string IntentArbiter::ExtractAlarmTime(const std::string& query) {
 }
 
 std::string IntentArbiter::ExtractWeatherCity(const std::string& query) {
+    if (query.size() < 6) return "";
+    std::string_view q(query);
     std::shared_lock<std::shared_mutex> lock(s_dict_mutex);
     for (const auto& city : s_registered_cities) {
-        if (query.find(city) != std::string::npos) {
+        if (q.find(city) != std::string_view::npos) {
             return city;
         }
     }
@@ -320,8 +323,8 @@ std::string IntentArbiter::ExtractPhoneTarget(const std::string& query) {
     for (const auto& pre : phone_prefixes) {
         size_t p = q.find(pre);
         if (p != std::string_view::npos) {
-            std::string target = CleanPunctuationAndParticles(q.substr(p + pre.size()));
-            if (!target.empty()) return target;
+            std::string_view target = StripParticlesView(q.substr(p + pre.size()));
+            if (!target.empty()) return std::string(target);
         }
     }
 
