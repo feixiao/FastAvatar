@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avatar macOS · 方向 A：声学实体伴侣 (Acoustic Hardware Unit)</title>
+  <style>
+    :root {
+      --aluminum-base: #d2d6dc;
+      --aluminum-surface: #e5e8ec;
+      --aluminum-border: #9ca3af;
+      --aluminum-highlight: #ffffff;
+      --accent-orange: #ff5722;
+      --accent-orange-dim: rgba(255, 87, 34, 0.2);
+      --led-green: #10b981;
+      --led-amber: #d97706;
+      --lcd-cyan: #38bdf8;
+      --text-main: #111827;
+      --text-muted: #4b5563;
+      --text-dim: #6b7280;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      background: #232730;
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* macOS 模拟桌面顶部菜单栏 */
+    .macos-menubar {
+      height: 32px;
+      background: rgba(20, 22, 28, 0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 16px;
+      font-size: 13px;
+      color: #d1d5db;
+      z-index: 50;
+    }
+    .menubar-left, .menubar-right {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    .apple-icon {
+      font-size: 15px;
+      color: #f3f4f6;
+    }
+    .app-title-bold {
+      font-weight: 600;
+      color: #fff;
+    }
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .status-dot-sm {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--led-green);
+      box-shadow: 0 0 6px var(--led-green);
+    }
+
+    /* 桌面工作区背景 */
+    .desktop-stage {
+      flex: 1;
+      position: relative;
+      background: radial-gradient(circle at 75% 25%, #182030 0%, #0d0f14 70%);
+      padding: 40px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 20px;
+    }
+
+    .watermark-info {
+      position: absolute;
+      left: 40px;
+      top: 40px;
+      max-width: 480px;
+      pointer-events: none;
+    }
+    .watermark-title {
+      font-family: "Space Mono", "SF Mono", monospace;
+      font-size: 26px;
+      font-weight: 700;
+      color: #f3f4f6;
+      margin-bottom: 8px;
+    }
+    .watermark-sub {
+      font-size: 14px;
+      color: #9ca3af;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+    .spec-pill-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .spec-pill {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #cbd5e1;
+    }
+
+    /* ==================== 1. 实体声学伴侣主机单元 (Studio Deck) ==================== */
+    .hardware-unit {
+      width: 760px;
+      background: var(--aluminum-base);
+      border: 1.5px solid var(--aluminum-border);
+      border-radius: 14px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      position: relative;
+      padding: 16px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      color: #111827;
+    }
+
+    /* 顶部拉丝铝铭牌与螺丝装饰 */
+    .chassis-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 10px;
+    }
+    .chassis-screw {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #373b47;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.15);
+      position: relative;
+    }
+    .chassis-screw::after {
+      content: "";
+      position: absolute;
+      top: 3.5px;
+      left: 1px;
+      right: 1px;
+      height: 1px;
+      background: #111317;
+    }
+    .device-model-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1f2937;
+      font-family: "Space Mono", monospace;
+    }
+    .latency-pill {
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: #1e2229;
+      color: #ff6b3d;
+      border: 1px solid rgba(255, 94, 26, 0.4);
+      font-weight: 600;
+    }
+
+    /* 主机主控制区域 */
+    .unit-controls-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* 物理声学增益与电平旋钮 */
+    .dial-knob-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .dial-knob {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #4b5161, #20232a);
+      border: 2px solid #555c6e;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.6), inset 0 2px 3px rgba(255,255,255,0.25);
+      position: relative;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s ease;
+    }
+    .dial-knob:active {
+      transform: scale(0.96);
+    }
+    .knob-marker {
+      position: absolute;
+      width: 3px;
+      height: 14px;
+      background: var(--accent-orange);
+      top: 5px;
+      border-radius: 2px;
+      box-shadow: 0 0 8px var(--accent-orange);
+    }
+    .knob-sub-label {
+      font-size: 12px;
+      color: #1f2937;
+      font-weight: 600;
+      font-family: "Space Mono", monospace;
+    }
+
+    /* 液晶电平与转写显示屏 (LCD) */
+    .lcd-display {
+      flex: 1;
+      background: #0f1217;
+      border: 1px solid #323744;
+      border-radius: 8px;
+      padding: 10px 12px;
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.8);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow: hidden;
+    }
+    .lcd-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+    }
+    .lcd-status-text {
+      color: var(--lcd-cyan);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .lcd-state-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--lcd-cyan);
+      box-shadow: 0 0 6px var(--lcd-cyan);
+    }
+    .lcd-latency-metrics {
+      color: #e2e8f0;
+      font-size: 12px;
+      font-weight: 500;
+    .lcd-main-text {
+      font-size: 14px;
+      color: #f3f4f6;
+      line-height: 1.4;
+      min-height: 20px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 实时声学 VU 电平表 Canvas */
+    .vu-meter-canvas {
+      width: 100%;
+      height: 18px;
+      border-radius: 3px;
+      background: #090b0e;
+    }
+
+    /* 右侧物理触感开关组 */
+    .tactile-buttons-col {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .tactile-btn {
+      width: 44px;
+      height: 32px;
+      background: #e5e7eb;
+      border: 1px solid #b4b9c4;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 3px 0 #9ca3af, 0 4px 8px rgba(0,0,0,0.25);
+      transition: all 0.1s ease;
+      color: #1f2937;
+      position: relative;
+    }
+    .tactile-btn:active, .tactile-btn.pressed {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 #9ca3af, 0 2px 4px rgba(0,0,0,0.25);
+    }
+    .tactile-btn.active {
+      background: var(--accent-orange);
+      border-color: #f97316;
+      color: #fff;
+      box-shadow: 0 3px 0 #c2410c;
+    }
+    .tactile-btn.active:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 #c2410c;
+    }
+    .btn-svg-icon {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* ==================== 2. 可滑出式声学工程机架 (Command Rack) ==================== */
+    .rack-drawer {
+      width: 760px;
+      background: #181a20;
+      border: 1.5px solid var(--aluminum-border);
+      border-top: none;
+      border-radius: 0 0 16px 16px;
+      box-shadow: 0 30px 70px rgba(0,0,0,0.85);
+      margin-top: -10px;
+      padding: 24px 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      transition: max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease, padding 0.35s ease;
+      overflow: hidden;
+    }
+    .rack-drawer.collapsed {
+      max-height: 0;
+      opacity: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      border: none;
+      pointer-events: none;
+    }
+
+    .rack-tabs {
+      display: flex;
+      background: #111317;
+      border: 1px solid #2e3340;
+      border-radius: 8px;
+      padding: 3px;
+      gap: 3px;
+    }
+    .rack-tab-btn {
+      flex: 1;
+      padding: 7px 0;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      color: var(--text-muted);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      background: transparent;
+      border: none;
+    }
+    .rack-tab-btn.active {
+      background: #272b36;
+      color: #fff;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+    }
+
+    /* 机架面板内容 */
+    .rack-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .rack-section-title {
+      font-size: 12px;
+      font-weight: 700;
+      font-family: "SF Mono", Menlo, monospace;
+      color: #94a3b8;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* 记忆插槽卡片 (Cartridges) */
+    .cartridge-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .cartridge-card {
+      background: #20242d;
+      border: 1px solid #373d4d;
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+    .cartridge-key {
+      color: #cbd5e1;
+      font-weight: 500;
+    }
+    .cartridge-val {
+      color: var(--lcd-cyan);
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 13px;
+    }
+    .cartridge-badge {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #94a3b8;
+    }
+
+    /* 多模态人格拨动盘 */
+    .persona-selector-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .persona-box {
+      background: #20242d;
+      border: 1px solid #373d4d;
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .persona-box.active {
+      border-color: var(--accent-orange);
+      background: var(--accent-orange-dim);
+    }
+    .persona-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #f3f4f6;
+    }
+    .persona-desc {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    /* 物理里程计数器 (Odometer) */
+    .odometer-wrapper {
+      background: #0e1115;
+      border: 1px solid #323744;
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .odometer-label {
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+    .odometer-counter {
+      display: flex;
+      gap: 3px;
+    }
+    .odometer-digit {
+      width: 22px;
+      height: 30px;
+      background: #1b1e26;
+      border: 1px solid #3d4454;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 16px;
+      font-weight: 700;
+      color: #f3f4f6;
+    }
+
+    /* 交互测试操作栏 */
+    .test-actions-bar {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+    }
+    .btn-action-ghost {
+      flex: 1;
+      padding: 9px 0;
+      background: #232732;
+      border: 1px solid #3a4152;
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-action-ghost:hover {
+      background: #2e3442;
+      border-color: #4f586e;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 模拟 macOS 菜单栏 -->
+  <div class="macos-menubar">
+    <div class="menubar-left">
+      <span class="apple-icon"></span>
+      <span class="app-title-bold">Avatar</span>
+      <span>模式</span>
+      <span>声学</span>
+      <span>记忆库</span>
+      <span>设置</span>
+    </div>
+    <div class="menubar-right">
+      <div class="status-chip">
+        <span class="status-dot-sm"></span>
+        <span>AEC 硬件回声消除</span>
+      </div>
+      <div class="status-chip">
+        <span>MEM 28MB</span>
+      </div>
+      <span>20:48</span>
+    </div>
+  </div>
+
+  <div class="desktop-stage">
+    
+    <div class="watermark-info">
+      <div class="watermark-title">方向 A · 声学实体伴侣</div>
+      <div class="watermark-sub">
+        机能主义 (Dieter Rams) 与实体硬件工程 (Teenage Engineering) 的融合。
+        彻底抛弃虚拟 Emoji 与通用暗黑模板，将 80ms 极速打断、端云双环时延参数化为冷轧铝合金声学外设。
+      </div>
+      <div class="spec-pill-group">
+        <span class="spec-pill">冷轧阳极氧化铝拉丝微边框</span>
+        <span class="spec-pill">Doto 液晶点阵时延仪表</span>
+        <span class="spec-pill">毫秒级 VU 电平波形表</span>
+        <span class="spec-pill">物理下压触感开关</span>
+      </div>
+    </div>
+
+    <!-- 1. 实体声学伴侣主机单元 -->
+    <div class="hardware-unit" id="hardwareUnit">
+      <div class="chassis-header">
+        <div class="chassis-screw"></div>
+        <div class="device-model-label">Avatar AC-1 声学伴侣</div>
+        <div class="latency-pill" id="bargeinPill">80ms 毫秒打断</div>
+        <div class="chassis-screw"></div>
+      </div>
+
+      <div class="unit-controls-row">
+        <!-- 物理旋钮 -->
+        <div class="dial-knob-container">
+          <div class="dial-knob" id="gainKnob" title="旋转微调声学增益与阈值">
+            <div class="knob-marker" id="knobMarker"></div>
+          </div>
+          <span class="knob-sub-label" style="font-size:12px; color:#111827;">增益 72%</span>
+        </div>
+        <div class="lcd-display">
+          <div class="lcd-header">
+            <div class="lcd-status-text">
+              <span class="lcd-state-dot" id="stateDot"></span>
+              <span id="stateText">倾听中：双环待命</span>
+            </div>
+            <div class="lcd-latency-metrics" id="latencyDisplay">
+              端侧 84ms | 云端 412ms
+            </div>
+          </div>
+          
+          <div class="lcd-main-text" id="liveSubtitle">
+            随时开口与我畅聊，全双工毫秒打断已就绪...
+          </div>
+
+          <!-- 实时声学 VU 电平表 -->
+          <canvas class="vu-meter-canvas" id="vuCanvas" width="220" height="18"></canvas>
+        </div>
+
+        <!-- 右侧物理触感开关 -->
+        <div class="tactile-buttons-col">
+          <button class="tactile-btn active" id="btnMicToggle" title="麦克风开关">
+            <svg class="btn-svg-icon" viewBox="0 0 24 24">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="22"></line>
+            </svg>
+          </button>
+          <button class="tactile-btn" id="btnBargeInStop" title="一键掐断发音 (Barge-in)">
+            <svg class="btn-svg-icon" viewBox="0 0 24 24">
+              <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+            </svg>
+          </button>
+          <button class="tactile-btn" id="btnToggleRack" title="展开/收起伴侣中枢机架">
+            <svg class="btn-svg-icon" viewBox="0 0 24 24">
+              <line x1="4" y1="7" x2="20" y2="7"></line>
+              <line x1="4" y1="12" x2="20" y2="12"></line>
+              <line x1="4" y1="17" x2="20" y2="17"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 滑出式声学工程机架 (Command Rack) -->
+    <div class="rack-drawer" id="rackDrawer">
+      <div class="rack-tabs">
+        <button class="rack-tab-btn active" data-tab="tab-memory">记忆卡槽</button>
+        <button class="rack-tab-btn" data-tab="tab-persona">人格矩阵</button>
+        <button class="rack-tab-btn" data-tab="tab-bond">羁绊里程</button>
+      </div>
+
+      <!-- Tab 1: 记忆卡槽 -->
+      <div class="rack-panel" id="panel-memory">
+        <div class="rack-section-title">
+          <span>本地画像插槽 (Zero-Retention)</span>
+          <span style="color:var(--led-green);">已加密隔离</span>
+        </div>
+        <div class="cartridge-list">
+          <div class="cartridge-card">
+            <span class="cartridge-key">用户偏好</span>
+            <span class="cartridge-val">美式咖啡 不加糖</span>
+          </div>
+          <div class="cartridge-card">
+            <span class="cartridge-key">工作时区</span>
+            <span class="cartridge-val">UTC+8 夜间免打扰</span>
+          </div>
+          <div class="cartridge-card">
+            <span class="cartridge-key">核心语言</span>
+            <span class="cartridge-val">Swift / Go / TS</span>
+          </div>
+        </div>
+
+        <div class="rack-section-title" style="margin-top: 6px;">
+          <span>近期情景事件</span>
+        </div>
+        <div class="cartridge-card">
+          <span class="cartridge-key">讨论重构方案，确定端云双环架构</span>
+          <span class="cartridge-badge">EP-104</span>
+        </div>
+      </div>
+
+      <!-- Tab 2: 人格矩阵 -->
+      <div class="rack-panel" id="panel-persona" style="display: none;">
+        <div class="rack-section-title">
+          <span>当前激活人格</span>
+          <span>时段自动流转</span>
+        </div>
+        <div class="persona-selector-grid">
+          <div class="persona-box active" data-p="companion">
+            <div class="persona-name">知心伴侣</div>
+            <div class="persona-desc">温润共情 案头陪伴</div>
+          </div>
+          <div class="persona-box" data-p="executive">
+            <div class="persona-name">幕僚助手</div>
+            <div class="persona-desc">严谨高效 快速摘要</div>
+          </div>
+          <div class="persona-box" data-p="engineer">
+            <div class="persona-name">极客专家</div>
+            <div class="persona-desc">代码攻坚 架构推演</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: 羁绊里程 -->
+      <div class="rack-panel" id="panel-bond" style="display: none;">
+        <div class="rack-section-title">
+          <span>连续陪伴计数器 (Days of Bonding)</span>
+        </div>
+        <div class="odometer-wrapper">
+          <span class="odometer-label">连续陪伴天数</span>
+          <div class="odometer-counter">
+            <div class="odometer-digit">0</div>
+            <div class="odometer-digit">1</div>
+            <div class="odometer-digit">4</div>
+          </div>
+        </div>
+        <div class="odometer-wrapper" style="margin-top: 6px;">
+          <span class="odometer-label">亲密度经验值 (XP)</span>
+          <span style="color:var(--accent-orange); font-family: monospace; font-weight:700;">340 / 500 XP</span>
+        </div>
+      </div>
+
+      <!-- 快速调试动作 -->
+      <div class="test-actions-bar">
+        <button class="btn-action-ghost" id="btnSimulateSpeak">模拟伴侣发音</button>
+        <button class="btn-action-ghost" id="btnSimulateInterrupt">模拟毫秒打断</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // VU 电平动画
+    const canvas = document.getElementById("vuCanvas");
+    const ctx = canvas.getContext("2d");
+    let isSpeaking = false;
+    let isListening = true;
+
+    function renderVU() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const bars = 28;
+      const barWidth = 5;
+      const gap = 3;
+
+      for (let i = 0; i < bars; i++) {
+        let h = 3;
+        if (isSpeaking) {
+          h = Math.sin(Date.now() * 0.015 + i * 0.4) * 7 + 8;
+        } else if (isListening) {
+          h = Math.abs(Math.sin(Date.now() * 0.005 + i * 0.3)) * 4 + 2;
+        }
+        
+        let color = "#38bdf8";
+        if (i > 22) color = "#ff5e1a";
+        else if (i > 16) color = "#f59e0b";
+
+        ctx.fillStyle = color;
+        ctx.fillRect(i * (barWidth + gap), canvas.height - h, barWidth, h);
+      }
+      requestAnimationFrame(renderVU);
+    }
+    renderVU();
+
+    // 交互逻辑
+    const btnToggleRack = document.getElementById("btnToggleRack");
+    const rackDrawer = document.getElementById("rackDrawer");
+    btnToggleRack.addEventListener("click", () => {
+      rackDrawer.classList.toggle("collapsed");
+    });
+
+    // 旋钮交互
+    const gainKnob = document.getElementById("gainKnob");
+    const knobMarker = document.getElementById("knobMarker");
+    let angle = 45;
+    gainKnob.addEventListener("click", () => {
+      angle = (angle + 40) % 280;
+      knobMarker.style.transform = `rotate(${angle - 140}deg) translateY(-2px)`;
+    });
+
+    // 状态模拟
+    const stateDot = document.getElementById("stateDot");
+    const stateText = document.getElementById("stateText");
+    const liveSubtitle = document.getElementById("liveSubtitle");
+    const btnSimulateSpeak = document.getElementById("btnSimulateSpeak");
+    const btnSimulateInterrupt = document.getElementById("btnSimulateInterrupt");
+
+    btnSimulateSpeak.addEventListener("click", () => {
+      isSpeaking = true;
+      stateDot.style.background = "#f59e0b";
+      stateDot.style.boxShadow = "0 0 8px #f59e0b";
+      stateText.innerText = "SPEAKING // 语音合成播报中";
+      stateText.style.color = "#f59e0b";
+      liveSubtitle.innerText = "关于端云双环架构的极速切片，当前端侧 Swift ASR 耗时已收敛在 78ms 左右...";
+    });
+
+    btnSimulateInterrupt.addEventListener("click", () => {
+      isSpeaking = false;
+      stateDot.style.background = "#ff5e1a";
+      stateDot.style.boxShadow = "0 0 10px #ff5e1a";
+      stateText.innerText = "BARGE-IN // 毫秒打断生效 (62ms)";
+      stateText.style.color = "#ff5e1a";
+      liveSubtitle.innerText = "[已掐断语音输出] 正在倾听您的新指令...";
+      setTimeout(() => {
+        stateDot.style.background = "#38bdf8";
+        stateDot.style.boxShadow = "0 0 6px #38bdf8";
+        stateText.innerText = "LISTENING // 双环待命";
+        stateText.style.color = "#38bdf8";
+      }, 1500);
+    });
+
+    // 机架 Tab 切换
+    const tabBtns = document.querySelectorAll(".rack-tab-btn");
+    const panels = {
+      "tab-memory": document.getElementById("panel-memory"),
+      "tab-persona": document.getElementById("panel-persona"),
+      "tab-bond": document.getElementById("panel-bond")
+    };
+    tabBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        tabBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const target = btn.dataset.tab;
+        Object.keys(panels).forEach(k => {
+          panels[k].style.display = k === target ? "flex" : "none";
+        });
+      });
+    });
+
+    // 人格切换
+    const personaBoxes = document.querySelectorAll(".persona-box");
+    personaBoxes.forEach(box => {
+      box.addEventListener("click", () => {
+        personaBoxes.forEach(b => b.classList.remove("active"));
+        box.classList.add("active");
+      });
+    });
+  </script>
+</body>
+</html>

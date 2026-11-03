@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avatar macOS · 方向 C：暗域极速 HUD (Hyper-Speed Obsidian HUD)</title>
+  <style>
+    :root {
+      --hud-base: #07080a;
+      --hud-panel: #0d0f14;
+      --hud-card: #141720;
+      --hud-border: rgba(255, 255, 255, 0.1);
+      --hud-border-focus: rgba(56, 189, 248, 0.4);
+      --cyan-bright: #38bdf8;
+      --emerald-bright: #10b981;
+      --purple-pulse: #a855f7;
+      --amber-bright: #f59e0b;
+      --rose-bargein: #f43f5e;
+      --text-main: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      background: #050608;
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* 模拟 macOS 菜单栏 */
+    .macos-menubar {
+      height: 32px;
+      background: #090b0e;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 16px;
+      font-size: 13px;
+      color: #94a3b8;
+      z-index: 50;
+    }
+    .menubar-group {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    .menubar-bold {
+      font-weight: 600;
+      color: #fff;
+    }
+    .chip-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #cbd5e1;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .dot-live {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--emerald-bright);
+      box-shadow: 0 0 6px var(--emerald-bright);
+    }
+
+    /* 桌面工作区背景：全屏居中沉浸式 */
+    .desktop-viewport {
+      flex: 1;
+      position: relative;
+      background: radial-gradient(circle at 50% 30%, #161c29 0%, #050608 70%);
+      padding: 60px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 24px;
+    }
+
+    .hero-info-section {
+      text-align: center;
+      max-width: 680px;
+      pointer-events: none;
+      margin-bottom: 8px;
+    }
+    .hero-title {
+      font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+    .hero-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+    .tag-container {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .hud-spec-tag {
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 6px;
+      background: #11141c;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #cbd5e1;
+    }
+    /* ==================== 1. 常驻极客 HUD 胶囊 ==================== */
+    .obsidian-capsule {
+      width: 440px;
+      height: 66px;
+      background: var(--hud-panel);
+      border: 1px solid var(--hud-border);
+      border-radius: 12px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(56, 189, 248, 0.12);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 14px;
+      position: relative;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .obsidian-capsule::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 20px;
+      right: 20px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.6), transparent);
+    }
+
+    /* 雷达脉冲声波区 */
+    .radar-pulse-box {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: #131722;
+      border: 1px solid #283144;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      cursor: pointer;
+    }
+    .radar-core-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--emerald-bright);
+      box-shadow: 0 0 8px var(--emerald-bright);
+      transition: all 0.2s ease;
+    }
+
+    /* 中段状态与流式字幕 */
+    .hud-info-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      overflow: hidden;
+    }
+    .hud-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .hud-badge-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .latency-counter {
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 12px;
+      color: var(--cyan-bright);
+      font-weight: 600;
+    }
+    .hud-stream-text {
+      font-size: 13px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 快捷键键帽 */
+    .kbd-capsule {
+      font-size: 12px;
+      font-family: "SF Mono", Menlo, monospace;
+      padding: 3px 7px;
+      border-radius: 4px;
+      background: #1b202c;
+      border: 1px solid #2e374c;
+      color: #cbd5e1;
+      box-shadow: 0 2px 0 #0d1017;
+    }
+
+    /* 动作按钮 */
+    .hud-action-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: #171b24;
+      border: 1px solid #293142;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #cbd5e1;
+      transition: all 0.15s ease;
+    }
+    .hud-action-btn:hover {
+      background: #222836;
+      border-color: #3b465c;
+      color: #fff;
+    }
+    .hud-action-btn.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--cyan-bright);
+      color: var(--cyan-bright);
+    }
+    .svg-glyph {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* ==================== 2. 端云双环指挥控制台 (Dual-Loop Console) ==================== */
+    .console-dock {
+      width: 720px;
+      background: var(--hud-panel);
+      border: 1px solid var(--hud-border);
+      border-radius: 14px;
+      box-shadow: 0 32px 80px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(56, 189, 248, 0.2);
+      display: flex;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .console-dock.collapsed {
+      max-height: 0;
+      opacity: 0;
+      border: none;
+      pointer-events: none;
+    }
+
+    /* 控制台左栏 (260px) */
+    .console-sidebar {
+      width: 260px;
+      background: #090b0f;
+      border-right: 1px solid var(--hud-border);
+      padding: 18px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .section-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #94a3b8;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* 双环实时拓扑图 Canvas */
+    .topology-card {
+      background: #11141b;
+      border: 1px solid #232836;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+    }
+    .topology-canvas {
+      width: 210px;
+      height: 110px;
+      border-radius: 6px;
+      background: #090a0e;
+    }
+    .topology-legend {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #cbd5e1;
+    }
+
+    /* 人格卡槽 */
+    .persona-matrix-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .matrix-item {
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: #11141b;
+      border: 1px solid #232836;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      font-size: 13px;
+      color: #cbd5e1;
+      transition: all 0.15s ease;
+    }
+    .matrix-item.active {
+      border-color: var(--cyan-bright);
+      background: rgba(56, 189, 248, 0.1);
+      color: #fff;
+    }
+
+    /* 控制台右栏 (380px) */
+    .console-main-pane {
+      flex: 1;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      background: #0d1017;
+    }
+
+    .terminal-input-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #141824;
+      border: 1px solid #283248;
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+    .prompt-cursor {
+      color: var(--cyan-bright);
+      font-family: monospace;
+      font-weight: 700;
+    }
+    .terminal-input-fake {
+      flex: 1;
+      font-size: 13px;
+      color: #f1f5f9;
+      background: transparent;
+      border: none;
+      outline: none;
+    }
+
+    /* 实时流式转写与路由输出 */
+    .stream-feed-box {
+      flex: 1;
+      min-height: 160px;
+      background: #080a0e;
+      border: 1px solid #1e2433;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 13px;
+    }
+    .route-node-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--emerald-bright);
+      align-self: flex-start;
+      font-family: "SF Mono", Menlo, monospace;
+    }
+    .speech-transcript-text {
+      font-size: 14px;
+      line-height: 1.5;
+      color: #f3f4f6;
+    }
+    .privacy-guard-box {
+      margin-top: auto;
+      border-top: 1px dashed #202738;
+      padding-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    /* 操作动作组 */
+    .hud-control-footer {
+      display: flex;
+      gap: 10px;
+    }
+    .btn-hud-ghost {
+      flex: 1;
+      padding: 9px 0;
+      border-radius: 6px;
+      background: #171b26;
+      border: 1px solid #2d364a;
+      color: #f1f5f9;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-hud-ghost:hover {
+      background: #222838;
+      border-color: #3e4b66;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- macOS 模拟菜单栏 -->
+  <div class="macos-menubar">
+    <div class="menubar-group">
+      <span style="color:#fff;"></span>
+      <span class="menubar-bold">Avatar HUD</span>
+      <span>命令面板</span>
+      <span>双环拓扑</span>
+      <span>隐私安全锁</span>
+    </div>
+    <div class="menubar-group">
+      <div class="chip-badge">
+        <span class="dot-live"></span>
+        <span>端侧快环 150ms 就绪</span>
+      </div>
+      <div class="chip-badge">
+        <span>零留存合规锁</span>
+      </div>
+      <span>20:48</span>
+    </div>
+  </div>
+
+  <div class="desktop-viewport">
+
+    <div class="hero-info-section">
+      <div class="hero-title">方向 C · 暗域极速 HUD</div>
+      <div class="hero-desc">
+        现实参照 (Raycast 桌面效率工具 × Linear Obsidian 极暗发丝光)。
+        黑曜石极暗色底、1px 发丝微光顶线、全键盘快捷键驱动与端云双环拓扑可视化，生产力与极客掌控感拉满。
+      </div>
+      <div class="tag-container">
+        <span class="hud-spec-tag">黑曜石极暗底板</span>
+        <span class="hud-spec-tag">端云双环实时拓扑图</span>
+        <span class="hud-spec-tag">全键盘驱动 ⌥Space / ⌘K / Esc</span>
+        <span class="hud-spec-tag">流式意图路由器可视化</span>
+      </div>
+    </div>
+
+    <!-- 1. 常驻极客 HUD 胶囊 -->
+    <div class="obsidian-capsule" id="obsidianCapsule">
+      
+      <!-- 雷达脉冲声波 -->
+      <div class="radar-pulse-box" id="btnBargeInQuick" title="点击或按 Esc 毫秒打断">
+        <div class="radar-core-dot" id="radarDot"></div>
+      </div>
+
+      <!-- 中段状态与流式字幕 -->
+      <div class="hud-info-col">
+        <div class="hud-meta-row">
+          <div class="hud-badge-title">
+            <span>Avatar 双环伴侣</span>
+            <span style="font-size:12px; color:#94a3b8;" id="personaStatus">知心伴侣</span>
+          </div>
+          <div class="latency-counter" id="latencyStat">
+            快环: 78ms | 慢环: 410ms
+          </div>
+        </div>
+        <div class="hud-stream-text" id="streamSubtitle">
+          随时按 ⌥Space 唤出命令控制台，全双工就绪...
+        </div>
+      </div>
+
+      <!-- 快捷键提示 -->
+      <span class="kbd-capsule">⌥Space</span>
+
+      <!-- 展开动作 -->
+      <button class="hud-action-btn" id="btnToggleConsole" title="展开/收起控制台">
+        <svg class="svg-glyph" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+          <line x1="9" y1="3" x2="9" y2="21"></line>
+        </svg>
+      </button>
+
+    </div>
+
+    <!-- 2. 端云双环指挥控制台 (Dual-Loop Console) -->
+    <div class="console-dock" id="consoleDock">
+      
+      <!-- 左栏：拓扑与人格卡槽 (260px) -->
+      <div class="console-sidebar">
+        
+        <div class="section-label">
+          <span>端云双环拓扑 (Dual-Loop)</span>
+          <span style="color:var(--emerald-bright);">实时流转</span>
+        </div>
+
+        <div class="topology-card">
+          <canvas class="topology-canvas" id="topologyCanvas" width="210" height="110"></canvas>
+          <div class="topology-legend">
+            <span style="color:var(--cyan-bright);">端侧快环 150ms</span>
+            <span style="color:var(--purple-pulse);">云端慢环 800ms</span>
+          </div>
+        </div>
+
+        <div class="section-label">
+          <span>多模态人格卡槽</span>
+          <span>⌘1 - ⌘3</span>
+        </div>
+
+        <div class="persona-matrix-list">
+          <div class="matrix-item active" data-p="知心伴侣">
+            <span>知心伴侣 (Companion)</span>
+            <span class="kbd-capsule">⌘1</span>
+          </div>
+          <div class="matrix-item" data-p="幕僚助手">
+            <span>幕僚助手 (Executive)</span>
+            <span class="kbd-capsule">⌘2</span>
+          </div>
+          <div class="matrix-item" data-p="极客专家">
+            <span>极客专家 (Hacker)</span>
+            <span class="kbd-capsule">⌘3</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 右栏：流式意图终端与安全锁 (380px) -->
+      <div class="console-main-pane">
+        
+        <div class="terminal-input-bar">
+          <span class="prompt-cursor">❯</span>
+          <input type="text" class="terminal-input-fake" placeholder="输入对话指令或直接开嗓说话..." value="分析当前端侧 Swift ASR 耗时与打断策略" readonly />
+          <span class="kbd-capsule">↵</span>
+        </div>
+
+        <div class="stream-feed-box">
+          <div class="route-node-pill" id="routeNode">
+            <span>意图路由器：本地快环直连 (78ms)</span>
+          </div>
+          <div class="speech-transcript-text" id="transcriptBody">
+            根据端侧 ASR 探针数据，Swift 原生转写时延在 Apple M3 Pro 上稳定在 65ms 到 82ms 之间，满足 Barge-in 80ms 毫秒截断标准。
+          </div>
+          <div class="privacy-guard-box">
+            <span>零留存隐私隔离锁：已锁定</span>
+            <span style="color:var(--cyan-bright);">常驻内存 28MB</span>
+          </div>
+        </div>
+
+        <!-- 交互测试动作 -->
+        <div class="hud-control-footer">
+          <button class="btn-hud-ghost" id="btnSimulateStream">模拟流式应答</button>
+          <button class="btn-hud-ghost" id="btnSimulateBargeIn">模拟毫秒打断</button>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // 双环实时拓扑 Canvas 动画
+    const canvas = document.getElementById("topologyCanvas");
+    const ctx = canvas.getContext("2d");
+
+    function renderTopology() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const time = Date.now() * 0.003;
+
+      // 端侧极速快环 (左侧蓝环)
+      const cx1 = 60, cy1 = 55, r1 = 28;
+      ctx.beginPath();
+      ctx.arc(cx1, cy1, r1, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.3)";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // 快环粒子
+      const a1 = time * 2;
+      const px1 = cx1 + Math.cos(a1) * r1;
+      const py1 = cy1 + Math.sin(a1) * r1;
+      ctx.beginPath();
+      ctx.arc(px1, py1, 4, 0, Math.PI * 2);
+      ctx.fillStyle = "#38bdf8";
+      ctx.fill();
+
+      // 云端慢环 (右侧紫环)
+      const cx2 = 150, cy2 = 55, r2 = 36;
+      ctx.beginPath();
+      ctx.arc(cx2, cy2, r2, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(168, 85, 247, 0.25)";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // 慢环脉冲粒子
+      const a2 = -time * 0.8;
+      const px2 = cx2 + Math.cos(a2) * r2;
+      const py2 = cy2 + Math.sin(a2) * r2;
+      ctx.beginPath();
+      ctx.arc(px2, py2, 5, 0, Math.PI * 2);
+      ctx.fillStyle = "#c084fc";
+      ctx.fill();
+
+      // 双环交汇数据流线
+      ctx.beginPath();
+      ctx.moveTo(cx1 + r1, cy1);
+      ctx.lineTo(cx2 - r2, cy2);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      requestAnimationFrame(renderTopology);
+    }
+    renderTopology();
+
+    // 交互逻辑
+    const btnToggleConsole = document.getElementById("btnToggleConsole");
+    const consoleDock = document.getElementById("consoleDock");
+    btnToggleConsole.addEventListener("click", () => {
+      consoleDock.classList.toggle("collapsed");
+    });
+
+    // 快捷键 ⌥Space 支持
+    window.addEventListener("keydown", (e) => {
+      if (e.altKey && e.code === "Space") {
+        e.preventDefault();
+        consoleDock.classList.toggle("collapsed");
+      } else if (e.key === "Escape") {
+        triggerBargeInHUD();
+      }
+    });
+
+    const radarDot = document.getElementById("radarDot");
+    const streamSubtitle = document.getElementById("streamSubtitle");
+    const routeNode = document.getElementById("routeNode");
+    const transcriptBody = document.getElementById("transcriptBody");
+    const btnSimulateStream = document.getElementById("btnSimulateStream");
+    const btnSimulateBargeIn = document.getElementById("btnSimulateBargeIn");
+    const btnBargeInQuick = document.getElementById("btnBargeInQuick");
+
+    btnSimulateStream.addEventListener("click", () => {
+      radarDot.style.background = "#f59e0b";
+      radarDot.style.boxShadow = "0 0 10px #f59e0b";
+      streamSubtitle.innerText = "正在向您播报架构演进策略与测试结论...";
+      routeNode.innerHTML = "<span>意图路由器：云端慢环大模型推理 (420ms)</span>";
+      transcriptBody.innerText = "云端 LiveKit SFU 网关已建立全双工实时会话通道，当前慢环推理首字时延为 380ms，已完成流式输出编排。";
+    });
+
+    function triggerBargeInHUD() {
+      radarDot.style.background = "#f43f5e";
+      radarDot.style.boxShadow = "0 0 12px #f43f5e";
+      streamSubtitle.innerText = "[Barge-in 毫秒打断触发] 音频输出已掐断，耗时 72ms...";
+      routeNode.innerHTML = "<span style='color:#f43f5e;'>打断截断触发：向 LiveKit 发送 BargeIn 信号</span>";
+      transcriptBody.innerText = "[已截断] 本地与云端发音已实时掐断，等待用户新输入。";
+      setTimeout(() => {
+        radarDot.style.background = "#10b981";
+        radarDot.style.boxShadow = "0 0 8px #10b981";
+        streamSubtitle.innerText = "随时按 ⌥Space 唤出命令控制台，全双工就绪...";
+        routeNode.innerHTML = "<span>意图路由器：本地快环直连 (78ms)</span>";
+      }, 1800);
+    }
+
+    btnSimulateBargeIn.addEventListener("click", triggerBargeInHUD);
+    btnBargeInQuick.addEventListener("click", triggerBargeInHUD);
+
+    // 人格切换
+    const matrixItems = document.querySelectorAll(".matrix-item");
+    const personaStatus = document.getElementById("personaStatus");
+    matrixItems.forEach(item => {
+      item.addEventListener("click", () => {
+        matrixItems.forEach(m => m.classList.remove("active"));
+        item.classList.add("active");
+        personaStatus.innerText = item.dataset.p;
+      });
+    });
+  </script>
+</body>
+</html>

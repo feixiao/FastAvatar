@@ -19,7 +19,9 @@ avatar_config.json
 .DS_Store
 .idea/
 .vscode/
-
+.agents/
+.claude/
+skills-lock.json
 # Python & Virtual Environments
 __pycache__/
 *.pyc

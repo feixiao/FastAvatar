@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avatar for macOS · 三方向交互展示画板 (Design Showcase)</title>
+  <style>
+    :root {
+      --bg: #090b10;
+      --card-bg: #12151e;
+      --border: rgba(255, 255, 255, 0.1);
+      --accent: #38bdf8;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      padding: 36px 40px 80px;
+      line-height: 1.5;
+    }
+    header {
+      max-width: 1400px;
+      margin: 0 auto 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 24px;
+    }
+    .brand-title {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .badge-live {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 6px;
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .sub-caption {
+      font-size: 14px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* 方案横向对比网格 */
+    .showcase-grid {
+      max-width: 1400px;
+      margin: 0 auto 40px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    @media (max-width: 1100px) {
+      .showcase-grid { grid-template-columns: 1fr; }
+    }
+
+    .dir-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 16px 36px rgba(0,0,0,0.4);
+      transition: all 0.25s ease;
+    }
+    .dir-card:hover {
+      border-color: rgba(56, 189, 248, 0.4);
+      transform: translateY(-2px);
+    }
+    .dir-card-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .dir-card-title {
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tag-chip {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .tag-a { background: rgba(197, 160, 89, 0.2); color: #c5a059; border: 1px solid rgba(197, 160, 89, 0.4); }
+    .tag-b { background: rgba(0, 122, 255, 0.2); color: #60a5fa; border: 1px solid rgba(0, 122, 255, 0.4); }
+    .tag-c { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+
+    .img-preview-box {
+      height: 280px;
+      background: #000;
+      position: relative;
+      overflow: hidden;
+    }
+    .img-preview-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+    }
+
+    .dir-details {
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+    }
+    .detail-row {
+      font-size: 13px;
+      color: #cbd5e1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .detail-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .card-footer {
+      padding: 14px 20px;
+      background: rgba(0, 0, 0, 0.2);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .btn-open {
+      padding: 8px 16px;
+      border-radius: 8px;
+      background: #1e2433;
+      border: 1px solid #333d54;
+      color: #f1f5f9;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .btn-open:hover {
+      background: #2b344a;
+      border-color: #485777;
+    }
+
+    /* 差异性检验指纹表 */
+    .compare-section {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .compare-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .fingerprint-pre {
+      background: #080a0e;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 12px;
+      color: #38bdf8;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <div class="brand-title">
+        Avatar for macOS · 三方向展示画板
+        <span class="badge-live">Gate 3 · 等待用户选择</span>
+      </div>
+      <div class="sub-caption">
+        已生成三个骨架结构、底色类别与文化温度截然不同、完全拉开的高保真可交互原型。
+      </div>
+    </div>
+  </header>
+
+  <main class="showcase-grid">
+
+    <!-- 方向 A -->
+    <div class="dir-card">
+      <div class="dir-card-header">
+        <div class="dir-card-title">方向 A · 案头清供 墨韵灵石</div>
+        <span class="tag-chip tag-a">East 文人意境</span>
+      </div>
+      <div class="img-preview-box">
+        <img src="./direction-a.png" alt="方向 A 案头清供">
+      </div>
+      <div class="dir-details">
+        <div class="detail-row">
+          <span class="detail-label">设计来源与理念</span>
+          <span>秒数轮盘（East 跨媒介风格库 · 吕敬人与宋代案头清供），宣纸暖底搭配矿物砚石。</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">核心主角素材</span>
+          <span>Canvas 砚池墨滴呼吸灵核 + 朱砂印章状态 + 经折装案头条签。</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">版式骨架</span>
+          <span>横向案头清供条屏（中明度灰底 #3F3C38，Noto Serif SC 衬线排印）。</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <span style="font-size:12px; color:var(--muted);">交互原型已就绪</span>
+        <a class="btn-open" href="./direction-a-inkstone.html" target="_blank">预览原型 ↗</a>
+      </div>
+    </div>
+
+    <!-- 方向 B -->
+    <div class="dir-card">
+      <div class="dir-card-header">
+        <div class="dir-card-title">方向 B · 挺括纸感案头</div>
+        <span class="tag-chip tag-b">Things 3 纯白原生</span>
+      </div>
+      <div class="img-preview-box">
+        <img src="./direction-b.png" alt="方向 B 挺括纸感">
+      </div>
+      <div class="dir-details">
+        <div class="detail-row">
+          <span class="detail-label">设计来源与理念</span>
+          <span>现实参照（Things 3 纯白精修美学 · Cultured Code），案头挺括白纸手账。</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">核心主角素材</span>
+          <span>呼吸微光萌伴光球 + 案头手账生活习惯便签 + 亲密度进度。</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">版式骨架</span>
+          <span>右侧浮动灵动便签（浅色有色底 #DFE6EF，SF Pro Display 人文无衬线）。</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <span style="font-size:12px; color:var(--muted);">交互原型已就绪</span>
+        <a class="btn-open" href="./direction-b-paper.html" target="_blank">预览原型 ↗</a>
+      </div>
+    </div>
+
+    <!-- 方向 C -->
+    <div class="dir-card">
+      <div class="dir-card-header">
+        <div class="dir-card-title">方向 C · 暗域极速 HUD</div>
+        <span class="tag-chip tag-c">Raycast 桌面效率</span>
+      </div>
+      <div class="img-preview-box">
+        <img src="./direction-c.png" alt="方向 C 暗域极速 HUD">
+      </div>
+      <div class="dir-details">
+        <div class="detail-row">
+          <span class="detail-label">设计来源与理念</span>
+          <span>现实参照（Raycast Desktop 效率面板 × Linear Obsidian 极暗发丝光）。</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">核心主角素材</span>
+          <span>端云双环数据流拓扑图 + 全键盘快捷键 (⌥Space / Esc) + 流式意图终端。</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">版式骨架</span>
+          <span>居中聚光控制台（深黑底 #050608，SF Pro Display + Space Mono 排印）。</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <span style="font-size:12px; color:var(--muted);">交互原型已就绪</span>
+        <a class="btn-open" href="./direction-c-obsidian-hud.html" target="_blank">预览原型 ↗</a>
+      </div>
+    </div>
+
+  </main>
+
+  <section class="compare-section">
+    <div class="compare-title">
+      <span>📐 design_lint.py 事实比对与体检数据</span>
+    </div>
+    <div class="fingerprint-pre">三方向外观与差异性度量：
+  direction-a-inkstone.html：中明度·灰底 #3F3C38，衬线标题（Noto Serif SC）
+  direction-b-paper.html：   浅·有色底 #DFE6EF，无衬线标题（SF Pro Display）
+  direction-c-obsidian-hud.html：深·近黑底 #050608，无衬线标题（SF Pro Display）
+  direction-a ↔ direction-b：色板距离 0.076，骨架相关 -0.01
+  direction-a ↔ direction-c：色板距离 0.389，骨架相关  0.50
+  direction-b ↔ direction-c：色板距离 0.704，骨架相关 -0.08
+  ✓ 三版拉开了（无红灯、无模板装饰）</div>
+  </section>
+
+</body>
+</html>

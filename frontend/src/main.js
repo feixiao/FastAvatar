@@ -103,14 +103,13 @@ const stateLabels = {
 };
 
 const stateColors = {
-  idle: "#38bdf8",
-  listening: "#10b981",
-  thinking: "#a855f7",
-  speaking: "#f59e0b",
-  sleep: "#64748b",
-  error: "#ef4444",
+  idle: "#0051ba",
+  listening: "#047857",
+  thinking: "#6d28d9",
+  speaking: "#b45309",
+  sleep: "#4b5563",
+  error: "#b91c1c",
 };
-
 // ==================== 3. 形态与皮肤控制 ====================
 
 function applyDisplayForm(form) {
@@ -123,9 +122,9 @@ function applyDisplayForm(form) {
   }
 
   if (currentForm === "capsule") {
-    menuToggleForm.textContent = "🐾 切换为桌面宠物形态";
+    menuToggleForm.textContent = "切换为灵动桌宠形态";
   } else {
-    menuToggleForm.textContent = "🔄 切换为极简胶囊形态";
+    menuToggleForm.textContent = "切换为挺括胶囊形态";
   }
 }
 
@@ -141,12 +140,11 @@ function applySkin(skinId) {
   petRenderer.loadSkin(currentSkin);
 
   const skinNames = {
-    cat: "🐾 橘宝喵 (桌宠)",
-    fox: "🦊 灵狐小九 (桌宠)",
-    spirit: "✨ 星灵露露 (桌宠)",
+    cat: "橘宝喵 (桌宠伴侣)",
+    fox: "灵狐小九 (桌宠伴侣)",
+    spirit: "星灵露露 (桌宠伴侣)",
   };
-  menuPetTitle.textContent = skinNames[currentSkin] || `🐾 ${currentSkin} (桌宠)`;
-
+  menuPetTitle.textContent = skinNames[currentSkin] || `${currentSkin} (桌宠伴侣)`;
   if (window.go && window.go.main && window.go.main.App) {
     window.go.main.App.SetPetSkin(currentSkin);
   }
@@ -773,8 +771,7 @@ function initPTTKeyboard() {
           window.go.main.App.StartPTT();
         }
         applyState("listening");
-        subtitleText.textContent = "🎙️ 正在倾听，松开空格发送...";
-        hideBubble();
+        subtitleText.textContent = "正在倾听，松开空格发送...";
       }
     }
   });
@@ -832,9 +829,8 @@ if (window.runtime) {
     showBubble(sentence, Math.max(4000, sentence.length * 300));
   });
   window.runtime.EventsOn("avatar:error", (err) => {
-    subtitleText.textContent = "❌ " + err;
-    showBubble("❌ " + err, 6000);
-    applyState("error");
+    subtitleText.textContent = "连接异常: " + err;
+    showBubble("连接异常: " + err, 6000);
   });
   window.runtime.EventsOn("avatar:display_form", (f) => {
     applyDisplayForm(f);
@@ -846,7 +842,7 @@ if (window.runtime) {
     currentMode = m;
     modeBadge.textContent = m === "hands_free" ? "免唤醒" : "快捷键";
     const desc = m === "hands_free" ? "免唤醒模式 (随时开口)" : "按住空格说话模式";
-    showBubble(`🎙️ ${desc}`, 2500);
+    showBubble(desc, 2500);
     if (currentState === "idle") {
       const defaultText =
         m === "hands_free" ? "随时开口与我畅聊..." : "按住空格说话...";

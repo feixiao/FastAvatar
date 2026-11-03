@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avatar macOS · 方向 A：案头清供·墨韵灵石 (Inkstone Companion)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --xuan-bg: #ece7dc;
+      --xuan-surface: #f4efe6;
+      --ink-stone: #1a1917;
+      --ink-border: #383530;
+      --gold-wire: #c5a059;
+      --cinnabar-red: #b91c1c;
+      --cinnabar-dim: rgba(185, 28, 28, 0.15);
+      --text-ink: #1f1e1c;
+      --text-rice: #f5f2eb;
+      --text-sub: #78716c;
+      --text-stone-muted: #a8a29e;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      font-family: "Noto Serif SC", -apple-system, serif;
+      /* 宣纸温润底色与微弱光泽 */
+      background: radial-gradient(circle at 50% 15%, #f7f3eb 0%, #ece7dc 60%, #e2dcce 100%);
+      color: var(--text-ink);
+    }
+
+    /* 模拟 macOS 菜单栏：融入古典案头竹木意蕴 */
+    .macos-menubar {
+      height: 32px;
+      background: rgba(244, 239, 230, 0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(120, 113, 108, 0.18);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 18px;
+      font-size: 13px;
+      color: var(--text-sub);
+      z-index: 50;
+    }
+    .menubar-items {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .menubar-brand {
+      font-weight: 700;
+      color: var(--text-ink);
+      letter-spacing: 0.5px;
+    }
+    .seal-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(185, 28, 28, 0.08);
+      border: 1px solid rgba(185, 28, 28, 0.2);
+      color: var(--cinnabar-red);
+      font-weight: 600;
+    }
+
+    /* 桌面工作区背景 */
+    .desktop-viewport {
+      flex: 1;
+      padding: 44px 36px 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 28px;
+      position: relative;
+    }
+
+    .hero-watermark {
+      text-align: center;
+      max-width: 640px;
+      pointer-events: none;
+    }
+    .hero-title {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: var(--text-ink);
+      margin-bottom: 10px;
+    }
+    .hero-desc {
+      font-size: 14px;
+      color: var(--text-sub);
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+    .tag-row {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .craft-tag {
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.65);
+      border: 1px solid rgba(120, 113, 108, 0.2);
+      color: var(--text-ink);
+    }
+
+    /* ==================== 1. 案头清供·砚池灵石条屏 ==================== */
+    .inkstone-tray {
+      width: 780px;
+      background: var(--ink-stone);
+      border: 1.5px solid var(--ink-border);
+      border-radius: 18px;
+      box-shadow: 0 24px 50px rgba(40, 32, 25, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.12);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      position: relative;
+      color: var(--text-rice);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .inkstone-tray::after {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      border-radius: 16px;
+      border: 1px solid rgba(197, 160, 89, 0.15);
+      pointer-events: none;
+    }
+
+    /* 砚池灵核 (Canvas Ink Ripple) */
+    .inkwell-container {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #2a2825, #11100e 80%);
+      border: 1.5px solid #4a463f;
+      box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.9), 0 2px 8px rgba(0, 0, 0, 0.5);
+      position: relative;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s ease;
+    }
+    .inkwell-container:active {
+      transform: scale(0.95);
+    }
+    .ink-canvas {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+    }
+    .cinnabar-seal {
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      background: var(--cinnabar-red);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 700;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 10px rgba(185, 28, 28, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    /* 中段题签与转写信息 */
+    .ink-stream-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      overflow: hidden;
+    }
+    .tray-title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .tray-companion-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-rice);
+      letter-spacing: 0.5px;
+    }
+    .state-seal-pill {
+      font-size: 12px;
+      padding: 1px 8px;
+      border-radius: 4px;
+      background: var(--cinnabar-dim);
+      border: 1px solid rgba(185, 28, 28, 0.4);
+      color: #fca5a5;
+      font-weight: 600;
+    }
+    .latency-note {
+      font-size: 12px;
+      color: var(--gold-wire);
+    }
+    .tray-transcript {
+      font-size: 14px;
+      color: #d6d3d1;
+      line-height: 1.5;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 右侧控制键位 */
+    .ink-btn-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ink-action-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: #282622;
+      border: 1px solid #44403a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-rice);
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+      transition: all 0.15s ease;
+    }
+    .ink-action-btn:hover {
+      background: #33302b;
+      border-color: #5c564e;
+    }
+    .ink-action-btn.active {
+      background: var(--cinnabar-red);
+      border-color: #dc2626;
+      color: #ffffff;
+      box-shadow: 0 0 10px rgba(185, 28, 28, 0.5);
+    }
+    .ink-svg {
+      width: 17px;
+      height: 17px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* ==================== 2. 案头清供·中枢经折卷 (Accordian Hub) ==================== */
+    .ink-accordion-hub {
+      width: 780px;
+      background: var(--ink-stone);
+      border: 1.5px solid var(--ink-border);
+      border-top: none;
+      border-radius: 0 0 18px 18px;
+      margin-top: -12px;
+      box-shadow: 0 30px 65px rgba(40, 32, 25, 0.4);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      color: var(--text-rice);
+    }
+    .ink-accordion-hub.collapsed {
+      max-height: 0;
+      opacity: 0;
+      padding: 0;
+      border: none;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    /* 经折装 Tab 栏 */
+    .ink-tabs-row {
+      display: flex;
+      background: #121110;
+      border: 1px solid #33302a;
+      border-radius: 8px;
+      padding: 3px;
+      gap: 3px;
+    }
+    .ink-tab-btn {
+      flex: 1;
+      padding: 8px 0;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      color: var(--text-stone-muted);
+      border-radius: 6px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: "Noto Serif SC", serif;
+    }
+    .ink-tab-btn.active {
+      background: #2b2823;
+      color: var(--text-rice);
+      border: 1px solid rgba(197, 160, 89, 0.3);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    }
+
+    /* 面板内容 */
+    .ink-panel-box {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .panel-caption-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: var(--gold-wire);
+    }
+
+    /* 案头条签 (Slips) */
+    .slip-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .slip-card {
+      background: #24221f;
+      border: 1px solid #3d3933;
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+    .slip-key {
+      color: var(--text-rice);
+    }
+    .slip-tag {
+      font-size: 12px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: rgba(197, 160, 89, 0.15);
+      color: var(--gold-wire);
+      border: 1px solid rgba(197, 160, 89, 0.3);
+    }
+
+    /* 人格化境选择 */
+    .persona-scroll-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .scroll-card {
+      background: #24221f;
+      border: 1px solid #3d3933;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .scroll-card.active {
+      border-color: var(--gold-wire);
+      background: rgba(197, 160, 89, 0.12);
+    }
+    .scroll-card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-rice);
+    }
+    .scroll-card-desc {
+      font-size: 12px;
+      color: var(--text-stone-muted);
+      margin-top: 4px;
+    }
+
+    /* 案头墨痕进度 */
+    .ink-growth-box {
+      background: #24221f;
+      border: 1px solid #3d3933;
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .growth-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+    }
+    .ink-rail {
+      height: 8px;
+      border-radius: 4px;
+      background: #11100e;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid #33302a;
+    }
+    .ink-rail-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 68%;
+      background: linear-gradient(90deg, #c5a059, #b91c1c);
+      border-radius: 4px;
+    }
+
+    /* 快捷交互测试 */
+    .ink-demo-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .btn-ink-action {
+      flex: 1;
+      padding: 9px 0;
+      border-radius: 8px;
+      background: #292723;
+      border: 1px solid #44403a;
+      color: var(--text-rice);
+      font-size: 13px;
+      font-weight: 600;
+      font-family: "Noto Serif SC", serif;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-ink-action:hover {
+      background: #36322d;
+      border-color: #5c564e;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- macOS 模拟案头菜单栏 -->
+  <div class="macos-menubar">
+    <div class="menubar-items">
+      <span></span>
+      <span class="menubar-brand">Avatar 清供</span>
+      <span>题跋</span>
+      <span>砚池</span>
+      <span>墨痕录</span>
+      <span>静室</span>
+    </div>
+    <div class="menubar-items">
+      <div class="seal-chip">
+        <span>端侧快环 150ms 就绪</span>
+      </div>
+      <span style="font-size:12px; color:var(--text-sub);">零留存 物理隔离</span>
+    </div>
+  </div>
+
+  <div class="desktop-viewport">
+
+    <div class="hero-watermark">
+      <div class="hero-title">方向 A 案头清供 墨韵灵石</div>
+        秒数轮盘与东方设计意象 (East 风格库 · 吕敬人书籍设计与宋代案头清供)。
+        宣纸温润底色、砚池墨滴灵核与朱砂印记状态，将全双工 AI 伴侣化为案头君子清供，沉静内敛且毫秒知意。
+      </div>
+      <div class="tag-row">
+        <span class="craft-tag">温润宣纸底色与矿物砚台</span>
+        <span class="craft-tag">Canvas 墨滴呼吸聚散灵核</span>
+        <span class="craft-tag">朱砂印记状态转换</span>
+        <span class="craft-tag">经折装案头手折中枢</span>
+      </div>
+    </div>
+
+    <!-- 1. 案头清供·砚池灵石条屏 -->
+    <div class="inkstone-tray" id="inkstoneTray">
+      
+      <!-- 砚池灵核 -->
+      <div class="inkwell-container" id="inkwellBtn" title="点击墨核打断发音或唤醒">
+        <canvas class="ink-canvas" id="inkCanvas" width="58" height="58"></canvas>
+        <div class="cinnabar-seal" id="sealBadge">伴</div>
+      </div>
+
+      <!-- 中段题签与转写信息 -->
+      <div class="ink-stream-col">
+        <div class="tray-title-row">
+          <span class="tray-companion-title">Avatar 墨韵伴侣</span>
+          <span class="state-seal-pill" id="statePill">双环静候</span>
+          <span class="latency-note" id="latencyNote">端侧 78ms / 云端 410ms</span>
+        <div class="tray-transcript" id="transcriptText">
+          君子案头 清供有声，随时开嗓倾谈...
+        </div>
+      </div>
+
+      <!-- 右侧控制键位 -->
+      <div class="ink-btn-group">
+        <button class="ink-action-btn active" id="btnMicToggle" title="拾音开关">
+          <svg class="ink-svg" viewBox="0 0 24 24">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="22"></line>
+          </svg>
+        </button>
+        <button class="ink-action-btn" id="btnBargeIn" title="毫秒掐断 (Barge-in)">
+          <svg class="ink-svg" viewBox="0 0 24 24">
+            <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+          </svg>
+        </button>
+        <button class="ink-action-btn" id="btnToggleAccordion" title="展开/收起经折中枢">
+          <svg class="ink-svg" viewBox="0 0 24 24">
+            <line x1="4" y1="7" x2="20" y2="7"></line>
+            <line x1="4" y1="12" x2="20" y2="12"></line>
+            <line x1="4" y1="17" x2="20" y2="17"></line>
+          </svg>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- 2. 案头清供·中枢经折卷 (Accordian Hub) -->
+    <div class="ink-accordion-hub" id="accordionHub">
+      
+      <div class="ink-tabs-row">
+        <button class="ink-tab-btn active" data-tab="tab-slips">画像条签</button>
+        <button class="ink-tab-btn" data-tab="tab-persona">人格化境</button>
+        <button class="ink-tab-btn" data-tab="tab-growth">羁绊墨痕</button>
+      </div>
+
+      <!-- Tab 1: 画像条签 -->
+      <div class="ink-panel-box" id="panel-slips">
+        <div class="panel-caption-row">
+          <span>端侧画像铭文 (Zero-Retention)</span>
+          <span style="color:#34d399;">已加密封存</span>
+        </div>
+        <div class="slip-list">
+          <div class="slip-card">
+            <span class="slip-key">案头饮好：嗜美式浓咖啡 不假甘饴</span>
+            <span class="slip-tag">日常习惯</span>
+          </div>
+          <div class="slip-card">
+            <span class="slip-key">作息节律：处东八区 夜半二十三点后免扰</span>
+            <span class="slip-tag">时序画像</span>
+          </div>
+          <div class="slip-card">
+            <span class="slip-key">编程之道：研习 Swift 与 Go 双环拓扑</span>
+            <span class="slip-tag">工程底座</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: 人格化境 -->
+      <div class="ink-panel-box" id="panel-persona" style="display: none;">
+        <div class="panel-caption-row">
+          <span>当前陪伴化境</span>
+          <span style="color:var(--text-stone-muted);">时辰自动流转</span>
+        </div>
+        <div class="persona-scroll-grid">
+          <div class="scroll-card active" data-name="知心伴侣">
+            <div class="scroll-card-title">知心伴侣</div>
+            <div class="scroll-card-desc">温润共情 案头倾听</div>
+          </div>
+          <div class="scroll-card" data-name="幕僚幕宾">
+            <div class="scroll-card-title">幕僚幕宾</div>
+            <div class="scroll-card-desc">干练明决 提纲挈领</div>
+          </div>
+          <div class="scroll-card" data-name="极客先生">
+            <div class="scroll-card-title">极客先生</div>
+            <div class="scroll-card-desc">推演架构 攻坚代码</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: 羁绊墨痕 -->
+      <div class="ink-panel-box" id="panel-growth" style="display: none;">
+        <div class="panel-caption-row">
+          <span>案头默契深浅</span>
+          <span style="color:var(--gold-wire);">第三阶 莫逆之交</span>
+        <div class="ink-growth-box">
+          <div class="growth-header-row">
+            <span>连续伴案第十四日</span>
+            <span style="color:var(--gold-wire); font-weight:600;">340 / 500 墨痕值</span>
+          </div>
+          <div class="ink-rail">
+            <div class="ink-rail-fill"></div>
+          </div>
+          <div style="font-size:12px; color:var(--text-stone-muted);">
+            言谈抚慰皆化作案头墨痕，伴侣回话将随日久而益显心照不宣。
+          </div>
+        </div>
+      </div>
+
+      <!-- 快速交互演示 -->
+      <div class="ink-demo-actions">
+        <button class="btn-ink-action" id="btnDemoSpeak">模拟开嗓播报</button>
+        <button class="btn-ink-action" id="btnDemoBargeIn">模拟毫秒打断</button>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // 砚池墨滴微晕动画
+    const canvas = document.getElementById("inkCanvas");
+    const ctx = canvas.getContext("2d");
+    let state = "idle"; // "idle" | "speaking" | "bargein"
+
+    function renderInk() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const time = Date.now() * 0.002;
+
+      // 墨波扩散
+      const rings = 3;
+      for (let i = 0; i < rings; i++) {
+        let r = ((time * 12 + i * 9) % 24) + 6;
+        let alpha = 1 - r / 30;
+        if (state === "speaking") {
+          alpha *= 0.8;
+          ctx.strokeStyle = `rgba(197, 160, 89, ${alpha})`;
+        } else if (state === "bargein") {
+          ctx.strokeStyle = `rgba(185, 28, 28, ${alpha})`;
+        } else {
+          ctx.strokeStyle = `rgba(168, 162, 158, ${alpha * 0.4})`;
+        }
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      requestAnimationFrame(renderInk);
+    }
+    renderInk();
+
+    // 交互逻辑
+    const btnToggleAccordion = document.getElementById("btnToggleAccordion");
+    const accordionHub = document.getElementById("accordionHub");
+    btnToggleAccordion.addEventListener("click", () => {
+      accordionHub.classList.toggle("collapsed");
+    });
+
+    const transcriptText = document.getElementById("transcriptText");
+    const statePill = document.getElementById("statePill");
+    const btnDemoSpeak = document.getElementById("btnDemoSpeak");
+    const btnDemoBargeIn = document.getElementById("btnDemoBargeIn");
+    const btnBargeIn = document.getElementById("btnBargeIn");
+    const inkwellBtn = document.getElementById("inkwellBtn");
+
+    btnDemoSpeak.addEventListener("click", () => {
+      state = "speaking";
+      statePill.innerText = "开嗓发音中";
+      statePill.style.color = "#fef08a";
+      transcriptText.innerText = "关于端云双环架构的极速切片，当前端侧 Swift ASR 耗时已收敛在 78ms 左右...";
+    });
+
+    function triggerBargeIn() {
+      state = "bargein";
+      statePill.innerText = "毫秒打断生效";
+      statePill.style.color = "#fca5a5";
+      transcriptText.innerText = "[已掐断语音播报] 毫秒截断生效，正在聆听您的新吩咐...";
+      setTimeout(() => {
+        state = "idle";
+        statePill.innerText = "双环静候";
+        statePill.style.color = "#fca5a5";
+        transcriptText.innerText = "君子案头 清供有声，随时开嗓倾谈...";
+      }, 1800);
+    }
+
+    btnDemoBargeIn.addEventListener("click", triggerBargeIn);
+    btnBargeIn.addEventListener("click", triggerBargeIn);
+    inkwellBtn.addEventListener("click", triggerBargeIn);
+
+    // Tab 切换
+    const tabBtns = document.querySelectorAll(".ink-tab-btn");
+    const panels = {
+      "tab-slips": document.getElementById("panel-slips"),
+      "tab-persona": document.getElementById("panel-persona"),
+      "tab-growth": document.getElementById("panel-growth")
+    };
+    tabBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        tabBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const target = btn.dataset.tab;
+        Object.keys(panels).forEach(k => {
+          panels[k].style.display = k === target ? "flex" : "none";
+        });
+      });
+    });
+
+    // 人格切换
+    const scrollCards = document.querySelectorAll(".scroll-card");
+    scrollCards.forEach(card => {
+      card.addEventListener("click", () => {
+        scrollCards.forEach(c => c.classList.remove("active"));
+        card.classList.add("active");
+      });
+    });
+  </script>
+</body>
+</html>

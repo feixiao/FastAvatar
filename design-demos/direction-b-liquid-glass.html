@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avatar macOS · 方向 B：空间液态玻璃 (Liquid Glass Companion)</title>
+  <style>
+    :root {
+      --glass-bg: rgba(255, 255, 255, 0.12);
+      --glass-border: rgba(255, 255, 255, 0.28);
+      --glass-shine: rgba(255, 255, 255, 0.45);
+      --glass-shadow: 0 24px 50px rgba(0, 0, 0, 0.45), 0 2px 10px rgba(0, 0, 0, 0.25);
+      --accent-cyan: #38bdf8;
+      --accent-blue: #3b82f6;
+      --accent-violet: #a855f7;
+      --accent-amber: #f59e0b;
+      --text-white: #ffffff;
+      --text-soft: rgba(255, 255, 255, 0.85);
+      --text-dimmed: rgba(255, 255, 255, 0.65);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      /* 模拟 macOS 26 Tahoe 高动态自然光影壁纸 */
+      background: radial-gradient(circle at 15% 20%, #2e1065 0%, transparent 45%),
+                  radial-gradient(circle at 85% 15%, #0369a1 0%, transparent 50%),
+                  radial-gradient(circle at 50% 80%, #064e3b 0%, transparent 60%),
+                  #090d16;
+      color: var(--text-white);
+    }
+
+    /* 模拟 macOS 顶部半透明菜单栏 */
+    .macos-menubar {
+      height: 34px;
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 18px;
+      font-size: 13px;
+      color: var(--text-soft);
+      z-index: 50;
+    }
+    .menubar-left, .menubar-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .app-brand-title {
+      font-weight: 600;
+      color: #fff;
+    }
+    .status-capsule-sm {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: var(--text-soft);
+    }
+    .pulse-dot-green {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+    /* 桌面工作区 */
+    .desktop-stage {
+      flex: 1;
+      padding: 40px 36px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 22px;
+      position: relative;
+    }
+
+    .watermark-hero {
+      position: absolute;
+      left: 44px;
+      top: 44px;
+      max-width: 500px;
+      pointer-events: none;
+    }
+    .watermark-title {
+      font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+      margin-bottom: 10px;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    }
+    .watermark-sub {
+      font-size: 14px;
+      color: var(--text-soft);
+      line-height: 1.6;
+      margin-bottom: 18px;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    }
+    .feature-tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .feature-tag {
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.14);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    /* ==================== 1. 悬浮液态玻璃胶囊 ==================== */
+    .liquid-capsule {
+      width: 410px;
+      height: 72px;
+      border-radius: 36px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(32px) saturate(200%);
+      -webkit-backdrop-filter: blur(32px) saturate(200%);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow), inset 0 1px 1px var(--glass-shine);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 14px;
+      position: relative;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .liquid-capsule:hover {
+      box-shadow: 0 28px 60px rgba(0, 0, 0, 0.55), inset 0 1px 1.5px rgba(255,255,255,0.6);
+      border-color: rgba(255, 255, 255, 0.38);
+    }
+
+    /* 灵动光灵核 (Luminescent Sprite Canvas) */
+    .sprite-stage {
+      width: 46px;
+      height: 46px;
+      position: relative;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .sprite-canvas {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+    }
+    .sprite-halo {
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.3) 0%, transparent 70%);
+      pointer-events: none;
+      animation: pulseHalo 3s infinite ease-in-out;
+    }
+    @keyframes pulseHalo {
+      0%, 100% { transform: scale(0.92); opacity: 0.6; }
+      50% { transform: scale(1.15); opacity: 1; }
+    }
+
+    /* 中间信息区 */
+    .capsule-info-block {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      overflow: hidden;
+    }
+    .capsule-header-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .companion-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #ffffff;
+      letter-spacing: -0.2px;
+    }
+    .persona-pill-badge {
+      font-size: 12px;
+      font-weight: 500;
+      padding: 1px 8px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.16);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #e0f2fe;
+    }
+    .live-status-subtitle {
+      font-size: 13px;
+      color: var(--text-soft);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 右侧悬浮动作按钮组 */
+    .capsule-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .glass-action-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 17px;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #ffffff;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .glass-action-btn:hover {
+      background: rgba(255, 255, 255, 0.24);
+      border-color: rgba(255, 255, 255, 0.4);
+      transform: scale(1.05);
+    }
+    .glass-action-btn:active {
+      transform: scale(0.95);
+    }
+    .glass-action-btn.active {
+      background: rgba(56, 189, 248, 0.3);
+      border-color: rgba(56, 189, 248, 0.5);
+      color: #38bdf8;
+    }
+    .glass-action-btn.danger-action:hover {
+      background: rgba(239, 68, 68, 0.3);
+      border-color: rgba(239, 68, 68, 0.5);
+      color: #fca5a5;
+    }
+    .svg-icon {
+      width: 17px;
+      height: 17px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* ==================== 2. 空间液态伴侣中枢 (Spatial Liquid Hub) ==================== */
+    .spatial-hub {
+      width: 410px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(36px) saturate(210%);
+      -webkit-backdrop-filter: blur(36px) saturate(210%);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow), inset 0 1px 1px var(--glass-shine);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .spatial-hub.collapsed {
+      max-height: 0;
+      opacity: 0;
+      padding: 0;
+      border: none;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .hub-navigation-tabs {
+      display: flex;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+      padding: 4px;
+      gap: 4px;
+    }
+    .hub-tab-item {
+      flex: 1;
+      padding: 8px 0;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-soft);
+      text-align: center;
+      border-radius: 9px;
+      cursor: pointer;
+      background: transparent;
+      border: none;
+      transition: all 0.2s ease;
+    }
+    .hub-tab-item.active {
+      background: rgba(255, 255, 255, 0.22);
+      color: #ffffff;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .hub-pane-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .section-headline {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.9);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* 毛玻璃信息卡片 */
+    .glass-card-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+    .card-label-key {
+      color: var(--text-soft);
+    }
+    .card-label-val {
+      color: #ffffff;
+      font-weight: 500;
+    }
+
+    /* 多模态星轨选择 */
+    .orbit-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .orbit-card {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 14px;
+      padding: 12px 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .orbit-card.active {
+      background: rgba(56, 189, 248, 0.22);
+      border-color: rgba(56, 189, 248, 0.5);
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
+    }
+    .orbit-card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+    .orbit-card-sub {
+      font-size: 12px;
+      color: var(--text-soft);
+      margin-top: 4px;
+    }
+
+    /* 极光进度条 (Aurora Progress) */
+    .aurora-box {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .aurora-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: var(--text-soft);
+    }
+    .aurora-track {
+      height: 8px;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+    .aurora-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 68%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
+      box-shadow: 0 0 12px rgba(129, 140, 248, 0.6);
+    }
+
+    /* 模拟交互动作条 */
+    .interactive-demo-bar {
+      display: flex;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .glass-btn-wide {
+      flex: 1;
+      padding: 10px 0;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .glass-btn-wide:hover {
+      background: rgba(255, 255, 255, 0.22);
+      border-color: rgba(255, 255, 255, 0.35);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 模拟 macOS 菜单栏 -->
+  <div class="macos-menubar">
+    <div class="menubar-left">
+      <span></span>
+      <span class="app-brand-title">Avatar</span>
+      <span>视图</span>
+      <span>空间形态</span>
+      <span>记忆库</span>
+      <span>窗口</span>
+    </div>
+    <div class="menubar-right">
+      <div class="status-capsule-sm">
+        <span class="pulse-dot-green"></span>
+        <span>端云全双工就绪</span>
+      </div>
+      <div class="status-capsule-sm">
+        <span>时延 72ms</span>
+      </div>
+      <span>20:48</span>
+    </div>
+  </div>
+
+  <div class="desktop-stage">
+
+    <div class="watermark-hero">
+      <div class="watermark-title">方向 B · 空间液态玻璃</div>
+      <div class="watermark-sub">
+        基于 Apple macOS Tahoe 26 液态玻璃 (Liquid Glass) 与空间微光灵核。
+        利用环境折射高透玻璃（blur 32px saturate 200%）自适应桌面背景，以动态呼吸光灵取代粗糙像素桌宠，无缝融入 macOS 视觉空间。
+      </div>
+      <div class="feature-tag-list">
+        <span class="feature-tag">环境漫反射高折射玻璃</span>
+        <span class="feature-tag">Canvas 粒子光灵生命体</span>
+        <span class="feature-tag">柔光弥散极光轨迹</span>
+        <span class="feature-tag">平滑展开空间中枢</span>
+      </div>
+    </div>
+
+    <!-- 1. 悬浮液态玻璃胶囊 -->
+    <div class="liquid-capsule" id="liquidCapsule">
+      
+      <!-- 灵动光灵核 -->
+      <div class="sprite-stage" id="spriteStage" title="点击光灵核打断或重置">
+        <canvas class="sprite-canvas" id="spriteCanvas" width="46" height="46"></canvas>
+        <div class="sprite-halo"></div>
+      </div>
+
+      <!-- 信息与字幕 -->
+      <div class="capsule-info-block">
+        <div class="capsule-header-row">
+          <span class="companion-title">Avatar 伴侣</span>
+          <span class="persona-pill-badge" id="personaBadge">知心伴侣</span>
+          <span style="font-size:12px; color:rgba(255,255,255,0.7);">端云双环</span>
+        </div>
+        <div class="live-status-subtitle" id="statusSubtitle">
+          随时开口与我畅聊，实时共振中...
+        </div>
+      </div>
+
+      <!-- 右侧快捷动作 -->
+      <div class="capsule-actions">
+        <button class="glass-action-btn active" id="btnMicAction" title="麦克风开关">
+          <svg class="svg-icon" viewBox="0 0 24 24">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="22"></line>
+          </svg>
+        </button>
+        <button class="glass-action-btn danger-action" id="btnBargeInAction" title="毫秒打断发音">
+          <svg class="svg-icon" viewBox="0 0 24 24">
+            <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+          </svg>
+        </button>
+        <button class="glass-action-btn" id="btnToggleHub" title="展开/收起空间伴侣中枢">
+          <svg class="svg-icon" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- 2. 空间液态伴侣中枢 (Spatial Liquid Hub) -->
+    <div class="spatial-hub" id="spatialHub">
+      <div class="hub-navigation-tabs">
+        <button class="hub-tab-item active" data-tab="tab-insights">画像记忆</button>
+        <button class="hub-tab-item" data-tab="tab-orbit">人格星轨</button>
+        <button class="hub-tab-item" data-tab="tab-aurora">羁绊极光</button>
+      </div>
+
+      <!-- Tab 1: 画像记忆 -->
+      <div class="hub-pane-section" id="pane-insights">
+        <div class="section-headline">
+          <span>端侧画像插槽 (Zero-Retention)</span>
+          <span style="font-size:12px; color:#34d399;">物理加密隔离</span>
+        </div>
+        <div class="glass-card-group">
+          <div class="glass-card">
+            <span class="card-label-key">咖啡偏好</span>
+            <span class="card-label-val">美式不加糖</span>
+          </div>
+          <div class="glass-card">
+            <span class="card-label-key">设备架构</span>
+            <span class="card-label-val">Apple M3 Pro 36GB</span>
+          </div>
+          <div class="glass-card">
+            <span class="card-label-key">最近讨论</span>
+            <span class="card-label-val">端云双环全双工协议</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: 人格星轨 -->
+      <div class="hub-pane-section" id="pane-orbit" style="display: none;">
+        <div class="section-headline">
+          <span>多模态人格星轨</span>
+          <span style="font-size:12px; color:rgba(255,255,255,0.7);">时段自动流转已开启</span>
+        </div>
+        <div class="orbit-grid">
+          <div class="orbit-card active" data-persona="知心伴侣">
+            <div class="orbit-card-title">知心伴侣</div>
+            <div class="orbit-card-sub">温润共情 案头陪伴</div>
+          </div>
+          <div class="orbit-card" data-persona="幕僚助手">
+            <div class="orbit-card-title">幕僚助手</div>
+            <div class="orbit-card-sub">严谨高效 重点提炼</div>
+          </div>
+          <div class="orbit-card" data-persona="极客专家">
+            <div class="orbit-card-title">极客专家</div>
+            <div class="orbit-card-sub">代码解析 架构推演</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: 羁绊极光 -->
+      <div class="hub-pane-section" id="pane-aurora" style="display: none;">
+        <div class="section-headline">
+          <span>伴侣羁绊极光</span>
+          <span style="font-size:12px; color:#38bdf8;">Lv.3 默契伴侣</span>
+        </div>
+        <div class="aurora-box">
+          <div class="aurora-header">
+            <span>连续陪伴天数</span>
+            <span style="color:#ffffff; font-weight:600;">14 天</span>
+          </div>
+          <div class="aurora-track">
+            <div class="aurora-fill"></div>
+          </div>
+          <div style="font-size:12px; color:rgba(255,255,255,0.7); display:flex; justify-content:space-between;">
+            <span>经验积累 340 XP</span>
+            <span>下一等级 500 XP</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 快速调试动作 -->
+      <div class="interactive-demo-bar">
+        <button class="glass-btn-wide" id="btnDemoSpeak">模拟伴侣发音</button>
+        <button class="glass-btn-wide" id="btnDemoBargeIn">模拟毫秒打断</button>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // 灵动光灵粒子画布渲染
+    const canvas = document.getElementById("spriteCanvas");
+    const ctx = canvas.getContext("2d");
+    let state = "idle"; // "idle" | "speaking" | "interrupted"
+
+    function renderSprite() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const time = Date.now() * 0.003;
+
+      // 外层柔光粒子环
+      const particleCount = 12;
+      for (let i = 0; i < particleCount; i++) {
+        const angle = (i / particleCount) * Math.PI * 2 + time * 0.4;
+        let dist = 14 + Math.sin(time * 2 + i) * 2;
+        if (state === "speaking") {
+          dist = 14 + Math.sin(time * 6 + i) * 5;
+        }
+
+        const px = cx + Math.cos(angle) * dist;
+        const py = cy + Math.sin(angle) * dist;
+        
+        ctx.beginPath();
+        ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = state === "speaking" ? "rgba(245, 158, 11, 0.7)" : "rgba(56, 189, 248, 0.7)";
+        ctx.fill();
+      }
+
+      // 中心呼吸核心
+      const coreGrad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 14);
+      if (state === "speaking") {
+        coreGrad.addColorStop(0, "#ffffff");
+        coreGrad.addColorStop(0.5, "#fbbf24");
+        coreGrad.addColorStop(1, "rgba(245, 158, 11, 0)");
+      } else if (state === "interrupted") {
+        coreGrad.addColorStop(0, "#ffffff");
+        coreGrad.addColorStop(0.5, "#f87171");
+        coreGrad.addColorStop(1, "rgba(239, 68, 68, 0)");
+      } else {
+        coreGrad.addColorStop(0, "#ffffff");
+        coreGrad.addColorStop(0.5, "#38bdf8");
+        coreGrad.addColorStop(1, "rgba(59, 130, 246, 0)");
+      }
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+      ctx.fillStyle = coreGrad;
+      ctx.fill();
+
+      requestAnimationFrame(renderSprite);
+    }
+    renderSprite();
+
+    // 交互响应
+    const btnToggleHub = document.getElementById("btnToggleHub");
+    const spatialHub = document.getElementById("spatialHub");
+    btnToggleHub.addEventListener("click", () => {
+      spatialHub.classList.toggle("collapsed");
+    });
+
+    const statusSubtitle = document.getElementById("statusSubtitle");
+    const btnDemoSpeak = document.getElementById("btnDemoSpeak");
+    const btnDemoBargeIn = document.getElementById("btnDemoBargeIn");
+    const btnBargeInAction = document.getElementById("btnBargeInAction");
+
+    btnDemoSpeak.addEventListener("click", () => {
+      state = "speaking";
+      statusSubtitle.innerText = "正在为您梳理今日全双工架构演进关键点...";
+    });
+
+    function triggerBargeIn() {
+      state = "interrupted";
+      statusSubtitle.innerText = "[80ms 毫秒打断触发] 已掐断音频输出，正在聆听您的新输入...";
+      setTimeout(() => {
+        state = "idle";
+        statusSubtitle.innerText = "随时开口与我畅聊，实时共振中...";
+      }, 1800);
+    }
+
+    btnDemoBargeIn.addEventListener("click", triggerBargeIn);
+    btnBargeInAction.addEventListener("click", triggerBargeIn);
+
+    // Tab 切换
+    const tabItems = document.querySelectorAll(".hub-tab-item");
+    const panes = {
+      "tab-insights": document.getElementById("pane-insights"),
+      "tab-orbit": document.getElementById("pane-orbit"),
+      "tab-aurora": document.getElementById("pane-aurora")
+    };
+    tabItems.forEach(item => {
+      item.addEventListener("click", () => {
+        tabItems.forEach(t => t.classList.remove("active"));
+        item.classList.add("active");
+        const target = item.dataset.tab;
+        Object.keys(panes).forEach(k => {
+          panes[k].style.display = k === target ? "flex" : "none";
+        });
+      });
+    });
+
+    // 人格切换
+    const orbitCards = document.querySelectorAll(".orbit-card");
+    const personaBadge = document.getElementById("personaBadge");
+    orbitCards.forEach(card => {
+      card.addEventListener("click", () => {
+        orbitCards.forEach(c => c.classList.remove("active"));
+        card.classList.add("active");
+        personaBadge.innerText = card.dataset.persona;
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avatar macOS · 方向 B：挺括纸感案头 (Things 3 Crisp Paper)</title>
+  <style>
+    :root {
+      --paper-bg: #ffffff;
+      --paper-card: #f9fafb;
+      --paper-border: rgba(0, 0, 0, 0.08);
+      --paper-shadow: 0 16px 36px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+      --apple-blue: #0051ba;
+      --apple-blue-dim: #eff6ff;
+      --star-amber: #92400e;
+      --success-green: #047857;
+      --bargein-coral: #b91c1c;
+      --text-primary: #111827;
+      --text-secondary: #374151;
+      --text-tertiary: #4b5563;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      /* macOS 浅色自然晨光桌面 */
+      background: linear-gradient(135deg, #f0f4f9 0%, #e2e8f0 50%, #dbe4ee 100%);
+      color: var(--text-primary);
+    }
+
+    /* 模拟 macOS 浅色系统菜单栏 */
+    .macos-menubar {
+      height: 32px;
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      z-index: 50;
+    }
+    .menubar-items {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    .menubar-brand {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .status-capsule-light {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.05);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      color: var(--text-secondary);
+    }
+    .dot-green-light {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success-green);
+    }
+
+    /* 桌面工作区 */
+    .desktop-viewport {
+      flex: 1;
+      padding: 40px 36px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 20px;
+      position: relative;
+    }
+
+    .hero-watermark {
+      position: absolute;
+      left: 44px;
+      top: 44px;
+      max-width: 500px;
+      pointer-events: none;
+    }
+    .hero-title {
+      font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #111827;
+      margin-bottom: 8px;
+    }
+    .hero-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+    .pill-tag-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .pill-tag {
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      color: var(--text-secondary);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+    }
+
+    /* ==================== 1. 挺括纸感浮动胶囊 (Things 3 Capsule) ==================== */
+    .paper-capsule {
+      width: 410px;
+      height: 68px;
+      border-radius: 34px;
+      background: var(--paper-bg);
+      border: 1px solid var(--paper-border);
+      box-shadow: var(--paper-shadow);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 14px;
+      position: relative;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .paper-capsule:hover {
+      box-shadow: 0 20px 42px rgba(0, 0, 0, 0.12), 0 3px 8px rgba(0, 0, 0, 0.05);
+      transform: translateY(-1px);
+    }
+
+    /* 呼吸萌伴微光球 (Aura Sprite) */
+    .companion-aura {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #93c5fd, #3b82f6 70%);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+      position: relative;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s ease;
+    }
+    .companion-aura:active {
+      transform: scale(0.92);
+    }
+    .aura-face {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+    .aura-eye {
+      width: 4px;
+      height: 6px;
+      border-radius: 2px;
+      background: #ffffff;
+      animation: blink 4s infinite ease-in-out;
+    }
+    @keyframes blink {
+      0%, 96%, 100% { transform: scaleY(1); }
+      98% { transform: scaleY(0.1); }
+    }
+
+    /* 中段信息文本 */
+    .capsule-text-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      overflow: hidden;
+    }
+    .capsule-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .paper-companion-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .paper-persona-pill {
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: #eff6ff;
+      border: 1px solid #dbeafe;
+      color: #1d4ed8;
+      font-weight: 600;
+    }
+    .paper-status-caption {
+      font-size: 13px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 右侧动作按键 */
+    .capsule-button-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .paper-icon-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 17px;
+      background: #f3f4f6;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.15s ease;
+    }
+    .paper-icon-btn:hover {
+      background: #e5e7eb;
+      color: var(--text-primary);
+    }
+    .paper-icon-btn.active {
+      background: var(--apple-blue-dim);
+      color: var(--apple-blue);
+      border-color: rgba(0, 122, 255, 0.2);
+    }
+    .paper-svg {
+      width: 17px;
+      height: 17px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* ==================== 2. 案头手账中枢 (Things 3 Companion Drawer) ==================== */
+    .paper-drawer {
+      width: 410px;
+      background: var(--paper-bg);
+      border: 1px solid var(--paper-border);
+      border-radius: 20px;
+      box-shadow: 0 24px 50px rgba(0, 0, 0, 0.1), 0 3px 8px rgba(0, 0, 0, 0.04);
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .paper-drawer.collapsed {
+      max-height: 0;
+      opacity: 0;
+      padding: 0;
+      border: none;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    /* 手账顶部抬头 */
+    .drawer-top-banner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #f3f4f6;
+      padding-bottom: 14px;
+    }
+    .drawer-heading {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .streak-star-pill {
+      font-size: 12px;
+      font-weight: 600;
+      color: #92400e;
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      padding: 3px 8px;
+      border-radius: 8px;
+    }
+
+    /* Things 3 风格 Tab 栏 */
+    .paper-tab-bar {
+      display: flex;
+      background: #f3f4f6;
+      border-radius: 10px;
+      padding: 3px;
+      gap: 3px;
+    }
+    .paper-tab {
+      flex: 1;
+      padding: 7px 0;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      border-radius: 8px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+    .paper-tab.active {
+      background: #ffffff;
+      color: var(--text-primary);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+
+    /* 内容面板 */
+    .paper-panel-view {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .list-section-caption {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Things 3 精致备忘列表 */
+    .checklist-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .check-row {
+      background: #f9fafb;
+      border: 1px solid rgba(0, 0, 0, 0.04);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+    .check-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-primary);
+    }
+    .square-checkbox {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      border: 1.8px solid var(--apple-blue);
+      background: var(--apple-blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 11px;
+    }
+    .check-tag {
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    /* 多模态人格选项 */
+    .persona-chip-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .persona-chip-card {
+      background: #f9fafb;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 10px;
+      padding: 12px 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .persona-chip-card.active {
+      background: var(--apple-blue-dim);
+      border-color: rgba(0, 122, 255, 0.35);
+    }
+    .persona-chip-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .persona-chip-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* 羁绊进度条 */
+    .bond-card-light {
+      background: #f9fafb;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .bond-row-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+    }
+    .progress-bar-rail {
+      height: 7px;
+      border-radius: 4px;
+      background: #e5e7eb;
+      position: relative;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 68%;
+      background: var(--apple-blue);
+      border-radius: 4px;
+    }
+
+    /* 快捷交互测试 */
+    .paper-action-bar {
+      display: flex;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .paper-btn-full {
+      flex: 1;
+      padding: 9px 0;
+      border-radius: 10px;
+      background: #f3f4f6;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .paper-btn-full:hover {
+      background: #e5e7eb;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- macOS 模拟浅色菜单栏 -->
+  <div class="macos-menubar">
+    <div class="menubar-items">
+      <span></span>
+      <span class="menubar-brand">Avatar</span>
+      <span>文件</span>
+      <span>手账本</span>
+      <span>伴侣偏好</span>
+      <span>窗口</span>
+    </div>
+    <div class="menubar-items">
+      <div class="status-capsule-light">
+        <span class="dot-green-light"></span>
+        <span>端侧快环 150ms 就绪</span>
+      </div>
+      <div class="status-capsule-light">
+        <span>常驻内存 26MB</span>
+      </div>
+      <span>20:48</span>
+    </div>
+  </div>
+
+  <div class="desktop-viewport">
+
+    <div class="hero-watermark">
+      <div class="hero-title">方向 B · 挺括纸感案头</div>
+      <div class="hero-desc">
+        现实参照 (Things 3 纯白精修美学)。
+        如同案头一张干净挺括的白纸，舒展的人文无衬线排印与柔和弥散阴影，将 AI 伴侣化作晨间案头手账，温润陪伴且毫无视觉压迫。
+      </div>
+      <div class="pill-tag-group">
+        <span class="pill-tag">纯白挺括纸感底板</span>
+        <span class="pill-tag">0 2px 8px 柔和弥散双层阴影</span>
+        <span class="pill-tag">Things 3 活页备忘手账</span>
+        <span class="pill-tag">灵动呼吸光灵萌伴</span>
+      </div>
+    </div>
+
+    <!-- 1. 挺括纸感浮动胶囊 -->
+    <div class="paper-capsule" id="paperCapsule">
+      
+      <!-- 呼吸萌伴微光球 -->
+      <div class="companion-aura" id="companionAura" title="点击打断或互动">
+        <div class="aura-face">
+          <div class="aura-eye"></div>
+          <div class="aura-eye"></div>
+        </div>
+      </div>
+
+      <!-- 胶囊文本区 -->
+      <div class="capsule-text-col">
+        <div class="capsule-title-row">
+          <span class="paper-companion-name">Avatar 案头伴侣</span>
+          <span class="paper-persona-pill" id="personaBadge">知心伴侣</span>
+          <span style="font-size:12px; color:var(--text-tertiary);">端云双环</span>
+        </div>
+        <div class="paper-status-caption" id="statusCaption">
+          清晨好，随时开口与我畅聊...
+        </div>
+      </div>
+
+      <!-- 右侧动作按键 -->
+      <div class="capsule-button-group">
+        <button class="paper-icon-btn active" id="btnMicSwitch" title="麦克风开关">
+          <svg class="paper-svg" viewBox="0 0 24 24">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="22"></line>
+          </svg>
+        </button>
+        <button class="paper-icon-btn" id="btnBargeIn" title="一键打断发音">
+          <svg class="paper-svg" viewBox="0 0 24 24">
+            <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+          </svg>
+        </button>
+        <button class="paper-icon-btn" id="btnToggleDrawer" title="展开/收起伴侣手账">
+          <svg class="paper-svg" viewBox="0 0 24 24">
+            <line x1="4" y1="7" x2="20" y2="7"></line>
+            <line x1="4" y1="12" x2="20" y2="12"></line>
+            <line x1="4" y1="17" x2="20" y2="17"></line>
+          </svg>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- 2. 案头手账中枢 (Things 3 Drawer) -->
+    <div class="paper-drawer" id="paperDrawer">
+      
+      <div class="drawer-top-banner">
+        <div class="drawer-heading">
+          <span>今日伴侣手账</span>
+        </div>
+        <div class="streak-star-pill">连续陪伴 14 天</div>
+      </div>
+
+      <div class="paper-tab-bar">
+        <button class="paper-tab active" data-tab="tab-notes">生活偏好</button>
+        <button class="paper-tab" data-tab="tab-persona">人格形态</button>
+        <button class="paper-tab" data-tab="tab-growth">默契成长</button>
+      </div>
+
+      <!-- Tab 1: 生活偏好 -->
+      <div class="paper-panel-view" id="panel-notes">
+        <div class="list-section-caption">
+          <span>端侧画像备忘录 (Zero-Retention)</span>
+          <span style="font-size:12px; color:var(--success-green);">已加密保护</span>
+        </div>
+        <div class="checklist-container">
+          <div class="check-row">
+            <div class="check-title">
+              <div class="square-checkbox">✓</div>
+              <span>饮食偏好：美式咖啡 不加糖</span>
+            </div>
+            <span class="check-tag">长期记忆</span>
+          </div>
+          <div class="check-row">
+            <div class="check-title">
+              <div class="square-checkbox">✓</div>
+              <span>工作习惯：默认 23:00 免打扰</span>
+            </div>
+            <span class="check-tag">时区偏好</span>
+          </div>
+          <div class="check-row">
+            <div class="check-title">
+              <div class="square-checkbox">✓</div>
+              <span>技术技术栈：Swift / Go / TypeScript</span>
+            </div>
+            <span class="check-tag">开发画像</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: 人格形态 -->
+      <div class="paper-panel-view" id="panel-persona" style="display: none;">
+        <div class="list-section-caption">
+          <span>选择当前陪伴形态</span>
+          <span style="font-size:12px; color:var(--text-tertiary);">时段自动流转已开启</span>
+        </div>
+        <div class="persona-chip-grid">
+          <div class="persona-chip-card active" data-name="知心伴侣">
+            <div class="persona-chip-name">知心伴侣</div>
+            <div class="persona-chip-sub">温润共情 案头倾听</div>
+          </div>
+          <div class="persona-chip-card" data-name="幕僚助手">
+            <div class="persona-chip-name">幕僚助手</div>
+            <div class="persona-chip-sub">严谨干练 快速摘要</div>
+          </div>
+          <div class="persona-chip-card" data-name="极客专家">
+            <div class="persona-chip-name">极客专家</div>
+            <div class="persona-chip-sub">架构分析 代码推演</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: 默契成长 -->
+      <div class="paper-panel-view" id="panel-growth" style="display: none;">
+        <div class="list-section-caption">
+          <span>羁绊与默契度成长</span>
+          <span style="font-size:12px; color:var(--apple-blue);">Lv.3 默契伴侣</span>
+        </div>
+        <div class="bond-card-light">
+          <div class="bond-row-title">
+            <span style="color:var(--text-primary); font-weight:600;">亲密度进度</span>
+            <span style="color:var(--apple-blue); font-weight:600;">340 / 500 XP</span>
+          </div>
+          <div class="progress-bar-rail">
+            <div class="progress-bar-fill"></div>
+          </div>
+          <div style="font-size:12px; color:var(--text-secondary);">
+            每天与桌宠对话、抚摸互动即可获得亲密度，伴侣语气将随羁绊深化。
+          </div>
+        </div>
+      </div>
+
+      <!-- 快速调试交互 -->
+      <div class="paper-action-bar">
+        <button class="paper-btn-full" id="btnSimulateSpeak">模拟伴侣发音</button>
+        <button class="paper-btn-full" id="btnSimulateInterrupt">模拟毫秒打断</button>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // 抽屉展开折叠
+    const btnToggleDrawer = document.getElementById("btnToggleDrawer");
+    const paperDrawer = document.getElementById("paperDrawer");
+    btnToggleDrawer.addEventListener("click", () => {
+      paperDrawer.classList.toggle("collapsed");
+    });
+
+    // 状态模拟
+    const statusCaption = document.getElementById("statusCaption");
+    const btnSimulateSpeak = document.getElementById("btnSimulateSpeak");
+    const btnSimulateInterrupt = document.getElementById("btnSimulateInterrupt");
+    const btnBargeIn = document.getElementById("btnBargeIn");
+    const companionAura = document.getElementById("companionAura");
+
+    btnSimulateSpeak.addEventListener("click", () => {
+      companionAura.style.background = "radial-gradient(circle at 35% 35%, #fde68a, #f59e0b 70%)";
+      companionAura.style.boxShadow = "0 4px 14px rgba(245, 158, 11, 0.4)";
+      statusCaption.innerText = "正在为您播报今日晨间简报与待办要点...";
+    });
+
+    function triggerInterrupt() {
+      companionAura.style.background = "radial-gradient(circle at 35% 35%, #fca5a5, #ef4444 70%)";
+      companionAura.style.boxShadow = "0 4px 14px rgba(239, 68, 68, 0.4)";
+      statusCaption.innerText = "[80ms 毫秒打断生效] 已掐断播报，正在倾听您的新指令...";
+      setTimeout(() => {
+        companionAura.style.background = "radial-gradient(circle at 35% 35%, #93c5fd, #3b82f6 70%)";
+        companionAura.style.boxShadow = "0 4px 12px rgba(59, 130, 246, 0.35)";
+        statusCaption.innerText = "清晨好，随时开口与我畅聊...";
+      }, 1800);
+    }
+
+    btnSimulateInterrupt.addEventListener("click", triggerInterrupt);
+    btnBargeIn.addEventListener("click", triggerInterrupt);
+    companionAura.addEventListener("click", triggerInterrupt);
+
+    // Tab 切换
+    const tabs = document.querySelectorAll(".paper-tab");
+    const panels = {
+      "tab-notes": document.getElementById("panel-notes"),
+      "tab-persona": document.getElementById("panel-persona"),
+      "tab-growth": document.getElementById("panel-growth")
+    };
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        tabs.forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        const target = tab.dataset.tab;
+        Object.keys(panels).forEach(k => {
+          panels[k].style.display = k === target ? "flex" : "none";
+        });
+      });
+    });
+
+    // 人格切换
+    const personaCards = document.querySelectorAll(".persona-chip-card");
+    const personaBadge = document.getElementById("personaBadge");
+    personaCards.forEach(card => {
+      card.addEventListener("click", () => {
+        personaCards.forEach(c => c.classList.remove("active"));
+        card.classList.add("active");
+        personaBadge.innerText = card.dataset.name;
+      });
+    });
+  </script>
+</body>
+</html>
