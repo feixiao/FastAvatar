@@ -37,14 +37,14 @@ private:
     void RunLoop();
 
     std::atomic<bool> is_running_{false};
+    std::atomic<bool> is_armed_{false};
     std::atomic<bool> fed_{false};
-    int timeout_ms_{3000};
+    std::chrono::steady_clock::time_point deadline_;
     std::function<void()> on_timeout_;
 
     std::thread worker_thread_;
     std::mutex mtx_;
     std::condition_variable cv_;
-    std::mutex start_stop_mtx_;
 };
 
 } // namespace audio_agent

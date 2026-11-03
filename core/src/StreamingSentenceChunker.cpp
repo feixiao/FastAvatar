@@ -11,7 +11,9 @@ StreamingSentenceChunker::StreamingSentenceChunker(SentenceChunkerCallbacks call
 
 void StreamingSentenceChunker::Reset() {
     buffer_.clear();
+    buffer_.reserve(128);
     history_for_repetition_.clear();
+    history_for_repetition_.reserve(64);
     is_first_sentence_ = true;
     in_tool_call_ = false;
     has_dispatched_tool_ = false;
@@ -188,9 +190,10 @@ bool StreamingSentenceChunker::CheckPunctuation(std::string_view token) const {
  * 与紧挨着其前面的子串完全一致，则判定为发生复读退化。
  */
 bool StreamingSentenceChunker::DetectRepetition(std::string_view new_text) {
+    constexpr size_t max_history = REPETITION_TRIGGER_BYTES * 2;
     history_for_repetition_.append(new_text.data(), new_text.size());
-    if (history_for_repetition_.size() > 256) {
-        history_for_repetition_.erase(0, history_for_repetition_.size() - 256);
+    if (history_for_repetition_.size() > max_history) {
+        history_for_repetition_.erase(0, history_for_repetition_.size() - max_history);
     }
 
     const size_t sz = history_for_repetition_.size();
