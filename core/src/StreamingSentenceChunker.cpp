@@ -16,6 +16,7 @@ void StreamingSentenceChunker::Reset() {
     history_for_repetition_.reserve(64);
     is_first_sentence_ = true;
     in_tool_call_ = false;
+    has_open_bracket_ = false;
     has_dispatched_tool_ = false;
     sentences_emitted_ = 0;
     total_bytes_emitted_ = 0;
@@ -41,6 +42,9 @@ std::streamsize StreamingSentenceChunker::xsputn(const char* s, std::streamsize 
 
     std::string_view token(s, static_cast<size_t>(n));
     total_bytes_emitted_ += token.size();
+    if (__builtin_expect(token.find('<') != std::string_view::npos, 0)) {
+        has_open_bracket_ = true;
+    }
 
     // 2. 检查 N-gram 重复死循环退化
     if (DetectRepetition(token)) {
@@ -52,28 +56,25 @@ std::streamsize StreamingSentenceChunker::xsputn(const char* s, std::streamsize 
 
     buffer_.append(s, static_cast<size_t>(n));
 
-    // 3. 工具调用协议检测与拦截：仅当 buffer_ 中包含 '<' 候选字符时才执行搜索
-    if (!in_tool_call_) {
-        if (buffer_.find('<') != std::string::npos) {
-            size_t open_pos = buffer_.find("<|tool_call|>");
-            if (open_pos == std::string::npos) {
-                open_pos = buffer_.find("<tool_call>");
-            }
-            if (open_pos != std::string::npos) {
-                // 若标签前存在自然语音片段，优先将前缀送给 TTS 播报！
-                if (open_pos > 0) {
-                    std::string prefix_text = buffer_.substr(0, open_pos);
-                    if (callbacks_.on_sentence_ready) {
-                        callbacks_.on_sentence_ready(prefix_text);
-                        sentences_emitted_++;
-                    }
-                    buffer_ = buffer_.substr(open_pos);
+    // 3. 工具调用协议检测与拦截：仅当标记存在时才执行搜索
+    if (__builtin_expect(has_open_bracket_, 0) && !in_tool_call_) {
+        size_t open_pos = buffer_.find("<|tool_call|>");
+        if (open_pos == std::string::npos) {
+            open_pos = buffer_.find("<tool_call>");
+        }
+        if (open_pos != std::string::npos) {
+            // 若标签前存在自然语音片段，优先将前缀送给 TTS 播报！
+            if (open_pos > 0) {
+                std::string prefix_text = buffer_.substr(0, open_pos);
+                if (callbacks_.on_sentence_ready) {
+                    callbacks_.on_sentence_ready(prefix_text);
+                    sentences_emitted_++;
                 }
-                in_tool_call_ = true;
+                buffer_ = buffer_.substr(open_pos);
             }
+            in_tool_call_ = true;
         }
     }
-
     if (in_tool_call_) {
         size_t close_pos = buffer_.find("<|/tool_call|>");
         size_t close_tag_len = 14;
@@ -92,6 +93,7 @@ std::streamsize StreamingSentenceChunker::xsputn(const char* s, std::streamsize 
             // 从语音播报缓冲区中彻底抹除工具调用协议块，绝不送往 TTS 朗读
             buffer_.erase(0, close_pos + close_tag_len);
             in_tool_call_ = false;
+            has_open_bracket_ = (buffer_.find('<') != std::string::npos);
         }
         return n;
     }
@@ -106,6 +108,7 @@ std::streamsize StreamingSentenceChunker::xsputn(const char* s, std::streamsize 
             sentences_emitted_++;
         }
         buffer_.clear();
+        has_open_bracket_ = false;
         is_first_sentence_ = false;
     }
 

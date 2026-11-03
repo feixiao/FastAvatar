@@ -64,6 +64,7 @@ private:
     std::string history_for_repetition_;
     bool is_first_sentence_{true};
     bool in_tool_call_{false};
+    bool has_open_bracket_{false};
     bool has_dispatched_tool_{false};
     size_t sentences_emitted_{0};
     size_t total_bytes_emitted_{0};
