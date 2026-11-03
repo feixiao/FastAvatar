@@ -189,7 +189,65 @@ std::string IntentArbiter::ExtractAlarmTime(const std::string& query) {
         }
     }
 
-    // 3. 匹配中文数字口语时间 如 "七点半", "八点"
+    // 3. 快速通道：解析常见中文口语时间 (如 "八点", "七点半", "十点", "十点半")
+    size_t dian_pos = query.find("点");
+    if (dian_pos != std::string::npos && dian_pos >= 3) {
+        int fast_h = -1;
+        std::string_view pre1(query.data() + dian_pos - 3, 3);
+        if (pre1 == "十") {
+            fast_h = 10;
+            if (dian_pos >= 6) {
+                std::string_view pre2(query.data() + dian_pos - 6, 3);
+                int tens = ChineseDigitToVal(pre2);
+                if (tens > 0) fast_h = tens * 10;
+            }
+        } else {
+            int d = ChineseDigitToVal(pre1);
+            if (d >= 0) {
+                fast_h = d;
+                if (dian_pos >= 6) {
+                    std::string_view pre2(query.data() + dian_pos - 6, 3);
+                    if (pre2 == "十") {
+                        fast_h = 10 + d;
+                        if (dian_pos >= 9) {
+                            std::string_view pre3(query.data() + dian_pos - 9, 3);
+                            int tens = ChineseDigitToVal(pre3);
+                            if (tens > 0) fast_h = tens * 10 + d;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (fast_h >= 0 && fast_h <= 24) {
+            int fast_min = 0;
+            size_t post_pos = dian_pos + 3;
+            if (post_pos + 3 <= query.size()) {
+                std::string_view post1(query.data() + post_pos, 3);
+                if (post1 == "半") {
+                    fast_min = 30;
+                } else {
+                    int md = ChineseDigitToVal(post1);
+                    if (md >= 0) {
+                        if (post_pos + 6 <= query.size()) {
+                            std::string_view post2(query.data() + post_pos + 3, 3);
+                            if (post2 == "十") {
+                                fast_min = md * 10;
+                            }
+                        }
+                    }
+                }
+            }
+            if (query.find("下午") != std::string::npos || query.find("晚上") != std::string::npos) {
+                if (fast_h < 12) fast_h += 12;
+            }
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%02d:%02d", fast_h, fast_min);
+            return std::string(buf);
+        }
+    }
+
+    // 4. 复杂中文数字口语时间回退匹配 如多字组合
     static const std::regex cn_time_point(R"(((?:(?:一|二|两|三|四|五|六|七|八|九)?十(?:一|二|两|三|四|五|六|七|八|九)?|(?:一|二|两|三|四|五|六|七|八|九)))点((?:(?:一|二|两|三|四|五|六|七|八|九)?十(?:一|二|两|三|四|五|六|七|八|九)?|(?:一|二|两|三|四|五|六|七|八|九))|半)?(?:分)?)");
     std::smatch m;
     if (std::regex_search(query, m, cn_time_point)) {
