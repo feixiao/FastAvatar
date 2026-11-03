@@ -72,8 +72,11 @@ void ThreeTierMemory::RollbackLastAssistantTurn(const std::string& actually_spok
     std::lock_guard<std::mutex> lock(mtx_);
     if (!l1_active_turns_.empty()) {
         auto& last = l1_active_turns_.back();
-        last.assistant_response.assign(actually_spoken_text);
-        last.assistant_response.append("（被用户打断）");
+        static constexpr std::string_view kInterruptedSuffix = "（被用户打断）";
+        last.assistant_response.clear();
+        last.assistant_response.reserve(actually_spoken_text.size() + kInterruptedSuffix.size());
+        last.assistant_response.append(actually_spoken_text);
+        last.assistant_response.append(kInterruptedSuffix);
         last.was_interrupted = true;
     }
 }

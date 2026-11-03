@@ -177,7 +177,6 @@ private:
     // KV Cache Rollback & Spoken Audio Tracker
     std::mutex spoken_mtx_;
     std::string spoken_text_accumulator_;
-    std::string current_user_query_;
 
     // Worker Threads
     std::thread perception_thread_;
