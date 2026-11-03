@@ -40,14 +40,14 @@ ThreeTierMemory::ThreeTierMemory(std::string system_prompt)
  * - 超过窗口时，最早的对话轮次被置换（Evict）移入待归纳队列 evicted_turns_pending_summary_，
  *   等待闲置时提炼为 L2/L3 长期事实。
  */
-void ThreeTierMemory::AddTurn(const std::string& user_query, const std::string& assistant_response, bool was_interrupted) {
+void ThreeTierMemory::AddTurn(std::string user_query, std::string assistant_response, bool was_interrupted) {
     std::lock_guard<std::mutex> lock(mtx_);
     int64_t now = GetCurrentTimeMs();
     last_activity_timestamp_ms_ = now;
 
     DialogueTurn turn;
-    turn.user_query = user_query;
-    turn.assistant_response = assistant_response;
+    turn.user_query = std::move(user_query);
+    turn.assistant_response = std::move(assistant_response);
     turn.was_interrupted = was_interrupted;
     turn.timestamp_ms = now;
 
@@ -99,37 +99,42 @@ std::string ThreeTierMemory::FormatPromptContext(const std::string& current_quer
     std::string prompt;
     prompt.reserve(est_size);
 
+    static constexpr std::string_view kSystemStart = "<|im_start|>system\n";
+    static constexpr std::string_view kEnd = "<|im_end|>\n";
+    static constexpr std::string_view kUserStart = "<|im_start|>user\n";
+    static constexpr std::string_view kEndAssistantStart = "<|im_end|>\n<|im_start|>assistant\n";
+
     // 1. 系统提示词
-    prompt += "<|im_start|>system\n";
-    prompt += system_prompt_;
+    prompt.append(kSystemStart);
+    prompt.append(system_prompt_);
 
     // 2. 注入 L3 长期记忆事实
     if (!l3_facts_.empty()) {
         auto relevant_facts = RetrieveRelevantFacts(current_query, 2);
         if (!relevant_facts.empty()) {
-            prompt += "\n【用户长期记忆与习惯】:\n";
+            prompt.append("\n【用户长期记忆与习惯】:\n");
             for (const auto& fact : relevant_facts) {
-                prompt += "- ";
-                prompt += fact;
-                prompt += "\n";
+                prompt.append("- ");
+                prompt.append(fact);
+                prompt.append("\n");
             }
         }
     }
-    prompt += "<|im_end|>\n";
+    prompt.append(kEnd);
 
     // 3. 注入 L1 活跃多轮历史
     for (const auto& turn : l1_active_turns_) {
-        prompt += "<|im_start|>user\n";
-        prompt += turn.user_query;
-        prompt += "<|im_end|>\n<|im_start|>assistant\n";
-        prompt += turn.assistant_response;
-        prompt += "<|im_end|>\n";
+        prompt.append(kUserStart);
+        prompt.append(turn.user_query);
+        prompt.append(kEndAssistantStart);
+        prompt.append(turn.assistant_response);
+        prompt.append(kEnd);
     }
 
     // 4. 拼接当前提问与 Assistant 引导标记
-    prompt += "<|im_start|>user\n";
-    prompt += current_query;
-    prompt += "<|im_end|>\n<|im_start|>assistant\n";
+    prompt.append(kUserStart);
+    prompt.append(current_query);
+    prompt.append(kEndAssistantStart);
     return prompt;
 }
 

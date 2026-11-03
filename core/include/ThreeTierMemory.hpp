@@ -57,7 +57,7 @@ public:
     }
 
     // L1: Record new user turn
-    void AddTurn(const std::string& user_query, const std::string& assistant_response, bool was_interrupted = false);
+    void AddTurn(std::string user_query, std::string assistant_response, bool was_interrupted = false);
 
     // L1: Rollback last assistant response on Barge-in (align with spoken text)
     void RollbackLastAssistantTurn(const std::string& actually_spoken_text);

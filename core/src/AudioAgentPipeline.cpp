@@ -455,7 +455,7 @@ void AudioAgentPipeline::CognitionWorkerLoop() {
 
         // 若未被打断，记录该完整轮次至 L1 记忆
         if (!full_assistant_response.empty() && !IsBargeInAborted()) {
-            memory_.AddTurn(query, full_assistant_response, false);
+            memory_.AddTurn(std::move(query), std::move(full_assistant_response), false);
         }
     }
 }
