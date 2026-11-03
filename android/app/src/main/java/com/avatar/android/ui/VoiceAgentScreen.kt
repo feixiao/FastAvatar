@@ -77,6 +77,8 @@ import com.avatar.android.ui.theme.AccentYellow
 import com.avatar.android.ui.theme.BgDark
 import com.avatar.android.ui.theme.CardBorder
 import com.avatar.android.ui.theme.CardDark
+import com.avatar.android.ui.theme.CardElevated
+import com.avatar.android.ui.theme.OnAccentGreen
 import com.avatar.android.ui.theme.TextMuted
 import com.avatar.android.ui.theme.TextPrimary
 import com.avatar.android.ui.theme.TextSecondary
@@ -129,14 +131,15 @@ fun VoiceAgentScreen(
                             Spacer(modifier = Modifier.width(6.dp))
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(CardDark)
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(CardElevated)
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
                             ) {
                                 Text(
                                     text = "Pixel 10 • Android 16",
-                                    fontSize = 10.sp,
-                                    color = AccentCyan
+                                    fontSize = 11.sp,
+                                    color = AccentGreen,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
@@ -148,7 +151,7 @@ fun VoiceAgentScreen(
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "伴侣设置",
-                            tint = AccentCyan
+                            tint = AccentGreen
                         )
                     }
 
@@ -229,10 +232,10 @@ fun VoiceAgentScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(if (isMuted) Color(0xFF161E28) else Color(0xFF231B34))
-                    .padding(horizontal = 10.dp, vertical = 5.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (isMuted) Color(0xFF142018) else Color(0xFF241E30))
+                    .border(1.dp, if (isMuted) CardBorder else AccentPurple.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -268,50 +271,52 @@ fun VoiceAgentScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C2D38)),
-                        shape = RoundedCornerShape(10.dp),
-                        border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(AccentCyan))
+                            .padding(vertical = 6.dp),
+                        colors = CardDefaults.cardColors(containerColor = CardElevated),
+                        shape = RoundedCornerShape(20.dp),
+                        border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(AccentGreen))
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                        Column(modifier = Modifier.padding(14.dp)) {
                             Text(
-                                text = "💡 本地记忆保存确认 (需用户明确授权)",
-                                fontSize = 12.sp,
+                                text = "本地记忆保存确认 (需用户明确授权)",
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = AccentCyan
+                                color = AccentGreen
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = pending.prompt,
-                                fontSize = 13.sp,
-                                color = TextPrimary
+                                fontSize = 14.sp,
+                                color = TextPrimary,
+                                lineHeight = 20.sp
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.End
                             ) {
                                 OutlinedButton(
                                     onClick = { viewModel.rejectStagedMemory() },
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentRed),
-                                    modifier = Modifier.height(32.dp)
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.height(34.dp)
                                 ) {
-                                    Text("放弃", fontSize = 11.sp)
+                                    Text("放弃", fontSize = 12.sp)
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Button(
                                     onClick = { viewModel.confirmStagedMemory() },
-                                    colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
-                                    modifier = Modifier.height(32.dp)
+                                    colors = ButtonDefaults.buttonColors(containerColor = AccentGreen, contentColor = OnAccentGreen),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.height(34.dp)
                                 ) {
-                                    Text("确认记住", fontSize = 11.sp, color = Color.White)
+                                    Text("确认记住", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
                     }
                 }
             }
-
             // 5. Conversation Message Stream
             LazyColumn(
                 state = listState,
@@ -378,14 +383,14 @@ fun VoiceAgentScreen(
                         }
                     },
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(44.dp)
                         .clip(CircleShape)
-                        .background(if (isVoiceListening) AccentRed else Color(0xFF238636))
+                        .background(if (isVoiceListening) AccentRed else AccentGreen)
                 ) {
                     Icon(
                         imageVector = if (isVoiceListening) Icons.Default.Stop else Icons.Default.Mic,
                         contentDescription = "语音输入",
-                        tint = Color.White,
+                        tint = if (isVoiceListening) Color.White else OnAccentGreen,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -406,13 +411,13 @@ fun VoiceAgentScreen(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
-                        focusedBorderColor = AccentCyan,
+                        focusedBorderColor = AccentGreen,
                         unfocusedBorderColor = CardBorder,
-                        focusedContainerColor = CardDark,
+                        focusedContainerColor = CardElevated,
                         unfocusedContainerColor = CardDark
                     ),
                     singleLine = true,
-                    shape = RoundedCornerShape(20.dp)
+                    shape = RoundedCornerShape(22.dp)
                 )
 
                 Spacer(modifier = Modifier.width(6.dp))
@@ -426,14 +431,14 @@ fun VoiceAgentScreen(
                         }
                     },
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(44.dp)
                         .clip(CircleShape)
-                        .background(AccentCyan)
+                        .background(AccentGreen)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Send,
                         contentDescription = "发送",
-                        tint = BgDark,
+                        tint = OnAccentGreen,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -446,12 +451,12 @@ fun VoiceAgentScreen(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isPlaying || sessionState == SessionState.SPEAKING) AccentRed else CardBorder
                     ),
-                    shape = RoundedCornerShape(20.dp),
-                    modifier = Modifier.height(42.dp)
+                    shape = RoundedCornerShape(22.dp),
+                    modifier = Modifier.height(44.dp)
                 ) {
                     Text(
                         text = "打断",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isPlaying || sessionState == SessionState.SPEAKING) Color.White else TextSecondary
                     )

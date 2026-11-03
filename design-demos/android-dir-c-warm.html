@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avatar Android · 方向 C：口袋生活编辑手账 (4屏交互展示板)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --board-bg: #ece7dc;
+      --phone-bg: #f8f5ee;
+      --phone-bezel: #dcd6c8;
+      --card-white: #ffffff;
+      --card-surface: #f2eee3;
+      --card-border: rgba(0, 0, 0, 0.08);
+      --card-border-subtle: rgba(0, 0, 0, 0.04);
+      --accent-ochre: #9a3412;
+      --accent-ochre-dim: #ffedd5;
+      --accent-green: #047857;
+      --accent-green-dim: #ecfdf5;
+      --text-ink: #1f1e1b;
+      --text-secondary: #4a4641;
+      --text-muted: #57534e;
+      --paper-shadow: 0 10px 24px rgba(60, 50, 35, 0.06), 0 2px 6px rgba(60, 50, 35, 0.03);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: var(--board-bg);
+      color: var(--text-ink);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      min-height: 100vh;
+      padding: 40px 32px 80px;
+      overflow-x: auto;
+    }
+
+    /* 展示板头部 */
+    .board-header {
+      max-width: 1540px;
+      margin: 0 auto 36px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+      padding-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .board-title {
+      font-family: "Noto Serif SC", serif;
+      font-size: 30px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: var(--text-ink);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .board-chip {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 6px;
+      background: var(--accent-ochre-dim);
+      color: var(--accent-ochre);
+      border: 1px solid rgba(194, 94, 46, 0.3);
+      font-family: -apple-system, sans-serif;
+    }
+    .board-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-top: 6px;
+      max-width: 820px;
+      line-height: 1.6;
+    }
+
+    /* 4 屏横向平铺展示板容器 */
+    .devices-row {
+      max-width: 1540px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+    }
+    @media (max-width: 1400px) {
+      .devices-row { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 760px) {
+      .devices-row { grid-template-columns: 1fr; }
+    }
+
+    .device-column {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .screen-label-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 4px;
+    }
+    .screen-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-ink);
+      font-family: "Noto Serif SC", serif;
+    }
+    .screen-badge {
+      font-size: 12px;
+      color: var(--accent-ochre);
+      background: var(--accent-ochre-dim);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    /* 优雅暖纸色手机外壳 */
+    .warm-phone {
+      width: 100%;
+      height: 640px;
+      background: var(--phone-bg);
+      border-radius: 36px;
+      border: 4px solid var(--phone-bezel);
+      box-shadow: 0 24px 50px rgba(60, 45, 30, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* 顶部状态栏 */
+    .warm-status-bar {
+      height: 36px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      z-index: 10;
+    }
+    .punch-hole {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #2b2823;
+    }
+
+    /* 内部滚动区 */
+    .phone-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* 顶部手账标题栏 */
+    .warm-app-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+    }
+    .warm-app-title {
+      font-size: 16px;
+      font-weight: 900;
+      font-family: "Noto Serif SC", serif;
+      color: var(--text-ink);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .streak-badge-warm {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      color: #92400e;
+    }
+
+    /* 水彩光晕萌伴舞台 (AvatarPetOrb Canvas) */
+    .warm-orb-stage {
+      background: var(--card-white);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      cursor: pointer;
+      box-shadow: var(--paper-shadow);
+    }
+    .warm-orb-canvas {
+      width: 86px;
+      height: 86px;
+    }
+    .warm-orb-status {
+      margin-top: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: "Noto Serif SC", serif;
+      color: var(--text-ink);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot-amber-warm {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent-ochre);
+      box-shadow: 0 0 6px var(--accent-ochre);
+    }
+
+    /* 安全门禁条 */
+    .gate-strip-warm {
+      background: var(--card-white);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 8px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* 手账对话流 */
+    .warm-chat-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+    }
+    .warm-bubble {
+      padding: 12px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 88%;
+      box-shadow: var(--paper-shadow);
+    }
+    .bubble-user-warm {
+      align-self: flex-end;
+      background: #ede6d8;
+      color: var(--text-ink);
+      border-bottom-right-radius: 4px;
+    }
+    .bubble-asst-warm {
+      align-self: flex-start;
+      background: var(--card-white);
+      color: var(--text-ink);
+      border-bottom-left-radius: 4px;
+      border: 1px solid var(--card-border);
+    }
+
+    /* 活页便签记忆确认卡 */
+    .sticky-confirm-card {
+      background: #fefce8;
+      border: 1.5px solid #facc15;
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      box-shadow: 0 8px 20px rgba(234, 179, 8, 0.12);
+    }
+    .sticky-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #854d0e;
+      font-family: "Noto Serif SC", serif;
+    }
+    .sticky-body {
+      font-size: 14px;
+      color: #713f12;
+      line-height: 1.4;
+    }
+    .sticky-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .btn-warm-ghost {
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.04);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      color: var(--text-secondary);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn-warm-solid {
+      padding: 6px 14px;
+      border-radius: 8px;
+      background: var(--accent-ochre);
+      border: none;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* 底部舒缓控制栏 */
+    .warm-bottom-bar {
+      margin-top: auto;
+      background: var(--card-white);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: var(--paper-shadow);
+    }
+    .warm-mic-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 21px;
+      background: var(--accent-ochre);
+      color: #ffffff;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(194, 94, 46, 0.3);
+      transition: transform 0.15s ease;
+    }
+    .warm-mic-btn:active {
+      transform: scale(0.92);
+    }
+    .warm-input-hint {
+      flex: 1;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .btn-warm-bargein {
+      padding: 7px 12px;
+      border-radius: 14px;
+      background: var(--accent-ochre-dim);
+      border: 1px solid rgba(194, 94, 46, 0.3);
+      color: var(--accent-ochre);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* 便签条目卡片 */
+    .note-item-card {
+      background: var(--card-white);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      box-shadow: var(--paper-shadow);
+    }
+
+    /* 人设书签卡片 */
+    .persona-bookmark-card {
+      background: var(--card-white);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: var(--paper-shadow);
+      transition: all 0.15s ease;
+    }
+    .persona-bookmark-card.active {
+      border-left: 4px solid var(--accent-ochre);
+      background: #faf7f0;
+    }
+
+    /* 锁屏卡片 */
+    .warm-lock-card {
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 20px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 16px 36px rgba(60, 45, 30, 0.15);
+    }
+
+    .svg-warm-icon {
+      width: 17px;
+      height: 17px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="board-header">
+    <div>
+      <div class="board-title">
+        Avatar Android 方向 C 口袋生活编辑手账
+        <span class="board-chip">4 屏交互展示板</span>
+      </div>
+      <div class="board-desc">
+        结合 Editorial Reader 编辑式阅读与晨光暖纸手账美学。暖纸米白底色、墨黑人文衬线排印与便签清单，带来松弛舒缓的长期陪伴感。每台手机均可独立进行触摸与交互演示。
+      </div>
+    </div>
+  </header>
+
+  <main class="devices-row">
+
+    <!-- 手机 1: 晨间伴侣与微光萌伴 -->
+    <div class="device-column">
+      <div class="screen-label-bar">
+        <span class="screen-title">01 晨间会话主屏</span>
+        <span class="screen-badge">微光萌伴</span>
+      </div>
+      <div class="warm-phone" id="phone1">
+        <div class="warm-status-bar">
+          <span>09:41</span>
+          <div class="punch-hole"></div>
+          <span>100%</span>
+        </div>
+        <div class="phone-content">
+          <div class="warm-app-bar">
+            <span class="warm-app-title">Avatar 案头伴侣</span>
+            <span class="streak-badge-warm">陪伴 14 天</span>
+          </div>
+
+          <!-- 水彩光晕萌伴舞台 -->
+          <div class="warm-orb-stage" id="p1OrbStage">
+            <canvas class="warm-orb-canvas" id="p1Canvas" width="86" height="86"></canvas>
+            <div class="warm-orb-status">
+              <span class="dot-amber-warm"></span>
+              <span id="p1StatusText">清晨好 随时开口</span>
+            </div>
+          </div>
+
+          <!-- 门禁与端侧指示 -->
+          <div class="gate-strip-warm">
+            <span>端侧快环 0.8ms 响应就绪</span>
+            <span style="color:var(--accent-green); font-weight:600;">已安全闭锁</span>
+          </div>
+
+          <!-- 会话气泡流 -->
+          <div class="warm-chat-group">
+            <div class="warm-bubble bubble-user-warm">
+              今天有些疲惫，帮我看看日程。
+            </div>
+            <div class="warm-bubble bubble-asst-warm">
+              清晨好！已为您整理了今日三项重点，下午两点前没有紧急安排，喝杯咖啡稍作休憩吧。
+            </div>
+          </div>
+
+          <!-- 底部控制栏 -->
+          <div class="warm-bottom-bar">
+            <button class="warm-mic-btn" id="p1MicBtn">
+              <svg class="svg-warm-icon" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+            </button>
+            <div class="warm-input-hint">倾诉或输入指令...</div>
+            <button class="btn-warm-bargein" id="p1BargeinBtn">80ms 打断</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 手机 2: 案头活页便签记忆库 -->
+    <div class="device-column">
+      <div class="screen-label-bar">
+        <span class="screen-title">02 活页便签记忆库</span>
+        <span class="screen-badge">两阶段备忘</span>
+      </div>
+      <div class="warm-phone" id="phone2">
+        <div class="warm-status-bar">
+          <span>09:41</span>
+          <div class="punch-hole"></div>
+          <span>VAULT</span>
+        </div>
+        <div class="phone-content">
+          <div class="warm-app-bar">
+            <span class="warm-app-title">生活偏好备忘</span>
+            <span style="font-size:12px; color:var(--accent-green); font-weight:600;">已加密保护</span>
+          </div>
+
+          <!-- 黄色便签纸确认卡片 -->
+          <div class="sticky-confirm-card" id="stagedCardC">
+            <div class="sticky-title">便签待收录 (需用户明确确认)</div>
+            <div class="sticky-body">
+              饮用偏好：早间美式咖啡 不加糖
+            </div>
+            <div class="sticky-actions">
+              <button class="btn-warm-ghost" id="btnRejectC">暂不收录</button>
+              <button class="btn-warm-solid" id="btnConfirmC">确认记住</button>
+            </div>
+          </div>
+
+          <div style="font-size:13px; font-weight:700; color:var(--text-ink); font-family:'Noto Serif SC', serif; margin-top:4px;">
+            长期生活画卷 (设备私有隔离)
+          </div>
+
+          <div class="note-item-card">
+            <div>
+              <div style="font-weight:700; color:var(--text-ink); font-family:'Noto Serif SC', serif;">作息习惯</div>
+              <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">晚间 23:00 后默认开启免打扰</div>
+            </div>
+            <span style="font-size:12px; color:var(--accent-ochre); font-weight:600;">常驻画像</span>
+          </div>
+
+          <div class="note-item-card">
+            <div>
+              <div style="font-weight:700; color:var(--text-ink); font-family:'Noto Serif SC', serif;">编程研发</div>
+              <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">主力语言 Swift 与 Go 双环架构</div>
+            </div>
+            <span style="font-size:12px; color:var(--accent-ochre); font-weight:600;">已收录</span>
+          </div>
+
+          <div class="note-item-card">
+            <div>
+              <div style="font-weight:700; color:var(--text-ink); font-family:'Noto Serif SC', serif;">咖啡风味</div>
+              <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">水洗耶加雪菲 浅烘焙偏好</div>
+            </div>
+            <span style="font-size:12px; color:var(--accent-ochre); font-weight:600;">已收录</span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- 手机 3: 伴侣化境与生活门禁 -->
+    <div class="device-column">
+      <div class="screen-label-bar">
+        <span class="screen-title">03 伴侣化境与门禁</span>
+        <span class="screen-badge">书签切片</span>
+      </div>
+      <div class="warm-phone" id="phone3">
+        <div class="warm-status-bar">
+          <span>09:41</span>
+          <div class="punch-hole"></div>
+          <span>PERSONA</span>
+        </div>
+        <div class="phone-content">
+          <div class="warm-app-bar">
+            <span class="warm-app-title">多模态陪伴化境</span>
+            <span style="font-size:12px; color:var(--text-muted);">自动流转</span>
+          </div>
+
+          <!-- 门禁与状态 -->
+          <div class="gate-strip-warm" style="background:#fef2f2; border-color:#fca5a5; color:#b91c1c;">
+            <span>硬件门禁: 物理闭锁保护中</span>
+            <span style="font-weight:600;">零网络泄露</span>
+          </div>
+
+          <div style="font-size:13px; font-weight:700; color:var(--text-ink); font-family:'Noto Serif SC', serif;">
+            书签卡槽形态
+          </div>
+
+          <div class="persona-bookmark-card active" data-p="知心伴侣">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:700; color:var(--text-ink); font-family:'Noto Serif SC', serif;">知心伴侣</span>
+              <span style="font-size:12px; color:var(--accent-ochre); font-weight:600;">当前陪伴</span>
+            </div>
+            <div style="font-size:12px; color:var(--text-secondary);">
+              温润舒缓 晨昏倾听 情绪共振
+            </div>
+          </div>
+
+          <div class="persona-bookmark-card" data-p="幕僚助手">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:700; color:var(--text-ink); font-family:'Noto Serif SC', serif;">幕僚助手</span>
+              <span style="font-size:12px; color:var(--text-muted);">轻触切换</span>
+            </div>
+            <div style="font-size:12px; color:var(--text-secondary);">
+              快速摘要 日程梳理 干练明决
+            </div>
+          </div>
+
+          <div class="persona-bookmark-card" data-p="极客专家">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:700; color:var(--text-ink); font-family:'Noto Serif SC', serif;">极客专家</span>
+              <span style="font-size:12px; color:var(--text-muted);">轻触切换</span>
+            </div>
+            <div style="font-size:12px; color:var(--text-secondary);">
+              架构深度推演 代码底层攻坚
+            </div>
+          </div>
+
+          <div style="background:var(--card-white); border-radius:14px; padding:12px; border:1px solid var(--card-border); box-shadow:var(--paper-shadow);">
+            <div style="font-size:13px; font-weight:700; color:var(--text-ink); font-family:'Noto Serif SC', serif; margin-bottom:4px;">耳机防外泄保护</div>
+            <div style="font-size:14px; color:var(--text-secondary); line-height:1.4;">
+              耳机拔出瞬间触发 Becoming Noisy 闭锁，杜绝私密语音外放。
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- 手机 4: 锁屏手账日课微组件 -->
+    <div class="device-column">
+      <div class="screen-label-bar">
+        <span class="screen-title">04 锁屏日课微组件</span>
+        <span class="screen-badge">息屏手账</span>
+      </div>
+      <div class="warm-phone" id="phone4" style="background:#ede7db;">
+        <div class="warm-status-bar">
+          <span>09:41</span>
+          <div class="punch-hole"></div>
+          <span>LOCKED</span>
+        </div>
+        <div class="phone-content" style="justify-content:center; gap:20px;">
+          
+          <div style="text-align:center;">
+            <div style="font-size:46px; font-weight:700; font-family:'Noto Serif SC', serif; color:var(--text-ink);">09:41</div>
+            <div style="font-size:13px; color:var(--text-secondary); margin-top:2px;">十一月三日 晴好 晨风微凉</div>
+          </div>
+
+          <!-- 锁屏手账微卡 -->
+          <div class="warm-lock-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <div style="width:8px; height:8px; border-radius:50%; background:var(--accent-ochre);"></div>
+                <span style="font-size:13px; font-weight:700; color:var(--text-ink); font-family:'Noto Serif SC', serif;">伴侣前台常驻服务</span>
+              </div>
+              <span style="font-size:11px; color:var(--accent-ochre); background:var(--accent-ochre-dim); padding:2px 6px; border-radius:6px; font-weight:600;">全双工</span>
+            </div>
+
+            <div style="font-size:14px; color:var(--text-secondary); line-height:1.4;">
+              “早安！今日端云协同链路已就绪，随时开嗓与我倾谈...”
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(0,0,0,0.06); padding-top:8px;">
+              <span style="font-size:12px; color:var(--text-muted);">媒体闭锁已生效 / 零泄露</span>
+              <button class="btn-warm-solid" style="padding:4px 10px; font-size:11px;" id="p4BargeinBtn">毫秒打断</button>
+            </div>
+          </div>
+
+          <div style="text-align:center; font-size:12px; color:var(--text-muted); margin-top:20px;">
+            向上滑动解锁 Pixel 10
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // 手机 1: 水彩呼吸光球 Canvas
+    const cv1 = document.getElementById("p1Canvas");
+    const ctx1 = cv1.getContext("2d");
+    let p1Speaking = false;
+
+    function renderWarmOrb() {
+      ctx1.clearRect(0, 0, cv1.width, cv1.height);
+      const cx = cv1.width / 2;
+      const cy = cv1.height / 2;
+      const t = Date.now() * 0.0025;
+
+      const r = p1Speaking ? 28 + Math.sin(t * 8) * 5 : 24 + Math.sin(t * 2) * 2;
+      const grad = ctx1.createRadialGradient(cx, cy, 3, cx, cy, r);
+      grad.addColorStop(0, "#ffffff");
+      grad.addColorStop(0.5, p1Speaking ? "#f97316" : "#f59e0b");
+      grad.addColorStop(1, p1Speaking ? "rgba(249,115,22,0)" : "rgba(245,158,11,0)");
+
+      ctx1.beginPath();
+      ctx1.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx1.fillStyle = grad;
+      ctx1.fill();
+
+      requestAnimationFrame(renderWarmOrb);
+    }
+    renderWarmOrb();
+
+    const p1MicBtn = document.getElementById("p1MicBtn");
+    const p1StatusText = document.getElementById("p1StatusText");
+    const p1BargeinBtn = document.getElementById("p1BargeinBtn");
+
+    p1MicBtn.addEventListener("click", () => {
+      p1Speaking = !p1Speaking;
+      p1StatusText.innerText = p1Speaking ? "播报中 温润倾听" : "清晨好 随时开口";
+    });
+
+    p1BargeinBtn.addEventListener("click", () => {
+      p1Speaking = false;
+      p1StatusText.innerText = "打断已生效 (68ms)";
+      setTimeout(() => { p1StatusText.innerText = "清晨好 随时开口"; }, 1500);
+    });
+
+    // 手机 2: 便签确认
+    const btnConfirmC = document.getElementById("btnConfirmC");
+    const btnRejectC = document.getElementById("btnRejectC");
+    const stagedCardC = document.getElementById("stagedCardC");
+
+    btnConfirmC.addEventListener("click", () => {
+      stagedCardC.style.opacity = "0.6";
+      stagedCardC.innerHTML = "<div style='font-size:13px; color:#047857; font-weight:700;'>已持久化收录至生活手账</div>";
+    });
+    btnRejectC.addEventListener("click", () => {
+      stagedCardC.style.display = "none";
+    });
+
+    // 手机 3: 人设切换
+    const bookmarkCards = document.querySelectorAll(".persona-bookmark-card");
+    bookmarkCards.forEach(c => {
+      c.addEventListener("click", () => {
+        bookmarkCards.forEach(card => card.classList.remove("active"));
+        c.classList.add("active");
+      });
+    });
+
+    // 手机 4: 锁屏打断
+    const p4BargeinBtn = document.getElementById("p4BargeinBtn");
+    p4BargeinBtn.addEventListener("click", () => {
+      p4BargeinBtn.innerText = "已掐断";
+      setTimeout(() => { p4BargeinBtn.innerText = "毫秒打断"; }, 1500);
+    });
+  </script>
+</body>
+</html>

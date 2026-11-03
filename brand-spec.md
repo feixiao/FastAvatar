@@ -16,6 +16,15 @@
   - 发音 (Speaking)：暖光共振琥珀 (`#F59E0B` / `#FBBF24`)
   - 打盹休眠 (Sleep)：微光月影暗灰 (`#475569`)
 
-## 3. 图标与字体资产
-- **系统排印**：macOS 原生 San Francisco (`-apple-system`, `SF Pro Display`, `SF Pro Text`) + 备选 Inter / Noto Sans SC，数字与参数仪表采用高精密等宽字型 (`SF Mono`, `JetBrains Mono`, `Doto`)。
-- **图标系统**：彻底剔除 Emoji，采用几何单线矢量符号（SF Symbols 风格 1.5px 描边），具备按下反馈与微动效。
+## 3. 图标与字体资产 (macOS 与 Android)
+- **macOS 系统排印**：macOS 原生 San Francisco (`-apple-system`, `SF Pro Display`, `SF Pro Text`) + 备选 Inter / Noto Sans SC，数字与参数仪表采用等宽字型 (`SF Mono`, `JetBrains Mono`)。
+- **Android 系统排印**：针对 Pixel 10 定制 Google Sans / Roboto Flex，等宽数字采用 `JetBrains Mono`，中文采用 `Noto Sans SC`。
+- **图标系统**：彻底剔除 Emoji，采用几何单线矢量符号（SF Symbols 与 Material Symbols Outlined 1.8px 描边），按压具有物理回弹。
+
+## 4. Android (Pixel 10) 专属规范
+- **设计规范**：Material 3 Expressive（大圆角 squircle、自适应 Tonal 色阶、物理弹簧阻尼微动效、状态驱动的 AvatarPetOrb）。
+- **四屏全景矩阵**：
+  1. 主伴侣实时会话流 (Main Voice Agent & Fluid Orb)
+  2. 两阶段本地记忆保险库 (Staged Memory & Vault)
+  3. 多模态人设与硬件媒体门禁 (Persona & Audio Gating Matrix)
+  4. 锁屏前台实时通知与灵动微岛 (Foreground Notification & At a Glance)

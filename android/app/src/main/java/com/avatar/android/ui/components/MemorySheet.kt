@@ -32,9 +32,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.avatar.android.core.memory.MemoryItem
 import com.avatar.android.ui.theme.AccentCyan
+import com.avatar.android.ui.theme.AccentGreen
 import com.avatar.android.ui.theme.AccentRed
 import com.avatar.android.ui.theme.CardBorder
 import com.avatar.android.ui.theme.CardDark
+import com.avatar.android.ui.theme.CardElevated
 import com.avatar.android.ui.theme.TextMuted
 import com.avatar.android.ui.theme.TextPrimary
 import com.avatar.android.ui.theme.TextSecondary
@@ -75,7 +77,7 @@ fun MemorySheet(
                     Text(
                         text = "设备隔离: $deviceId (绝不跨设备同步)",
                         fontSize = 12.sp,
-                        color = AccentCyan
+                        color = AccentGreen
                     )
                 }
 
@@ -112,8 +114,8 @@ fun MemorySheet(
                     items(memories, key = { it.id }) { item ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = CardDark),
-                            shape = RoundedCornerShape(8.dp),
+                            colors = CardDefaults.cardColors(containerColor = CardElevated),
+                            shape = RoundedCornerShape(16.dp),
                             border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CardBorder))
                         ) {
                             Row(

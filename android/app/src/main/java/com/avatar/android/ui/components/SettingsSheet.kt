@@ -43,6 +43,8 @@ import com.avatar.android.ui.theme.AccentCyan
 import com.avatar.android.ui.theme.AccentGreen
 import com.avatar.android.ui.theme.CardBorder
 import com.avatar.android.ui.theme.CardDark
+import com.avatar.android.ui.theme.CardElevated
+import com.avatar.android.ui.theme.OnAccentGreen
 import com.avatar.android.ui.theme.TextMuted
 import com.avatar.android.ui.theme.TextPrimary
 import com.avatar.android.ui.theme.TextSecondary
@@ -95,7 +97,7 @@ fun SettingsSheet(
                 text = "陪伴人设与音色风格",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = AccentCyan
+                color = AccentGreen
             )
             Spacer(modifier = Modifier.height(6.dp))
             Row(
@@ -103,19 +105,20 @@ fun SettingsSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 val personas = listOf(
-                    "companion" to "🌙 知心伴侣",
-                    "pet" to "🐾 元气小猫",
-                    "jarvis" to "💼 高效幕僚",
-                    "roaster" to "🔥 毒舌损友"
+                    "companion" to "知心伴侣",
+                    "pet" to "元气小猫",
+                    "jarvis" to "高效幕僚",
+                    "roaster" to "毒舌损友"
                 )
                 personas.forEach { (id, label) ->
                     FilterChip(
                         selected = activePersona == id,
                         onClick = { activePersona = id },
                         label = { Text(label, fontSize = 11.sp) },
+                        shape = RoundedCornerShape(12.dp),
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = AccentCyan,
-                            selectedLabelColor = Color.Black
+                            selectedContainerColor = AccentGreen,
+                            selectedLabelColor = OnAccentGreen
                         )
                     )
                 }
@@ -136,7 +139,7 @@ fun SettingsSheet(
                 Switch(
                     checked = autoTts,
                     onCheckedChange = { autoTts = it },
-                    colors = SwitchDefaults.colors(checkedThumbColor = AccentCyan)
+                    colors = SwitchDefaults.colors(checkedThumbColor = AccentGreen, checkedTrackColor = AccentGreen.copy(alpha = 0.4f))
                 )
             }
 
@@ -153,8 +156,8 @@ fun SettingsSheet(
                 valueRange = 0.8f..1.6f,
                 steps = 7,
                 colors = SliderDefaults.colors(
-                    thumbColor = AccentCyan,
-                    activeTrackColor = AccentCyan
+                    thumbColor = AccentGreen,
+                    activeTrackColor = AccentGreen
                 )
             )
 
@@ -189,7 +192,7 @@ fun SettingsSheet(
                 text = "云端网关服务地址 (Avatar Gateway)",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = AccentCyan
+                color = AccentGreen
             )
             Spacer(modifier = Modifier.height(6.dp))
             OutlinedTextField(
@@ -198,7 +201,7 @@ fun SettingsSheet(
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("http://192.168.x.x:8088", color = TextMuted) },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AccentCyan,
+                    focusedBorderColor = AccentGreen,
                     unfocusedBorderColor = CardBorder,
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary
@@ -228,7 +231,7 @@ fun SettingsSheet(
                 text = "直连大模型端点 (可选: Ollama / DeepSeek / OpenAI)",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = AccentCyan
+                color = AccentGreen
             )
             Spacer(modifier = Modifier.height(6.dp))
             OutlinedTextField(
@@ -237,7 +240,7 @@ fun SettingsSheet(
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("例如: http://192.168.1.100:11434/v1", color = TextMuted) },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AccentCyan,
+                    focusedBorderColor = AccentGreen,
                     unfocusedBorderColor = CardBorder,
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary
@@ -251,7 +254,7 @@ fun SettingsSheet(
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("模型名称: 例如 qwen2.5:7b 或 deepseek-chat", color = TextMuted) },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AccentCyan,
+                    focusedBorderColor = AccentGreen,
                     unfocusedBorderColor = CardBorder,
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary
@@ -265,7 +268,7 @@ fun SettingsSheet(
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("API Key (如果需要)", color = TextMuted) },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AccentCyan,
+                    focusedBorderColor = AccentGreen,
                     unfocusedBorderColor = CardBorder,
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary
@@ -289,13 +292,13 @@ fun SettingsSheet(
                     )
                     onDismiss()
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
+                colors = ButtonDefaults.buttonColors(containerColor = AccentGreen, contentColor = OnAccentGreen),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(44.dp),
-                shape = RoundedCornerShape(12.dp)
+                    .height(48.dp),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Text("保存设置", color = Color.Black, fontWeight = FontWeight.Bold)
+                Text("保存设置", fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
 
             Spacer(modifier = Modifier.height(20.dp))

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avatar Android (Pixel 10) · 三方向综合展示画板 (Design Showcase)</title>
+  <style>
+    :root {
+      --bg: #090b10;
+      --card-bg: #12151e;
+      --border: rgba(255, 255, 255, 0.1);
+      --accent: #38bdf8;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      padding: 36px 40px 80px;
+      line-height: 1.5;
+    }
+    header {
+      max-width: 1440px;
+      margin: 0 auto 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 24px;
+    }
+    .brand-title {
+      font-family: "SF Pro Display", -apple-system, sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .badge-live {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 6px;
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .sub-caption {
+      font-size: 14px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* 方案横向对比网格 */
+    .showcase-grid {
+      max-width: 1440px;
+      margin: 0 auto 40px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    @media (max-width: 1100px) {
+      .showcase-grid { grid-template-columns: 1fr; }
+    }
+
+    .dir-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 16px 36px rgba(0,0,0,0.4);
+      transition: all 0.25s ease;
+    }
+    .dir-card:hover {
+      border-color: rgba(56, 189, 248, 0.4);
+      transform: translateY(-2px);
+    }
+    .dir-card-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .dir-card-title {
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tag-chip {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .tag-a { background: rgba(168, 218, 181, 0.2); color: #a8dab5; border: 1px solid rgba(168, 218, 181, 0.4); }
+    .tag-b { background: rgba(225, 29, 72, 0.2); color: #fda4af; border: 1px solid rgba(225, 29, 72, 0.4); }
+    .tag-c { background: rgba(194, 94, 46, 0.2); color: #fb923c; border: 1px solid rgba(194, 94, 46, 0.4); }
+
+    .img-preview-box {
+      height: 280px;
+      background: #000;
+      position: relative;
+      overflow: hidden;
+    }
+    .img-preview-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+    }
+
+    .dir-details {
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+    }
+    .detail-row {
+      font-size: 13px;
+      color: #cbd5e1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .detail-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .card-footer {
+      padding: 14px 20px;
+      background: rgba(0, 0, 0, 0.2);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .btn-open {
+      padding: 8px 16px;
+      border-radius: 8px;
+      background: #1e2433;
+      border: 1px solid #333d54;
+      color: #f1f5f9;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .btn-open:hover {
+      background: #2b344a;
+      border-color: #485777;
+    }
+
+    /* 差异性检验指纹表 */
+    .compare-section {
+      max-width: 1440px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .compare-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .fingerprint-pre {
+      background: #080a0e;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 12px;
+      color: #38bdf8;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <div class="brand-title">
+        Avatar for Android (Pixel 10) · 三方向展示画板
+        <span class="badge-live">Gate 3 · 等待用户选择</span>
+      </div>
+      <div class="sub-caption">
+        针对 Google Pixel 10 (Android 16)，构建三套骨架、材质与文化温度完全拉开的高保真 4 屏平铺交互展示板。
+      </div>
+    </div>
+  </header>
+
+  <main class="showcase-grid">
+
+    <!-- 方向 A -->
+    <div class="dir-card">
+      <div class="dir-card-header">
+        <div class="dir-card-title">方向 A · Pixel 原生 M3 Expressive</div>
+        <span class="tag-chip tag-a">Google 原厂旗舰</span>
+      </div>
+      <div class="img-preview-box">
+        <img src="./android-dir-a.png" alt="方向 A Pixel 原生 M3 Expressive">
+      </div>
+      <div class="dir-details">
+        <div class="detail-row">
+          <span class="detail-label">设计来源与理念</span>
+          <span>最佳设计师（Google Matias Duarte · M3 Expressive），Pixel 10 原生 Sage Light 灰绿展台与抹茶薄荷深邃界面。</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">核心主角素材</span>
+          <span>Canvas 动态流体呼吸球（AvatarPetOrb 随音量膨胀）+ 连续曲率 Squircle 大圆角卡片。</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">4 屏全景规格</span>
+          <span>① 全双工会话主屏、② 两阶段记忆保险库、③ 11 状态机与人设矩阵、④ 锁屏实时前台通知微岛。</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <span style="font-size:12px; color:var(--muted);">4 屏独立交互已就绪</span>
+        <a class="btn-open" href="./android-dir-a-material.html" target="_blank">预览原型 ↗</a>
+      </div>
+    </div>
+
+    <!-- 方向 B -->
+    <div class="dir-card">
+      <div class="dir-card-header">
+        <div class="dir-card-title">方向 B · 掌上战术发报机 (Nothing OS)</div>
+        <span class="tag-chip tag-b">极客战术点阵</span>
+      </div>
+      <div class="img-preview-box">
+        <img src="./android-dir-b.png" alt="方向 B 掌上战术发报机">
+      </div>
+      <div class="dir-details">
+        <div class="detail-row">
+          <span class="detail-label">设计来源与理念</span>
+          <span>现实参照（Nothing OS 3.0 × Teenage Engineering），纯黑曜石底板、点阵 Doto 液晶排印与信号红点缀。</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">核心主角素材</span>
+          <span>Canvas 12×12 Glyph LED 点阵呼吸阵列 + 硬件级媒体门禁物理闭锁拨杆。</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">4 屏全景规格</span>
+          <span>① 战术通讯主屏、② 记忆磁带插槽卡、③ 11 状态机与媒体门禁锁、④ 战术 Glyph 锁屏通知。</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <span style="font-size:12px; color:var(--muted);">4 屏独立交互已就绪</span>
+        <a class="btn-open" href="./android-dir-b-nothing.html" target="_blank">预览原型 ↗</a>
+      </div>
+    </div>
+
+    <!-- 方向 C -->
+    <div class="dir-card">
+      <div class="dir-card-header">
+        <div class="dir-card-title">方向 C · 口袋生活编辑手账</div>
+        <span class="tag-chip tag-c">晨光暖纸手账</span>
+      </div>
+      <div class="img-preview-box">
+        <img src="./android-dir-c.png" alt="方向 C 口袋生活编辑手账">
+      </div>
+      <div class="dir-details">
+        <div class="detail-row">
+          <span class="detail-label">设计来源与理念</span>
+          <span>秒数轮盘（App 风格库 12 号 Editorial Reader & 晨光暖纸手账），暖纸米白底色搭配人文衬线排印。</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">核心主角素材</span>
+          <span>水彩柔光萌伴光球 + 黄色活页便签记忆卡 + 赭石橙书签插槽。</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">4 屏全景规格</span>
+          <span>① 晨间会话主屏、② 活页便签记忆库、③ 伴侣化境与生活门禁、④ 锁屏日课微组件。</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <span style="font-size:12px; color:var(--muted);">4 屏独立交互已就绪</span>
+        <a class="btn-open" href="./android-dir-c-warm.html" target="_blank">预览原型 ↗</a>
+      </div>
+    </div>
+
+  </main>
+
+  <section class="compare-section">
+    <div class="compare-title">
+      <span>📐 design_lint.py 事实比对与体检数据</span>
+    </div>
+    <div class="fingerprint-pre">三方向外观与差异性度量：
+  android-dir-a-material.html：浅·有色底 #E0EAE0，无衬线标题（SF Pro Display）
+  android-dir-b-nothing.html： 深·近黑底 #050608，无衬线标题（Space Mono）
+  android-dir-c-warm.html：    浅·暖纸底 #ECE7DC，衬线标题（Noto Serif SC）
+  android-dir-a ↔ android-dir-b：色板距离 0.146，骨架相关 0.79
+  android-dir-a ↔ android-dir-c：色板距离 0.211，骨架相关 0.87
+  android-dir-b ↔ android-dir-c：色板距离 0.635，骨架相关 0.83
+  ✓ 三版拉开了（0 红灯，0 模板装饰）</div>
+  </section>
+
+</body>
+</html>

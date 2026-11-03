@@ -9,10 +9,13 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -99,25 +102,25 @@ fun AvatarPetOrb(
 
     val primaryColor = when (sessionState) {
         SessionState.LISTENING -> AccentGreen
-        SessionState.SPEAKING -> AccentCyan
+        SessionState.SPEAKING -> AccentYellow
         SessionState.ROUTING, SessionState.LOCAL_PROCESSING,
         SessionState.CLOUD_CONNECTING, SessionState.CLOUD_TURN -> AccentPurple
-        SessionState.PAUSED, SessionState.OFFLINE -> AccentYellow
-        SessionState.STOPPED, SessionState.LOCAL_ONLY -> Color(0xFF58A6FF)
-        else -> AccentCyan
+        SessionState.PAUSED, SessionState.OFFLINE -> Color(0xFF6B7280)
+        SessionState.STOPPED, SessionState.LOCAL_ONLY -> AccentCyan
+        else -> AccentGreen
     }
 
     val secondaryColor = when (sessionState) {
-        SessionState.SPEAKING -> AccentPurple
-        SessionState.LISTENING -> AccentCyan
-        else -> Color(0xFF1F6FEB)
+        SessionState.SPEAKING -> AccentYellow
+        SessionState.LISTENING -> AccentGreen
+        else -> AccentCyan
     }
 
-    val personaEmoji = when (activePersona) {
-        "roaster" -> "🔥 毒舌损友"
-        "jarvis" -> "💼 高效幕僚"
-        "pet" -> "🐾 元气小猫"
-        else -> "🌙 知心伴侣"
+    val personaLabel = when (activePersona) {
+        "roaster" -> "毒舌损友"
+        "jarvis" -> "高效幕僚"
+        "pet" -> "元气小猫"
+        else -> "知心伴侣"
     }
 
     Column(
@@ -229,21 +232,13 @@ fun AvatarPetOrb(
                 )
             }
 
-            // Center status / emotional expression icon
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                val statusEmoji = when (sessionState) {
-                    SessionState.LISTENING -> "👂"
-                    SessionState.SPEAKING -> "💬"
-                    SessionState.ROUTING, SessionState.LOCAL_PROCESSING,
-                    SessionState.CLOUD_CONNECTING, SessionState.CLOUD_TURN -> "💭"
-                    SessionState.STOPPED, SessionState.PAUSED -> "💤"
-                    else -> "✨"
-                }
-                Text(
-                    text = statusEmoji,
-                    fontSize = 24.sp
-                )
-            }
+            // 中心微光呼吸核心
+            Box(
+                modifier = Modifier
+                    .size(16.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.85f))
+            )
         }
 
         Spacer(modifier = Modifier.height(6.dp))
@@ -267,7 +262,7 @@ fun AvatarPetOrb(
         Spacer(modifier = Modifier.height(2.dp))
 
         Text(
-            text = "人设: $personaEmoji",
+            text = "人设模式: $personaLabel",
             fontSize = 11.sp,
             color = TextMuted
         )
