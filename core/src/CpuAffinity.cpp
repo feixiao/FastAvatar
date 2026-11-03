@@ -27,73 +27,57 @@ namespace audio_agent {
  * 3. 若处于模拟器或虚拟环境中导致 sysfs 节点缺失，采用索引升序的保底主频估算。
  * 4. 按 max_freq_khz 降序排列，截取前 top_n 个大核，用于绑定 LLM 推理等重度算力线程。
  */
-std::vector<int> DetectTopPerformanceCores(size_t top_n) {
-    std::vector<CpuCoreInfo> cores;
+static const std::vector<int>& GetSortedPerfCores() {
+    static const std::vector<int> s_cores = []() {
+        std::vector<CpuCoreInfo> cores;
+        long num_cpus = sysconf(_SC_NPROCESSORS_CONF);
+        if (num_cpus <= 0) num_cpus = 4;
 
-    long num_cpus = sysconf(_SC_NPROCESSORS_CONF);
-    if (num_cpus <= 0) {
-        num_cpus = 4; // 保底默认值
-    }
-
-    for (int i = 0; i < num_cpus; ++i) {
-        std::string path = "/sys/devices/system/cpu/cpu" + std::to_string(i) + "/cpufreq/cpuinfo_max_freq";
-        std::ifstream ifs(path);
-        long freq = 0;
-        if (ifs >> freq) {
-            cores.push_back({i, freq});
-        } else {
-            // 在模拟器或沙箱环境下无 cpufreq 节点，按核心编号模拟差异化主频
-            cores.push_back({i, 1000000 + i * 100000});
+        for (int i = 0; i < num_cpus; ++i) {
+            std::string path = "/sys/devices/system/cpu/cpu" + std::to_string(i) + "/cpufreq/cpuinfo_max_freq";
+            std::ifstream ifs(path);
+            long freq = 0;
+            if (ifs >> freq) {
+                cores.push_back({i, freq});
+            } else {
+                cores.push_back({i, 1000000 + i * 100000});
+            }
         }
-    }
+        std::sort(cores.begin(), cores.end(), [](const CpuCoreInfo& a, const CpuCoreInfo& b) {
+            return a.max_freq_khz > b.max_freq_khz;
+        });
+        std::vector<int> result;
+        result.reserve(cores.size());
+        for (const auto& c : cores) {
+            result.push_back(c.id);
+        }
+        return result;
+    }();
+    return s_cores;
+}
 
-    // 按最大主频从高到低排序：超大核 (Cortex-X系列) -> 大核 (Cortex-A7系列) -> 小核 (Cortex-A5系列)
-    std::sort(cores.begin(), cores.end(), [](const CpuCoreInfo& a, const CpuCoreInfo& b) {
-        return a.max_freq_khz > b.max_freq_khz;
-    });
+static const std::vector<int>& GetSortedEffCores() {
+    static const std::vector<int> s_cores = []() {
+        const auto& perf = GetSortedPerfCores();
+        std::vector<int> eff(perf.rbegin(), perf.rend());
+        return eff;
+    }();
+    return s_cores;
+}
 
-    std::vector<int> result;
+std::vector<int> DetectTopPerformanceCores(size_t top_n) {
+    const auto& cores = GetSortedPerfCores();
     size_t count = std::min(top_n, cores.size());
-    result.reserve(count);
-    for (size_t i = 0; i < count; ++i) {
-        result.push_back(cores[i].id);
-    }
-    return result;
+    return std::vector<int>(cores.begin(), cores.begin() + count);
 }
 
 /**
  * @brief 检测并返回当前设备中主频最低的能效小核心（Little Cores）物理编号列表
- * 
- * 适用于低负载、常驻轮询后台任务（例如闲置记忆归纳线程），防止占用大核引起发热或挤占前台算力。
  */
 std::vector<int> DetectEfficiencyCores(size_t bottom_n) {
-    std::vector<CpuCoreInfo> cores;
-    long num_cpus = sysconf(_SC_NPROCESSORS_CONF);
-    if (num_cpus <= 0) num_cpus = 4;
-
-    for (int i = 0; i < num_cpus; ++i) {
-        std::string path = "/sys/devices/system/cpu/cpu" + std::to_string(i) + "/cpufreq/cpuinfo_max_freq";
-        std::ifstream ifs(path);
-        long freq = 0;
-        if (ifs >> freq) {
-            cores.push_back({i, freq});
-        } else {
-            cores.push_back({i, 1000000 + i * 100000});
-        }
-    }
-
-    // 按最大主频从低到高排序：小核排在最前面
-    std::sort(cores.begin(), cores.end(), [](const CpuCoreInfo& a, const CpuCoreInfo& b) {
-        return a.max_freq_khz < b.max_freq_khz;
-    });
-
-    std::vector<int> result;
+    const auto& cores = GetSortedEffCores();
     size_t count = std::min(bottom_n, cores.size());
-    result.reserve(count);
-    for (size_t i = 0; i < count; ++i) {
-        result.push_back(cores[i].id);
-    }
-    return result;
+    return std::vector<int>(cores.begin(), cores.begin() + count);
 }
 
 /**
