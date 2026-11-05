@@ -51,7 +51,7 @@ type AppConfig struct {
 var (
 	defaultConfig = AppConfig{
 		DisplayForm: "pet",
-		PetSkin:     "cat",
+		PetSkin:     "whale",
 		Mode:        ModeHandsFree,
 		AlwaysOnTop: true,
 		Hotkey:      "Option+Space",
@@ -113,7 +113,7 @@ func LoadConfig() AppConfig {
 		loaded.DisplayForm = "pet"
 	}
 	if loaded.PetSkin == "" {
-		loaded.PetSkin = "cat"
+		loaded.PetSkin = "whale"
 	}
 	if loaded.ASR.Engine == "" {
 		loaded.ASR.Engine = "native_mac"

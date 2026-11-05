@@ -218,6 +218,19 @@ func (a *App) startup(ctx context.Context) {
 			a.emitEvent("avatar:error", fmt.Sprintf("大模型未连接 (%s)。请启动 LM Studio 或 Ollama。", a.cfg.LLM.BaseURL))
 		}
 	}()
+
+	// 初始伴侣醒来开场白（根据当前激活人格动态输出）
+	go func() {
+		time.Sleep(1200 * time.Millisecond)
+		greeting := "你终于醒啦~ 今天想聊点什么呀？"
+		if a.personaMgr != nil {
+			active := a.personaMgr.GetActiveSlot()
+			if active.Greeting != "" {
+				greeting = active.Greeting
+			}
+		}
+		a.emitEvent("avatar:speech", greeting)
+	}()
 }
 
 // shutdown is called when the app terminates
@@ -522,17 +535,58 @@ func (a *App) InteractPet(action string) map[string]interface{} {
 	cue := "jumping"
 	switch action {
 	case "pet":
-		msg = "舒服地眯起眼睛摇尾巴~ (亲密度 +5!)"
+		if a.cfg.PetSkin == "whale" {
+			msg = "舒服地眯起眼睛晃动鱼鳍~ (亲密度 +5!)"
+		} else if a.cfg.PetSkin == "cat" {
+			msg = "舒服地眯起眼睛发出呼噜声~ (亲密度 +5!)"
+		} else if a.cfg.PetSkin == "fox" {
+			msg = "欢快地摇着毛茸茸的大尾巴~ (亲密度 +5!)"
+		} else {
+			msg = "舒服地眯起眼睛贴了贴你~ (亲密度 +5!)"
+		}
 		cue = "jumping"
 	case "feed":
-		msg = "嗷呜一口吃掉小零食，满脸满足！"
+		if a.cfg.PetSkin == "whale" {
+			msg = "嗷呜一口吃掉白饭配鱼片，满脸满足！"
+		} else if a.cfg.PetSkin == "cat" {
+			msg = "嗷呜一口吃掉小鱼干，吧唧着嘴巴超开心！"
+		} else {
+			msg = "嗷呜一口吃掉小零食，满脸满足！"
+		}
 		cue = "jumping"
+	case "rice":
+		if a.cfg.PetSkin == "whale" {
+			msg = "捧着热气腾腾的大米饭大口干饭！真香~ (亲密度 +5!)"
+		} else if a.cfg.PetSkin == "cat" {
+			msg = "把小脑袋埋进大白饭碗里大口吧唧吧唧！(亲密度 +5!)"
+		} else {
+			msg = "开心地享用大米饭，满脸满足！(亲密度 +5!)"
+		}
+		cue = "rice"
+	case "turbo":
+		if a.cfg.PetSkin == "whale" {
+			msg = "抱紧钢盆疯狂干饭，两只小脚丫欢快扑腾乱蹬！(亲密度 +5!)"
+		} else if a.cfg.PetSkin == "cat" {
+			msg = "抱住大碗狂吃一空，心满意足地舔着胡须！(亲密度 +5!)"
+		} else {
+			msg = "风卷残云般狂吃大餐，元气满满！(亲密度 +5!)"
+		}
+		cue = "turbo"
+	case "grass":
+		msg = "一个飞扑按住小草玩具，尾巴得意地摇了摇~ (亲密度 +5!)"
+		cue = "grass"
 	case "poke":
 		msg = "歪过头眨巴着眼睛看着你：怎么啦？"
 		cue = "jumping"
 	case "wake":
 		msg = "揉了揉眼睛，元气满满地醒来啦！"
-		cue = "jumping"
+		if a.personaMgr != nil {
+			active := a.personaMgr.GetActiveSlot()
+			if active.Greeting != "" {
+				msg = active.Greeting
+			}
+		}
+		cue = "wake"
 	}
 
 	if leveledUp {

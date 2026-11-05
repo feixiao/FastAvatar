@@ -1,10 +1,10 @@
 package splitter
 
 import (
+	"regexp"
 	"strings"
 	"unicode"
 )
-
 type SentenceSplitter struct {
 	buffer         strings.Builder
 	isFirstChunk   bool
@@ -91,4 +91,49 @@ func (s *SentenceSplitter) Flush() []string {
 	}
 	s.Reset()
 	return sentences
+}
+
+var (
+	bracketPattern  = regexp.MustCompile(`（[^）]*）|\([^)]*\)|【[^】]*】|\[[^\]]*\]`)
+	prefixPattern   = regexp.MustCompile(`^(大肥鱼|鲸鱼娘|回复|助手|AI|Assistant)\s*[:：]\s*`)
+	markdownPattern = regexp.MustCompile(`[*_#~` + "`" + `]`)
+)
+
+// CleanSpokenText 过滤大模型输出中的 Markdown 标记、括号神态指示、角色前缀与 Emoji，确保语音引擎只朗读纯净口语文本
+func CleanSpokenText(s string) string {
+	if s == "" {
+		return ""
+	}
+	s = markdownPattern.ReplaceAllString(s, "")
+	s = strings.TrimSpace(s)
+	s = prefixPattern.ReplaceAllString(s, "")
+	s = bracketPattern.ReplaceAllString(s, "")
+
+	var sb strings.Builder
+	for _, r := range s {
+		if isEmojiOrSymbol(r) {
+			continue
+		}
+		sb.WriteRune(r)
+	}
+	return strings.TrimSpace(sb.String())
+}
+
+func isEmojiOrSymbol(r rune) bool {
+	if (r >= 0x1F600 && r <= 0x1F64F) ||
+		(r >= 0x1F300 && r <= 0x1F5FF) ||
+		(r >= 0x1F680 && r <= 0x1F6FF) ||
+		(r >= 0x1F700 && r <= 0x1F77F) ||
+		(r >= 0x1F780 && r <= 0x1F7FF) ||
+		(r >= 0x1F800 && r <= 0x1F8FF) ||
+		(r >= 0x1F900 && r <= 0x1F9FF) ||
+		(r >= 0x1FA00 && r <= 0x1FA6F) ||
+		(r >= 0x1FA70 && r <= 0x1FAFF) ||
+		(r >= 0x2600 && r <= 0x26FF) ||
+		(r >= 0x2700 && r <= 0x27BF) ||
+		(r >= 0xFE00 && r <= 0xFE0F) ||
+		(r >= 0x1F1E6 && r <= 0x1F1FF) {
+		return true
+	}
+	return false
 }

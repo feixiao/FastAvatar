@@ -224,10 +224,10 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
 
         let now = Date()
 
-        // 4. Hands-free utterance finalization on 750ms silence after speech
+        // 4. Hands-free utterance finalization on 900ms silence after speech (对齐大肥鱼自然轮次判停)
         if mode == "hands_free" && hasSpeech && !lastText.isEmpty && !isFinalizing {
             let silenceDuration = now.timeIntervalSince(lastTranscriptionTime)
-            if silenceDuration >= 0.75 {
+            if silenceDuration >= 0.90 {
                 isFinalizing = true
                 hasSpeech = false
                 DispatchQueue.main.async {

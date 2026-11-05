@@ -34,6 +34,13 @@ type PetManifest struct {
 
 var BuiltinSkins = []SkinInfo{
 	{
+		ID:                  "whale",
+		DisplayName:         "大肥鱼 (鲸鱼娘)",
+		Description:         "生活在桌面上的专属大肥鱼/鲸鱼娘，呆萌温和、爱吃白饭，嘴型随说话起伏自然张合",
+		Type:                "builtin",
+		SpriteVersionNumber: 1,
+	},
+	{
 		ID:                  "cat",
 		DisplayName:         "橘宝喵",
 		Description:         "软萌可爱的橘猫伴侣，活泼好动，拥有眨眼、跳跃、倾听等完整动作帧",

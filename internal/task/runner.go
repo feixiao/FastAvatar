@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -146,6 +147,10 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 				if !ok {
 					return
 				}
+				cleanSentence := splitter.CleanSpokenText(sentence)
+				if strings.TrimSpace(cleanSentence) == "" {
+					continue
+				}
 				if firstChunk {
 					if r.coord != nil {
 						r.coord.SetState(orchestrator.StateSpeaking)
@@ -156,9 +161,9 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 				cb := r.onSpeechChunk
 				r.mu.RUnlock()
 				if cb != nil {
-					cb(sentence)
+					cb(cleanSentence)
 				}
-				_ = r.ttsEngine.Speak(ctx, sentence)
+				_ = r.ttsEngine.Speak(ctx, cleanSentence)
 			}
 		}
 	}()

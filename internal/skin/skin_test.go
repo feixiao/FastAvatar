@@ -10,10 +10,10 @@ import (
 func TestBuiltinSkins(t *testing.T) {
 	mgr := NewManager(t.TempDir())
 	skins := mgr.ListSkins()
-	if len(skins) < 3 {
-		t.Fatalf("expected at least 3 builtin skins, got %d", len(skins))
+	if len(skins) < 4 {
+		t.Fatalf("expected at least 4 builtin skins, got %d", len(skins))
 	}
-	if skins[0].ID != "cat" || skins[1].ID != "fox" || skins[2].ID != "spirit" {
+	if skins[0].ID != "whale" || skins[1].ID != "cat" || skins[2].ID != "fox" || skins[3].ID != "spirit" {
 		t.Errorf("builtin skins order or IDs mismatch: %+v", skins)
 	}
 }

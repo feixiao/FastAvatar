@@ -190,6 +190,9 @@
         ctx.save();
         ctx.translate(cx, cy);
         switch (skinId) {
+          case "whale":
+            drawWhaleFrame(ctx, row, col);
+            break;
           case "fox":
             drawFoxFrame(ctx, row, col);
             break;
@@ -203,6 +206,236 @@
         }
         ctx.restore();
       }
+    }
+  }
+  function drawWhaleFrame(ctx, row, col) {
+    const whaleBlue = "#2563eb";
+    const whaleDark = "#1e3a8a";
+    const whaleBelly = "#f8fafc";
+    const skinColor = "#ffe4d6";
+    const eyeColor = "#0284c7";
+    const blushColor = "rgba(244, 114, 182, 0.65)";
+    const waterColor = "#38bdf8";
+    let bobY = 0;
+    let stretchX = 1;
+    let stretchY = 1;
+    let eyeState = "open";
+    let mouthState = "smile";
+    let finWave = 0;
+    let tailAngle = Math.sin(col * 0.8) * 0.25;
+    let leanX = 0;
+    let blush = true;
+    let fxType = null;
+    let spoutHeight = 6;
+    switch (row) {
+      case 0:
+        bobY = Math.sin(col / 6 * Math.PI * 2) * 2.5;
+        stretchY = 1 + Math.sin(col / 6 * Math.PI * 2) * 0.03;
+        stretchX = 1 - Math.sin(col / 6 * Math.PI * 2) * 0.03;
+        if (col === 2 || col === 3) eyeState = "blink";
+        tailAngle = Math.sin(col * 0.9) * 0.35;
+        spoutHeight = 6 + Math.sin(col * 0.8) * 3;
+        break;
+      case 1:
+        bobY = Math.abs(Math.sin(col / 4 * Math.PI)) * -6;
+        leanX = 0.12;
+        tailAngle = -0.4 + Math.sin(col * 1.2) * 0.25;
+        finWave = Math.sin(col * 0.8) * 8;
+        break;
+      case 2:
+        bobY = Math.abs(Math.sin(col / 4 * Math.PI)) * -6;
+        leanX = -0.12;
+        tailAngle = 0.4 - Math.sin(col * 1.2) * 0.25;
+        finWave = -Math.sin(col * 0.8) * 8;
+        break;
+      case 3:
+        bobY = Math.sin(col * 1.5) * 3;
+        mouthState = col % 2 === 0 ? "open" : "smile";
+        finWave = -14 - col % 2 * 6;
+        tailAngle = 0.25;
+        spoutHeight = 8 + col % 2 * 4;
+        break;
+      case 4:
+        bobY = -Math.sin(col / 5 * Math.PI) * 22;
+        stretchY = col === 0 ? 0.85 : col === 2 ? 1.15 : 1;
+        stretchX = col === 0 ? 1.15 : col === 2 ? 0.9 : 1;
+        eyeState = "happy";
+        mouthState = "open";
+        fxType = "hearts";
+        spoutHeight = 12;
+        break;
+      case 5:
+        bobY = 3;
+        eyeState = "dizzy";
+        mouthState = "sad";
+        fxType = "sweat";
+        tailAngle = 0.1;
+        break;
+      case 6:
+        bobY = Math.sin(col / 6 * Math.PI * 2) * 1.2;
+        leanX = 0.06;
+        eyeState = "listening";
+        mouthState = "closed";
+        fxType = "wave";
+        tailAngle = Math.sin(col * 0.5) * 0.15;
+        break;
+      case 7:
+        bobY = Math.abs(Math.sin(col / 3 * Math.PI)) * -8;
+        leanX = 0.18;
+        tailAngle = -0.5;
+        mouthState = "open";
+        break;
+      case 8:
+        bobY = Math.sin(col * 0.8) * 1.8;
+        leanX = -0.05;
+        eyeState = "thinking";
+        mouthState = "closed";
+        fxType = "thought";
+        break;
+    }
+    ctx.translate(0, bobY);
+    ctx.scale(stretchX, stretchY);
+    ctx.rotate(leanX);
+    ctx.save();
+    ctx.translate(0, 36);
+    ctx.rotate(tailAngle);
+    ctx.fillStyle = whaleBlue;
+    ctx.beginPath();
+    ctx.moveTo(-10, 0);
+    ctx.quadraticCurveTo(-24, 18, -32, 28);
+    ctx.quadraticCurveTo(-16, 26, 0, 16);
+    ctx.quadraticCurveTo(16, 26, 32, 28);
+    ctx.quadraticCurveTo(24, 18, 10, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 46, 42, 0, 0, Math.PI * 2);
+    ctx.fillStyle = whaleBlue;
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, -38);
+    ctx.fillStyle = waterColor;
+    ctx.beginPath();
+    ctx.arc(0, -spoutHeight, 3.5, 0, Math.PI * 2);
+    ctx.arc(-5, -spoutHeight * 0.7, 2.5, 0, Math.PI * 2);
+    ctx.arc(5, -spoutHeight * 0.7, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.beginPath();
+    ctx.ellipse(0, 18, 30, 24, 0, 0, Math.PI * 2);
+    ctx.fillStyle = whaleBelly;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(0, -4, 32, 26, 0, 0, Math.PI * 2);
+    ctx.fillStyle = skinColor;
+    ctx.fill();
+    ctx.fillStyle = whaleDark;
+    ctx.beginPath();
+    ctx.moveTo(-30, -10);
+    ctx.quadraticCurveTo(-20, -28, 0, -28);
+    ctx.quadraticCurveTo(20, -28, 30, -10);
+    ctx.quadraticCurveTo(15, -16, 0, -12);
+    ctx.quadraticCurveTo(-15, -16, -30, -10);
+    ctx.fill();
+    drawWhaleEyes(ctx, eyeState, eyeColor);
+    if (blush || eyeState === "happy") {
+      ctx.fillStyle = blushColor;
+      ctx.beginPath();
+      ctx.ellipse(-20, 2, 6, 3.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(20, 2, 6, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = "#991b1b";
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = "round";
+    if (mouthState === "smile") {
+      ctx.beginPath();
+      ctx.arc(0, 3, 3.5, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+    } else if (mouthState === "open") {
+      ctx.beginPath();
+      ctx.ellipse(0, 5, 4.5, 5.5, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#e11d48";
+      ctx.fill();
+      ctx.fillStyle = "#fda4af";
+      ctx.beginPath();
+      ctx.ellipse(0, 7, 3, 2.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (mouthState === "closed") {
+      ctx.beginPath();
+      ctx.moveTo(-3, 4);
+      ctx.lineTo(3, 4);
+      ctx.stroke();
+    } else if (mouthState === "sad") {
+      ctx.beginPath();
+      ctx.arc(0, 6, 4, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+    }
+    ctx.fillStyle = whaleBlue;
+    ctx.save();
+    ctx.translate(-34, 12 + (row === 3 ? finWave : 0));
+    ctx.rotate(0.3 + (row === 3 ? -0.4 : 0));
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 12, 6, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.translate(34, 12);
+    ctx.rotate(-0.3);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 12, 6, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    if (fxType === "hearts") {
+      drawHeart(ctx, -26, -38, 6, "#f43f5e");
+      drawHeart(ctx, 26, -42, 8, "#fb7185");
+    } else if (fxType === "sweat") {
+      drawSweatDrop(ctx, 28, -28);
+    } else if (fxType === "wave") {
+      drawSoundWaves(ctx, -38, -6, col);
+      drawSoundWaves(ctx, 38, -6, col);
+    } else if (fxType === "thought") {
+      drawThoughtBubble(ctx, 26, -44, col);
+    }
+  }
+  function drawWhaleEyes(ctx, state, eyeColor) {
+    if (state === "blink") {
+      ctx.strokeStyle = "#1e3a8a";
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-19, -4);
+      ctx.quadraticCurveTo(-14, 0, -9, -4);
+      ctx.moveTo(9, -4);
+      ctx.quadraticCurveTo(14, 0, 19, -4);
+      ctx.stroke();
+    } else if (state === "happy") {
+      ctx.strokeStyle = "#1e3a8a";
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-20, -2);
+      ctx.quadraticCurveTo(-14, -8, -8, -2);
+      ctx.moveTo(8, -2);
+      ctx.quadraticCurveTo(14, -8, 20, -2);
+      ctx.stroke();
+    } else if (state === "dizzy") {
+      ctx.strokeStyle = "#1e3a8a";
+      ctx.lineWidth = 1.8;
+      drawSpiral(ctx, -14, -4, 4);
+      drawSpiral(ctx, 14, -4, 4);
+    } else {
+      let offX = 0;
+      let offY = 0;
+      if (state === "thinking") {
+        offX = 1;
+        offY = -2;
+      } else if (state === "listening") {
+        offY = 1;
+      }
+      drawSingleEye(ctx, -14, -4, eyeColor, offX, offY, 1.15);
+      drawSingleEye(ctx, 14, -4, eyeColor, offX, offY, 1.15);
     }
   }
   function drawCatFrame(ctx, row, col) {
@@ -269,7 +502,7 @@
         bobY = Math.sin(col / 6 * Math.PI * 2) * 1.5;
         leanX = 0.08;
         eyeState = "listening";
-        mouthState = "round";
+        mouthState = "closed";
         fxType = "wave";
         tailAngle = Math.sin(col * 0.6) * 0.2;
         break;
@@ -283,7 +516,7 @@
         bobY = Math.sin(col * 0.8) * 2;
         leanX = -0.06;
         eyeState = "thinking";
-        mouthState = "round";
+        mouthState = "closed";
         fxType = "thought";
         break;
     }
@@ -393,6 +626,11 @@
       ctx.beginPath();
       ctx.ellipse(0, 7, 3, 3, 0, 0, Math.PI * 2);
       ctx.fill();
+    } else if (mouthState === "closed") {
+      ctx.beginPath();
+      ctx.moveTo(-4, 3);
+      ctx.lineTo(4, 3);
+      ctx.stroke();
     } else if (mouthState === "round") {
       ctx.beginPath();
       ctx.arc(0, 4, 3, 0, Math.PI * 2);
@@ -894,6 +1132,13 @@
   var petStatusPill = document.getElementById("petStatusPill");
   var petStatusDot = document.getElementById("petStatusDot");
   var petStatusText = document.getElementById("petStatusText");
+  var petCharacterView = document.getElementById("petCharacterView");
+  var whaleCharacterBox = document.getElementById("whaleCharacterBox");
+  var whaleBaseImg = document.getElementById("whaleBaseImg");
+  var whaleMouth = document.getElementById("whaleMouth");
+  var whalePoseContainer = document.getElementById("whalePoseContainer");
+  var whalePoseImg = document.getElementById("whalePoseImg");
+  var whaleFoxtailLure = document.getElementById("whaleFoxtailLure");
   var petInputBar = document.getElementById("petInputBar");
   var petTextInput = document.getElementById("petTextInput");
   var btnPetSend = document.getElementById("btnPetSend");
@@ -905,11 +1150,16 @@
   var btnPetToCapsule = document.getElementById("btnPetToCapsule");
   var btnPetDrawer = document.getElementById("btnPetDrawer");
   var btnPetStop = document.getElementById("btnPetStop");
+  var btnPetRice = document.getElementById("btnPetRice");
+  var btnPetTurbo = document.getElementById("btnPetTurbo");
   var petContextMenu = document.getElementById("petContextMenu");
   var menuPetTitle = document.getElementById("menuPetTitle");
   var menuActionPet = document.getElementById("menuActionPet");
   var menuActionFeed = document.getElementById("menuActionFeed");
   var menuActionChat = document.getElementById("menuActionChat");
+  var menuActionRice = document.getElementById("menuActionRice");
+  var menuActionTurbo = document.getElementById("menuActionTurbo");
+  var menuActionGrass = document.getElementById("menuActionGrass");
   var skinSubmenu = document.getElementById("skinSubmenu");
   var personaSubmenu = document.getElementById("personaSubmenu");
   var menuToggleForm = document.getElementById("menuToggleForm");
@@ -950,7 +1200,7 @@
   var xpBarFill = document.getElementById("xpBarFill");
   var xpLabelText = document.getElementById("xpLabelText");
   var currentForm = "pet";
-  var currentSkin = "cat";
+  var currentSkin = "whale";
   var currentMode = "hands_free";
   var currentState = "idle";
   var isDrawerOpen = false;
@@ -992,10 +1242,57 @@
       window.go.main.App.SetDisplayForm(targetForm);
     }
   }
+  var activePoseTimer = null;
+  var isWhalePosePlaying = false;
+  var activeWhalePose = null;
+  function playWhalePose(poseName, durationMs = 0) {
+    if (currentSkin !== "whale" || !petCharacterView || !whaleCharacterBox || !whalePoseContainer || !whalePoseImg) {
+      return;
+    }
+    clearTimeout(activePoseTimer);
+    isWhalePosePlaying = true;
+    activeWhalePose = poseName;
+    whaleCharacterBox.style.display = "none";
+    whalePoseContainer.style.display = "flex";
+    whalePoseContainer.className = `whale-pose-container pose-${poseName}`;
+    whalePoseImg.src = `./assets/whale/${poseName}.webp`;
+    if (durationMs > 0) {
+      activePoseTimer = setTimeout(() => {
+        stopWhalePose();
+      }, durationMs);
+    }
+  }
+  function stopWhalePose() {
+    clearTimeout(activePoseTimer);
+    isWhalePosePlaying = false;
+    activeWhalePose = null;
+    if (whaleCharacterBox && whalePoseContainer) {
+      whaleCharacterBox.style.display = "flex";
+      whalePoseContainer.style.display = "none";
+    }
+  }
+  function playFoxtailInteraction() {
+    if (currentSkin !== "whale" || !whaleFoxtailLure) return;
+    whaleFoxtailLure.style.display = "block";
+    whaleFoxtailLure.style.left = "62%";
+    whaleFoxtailLure.style.top = "24%";
+    setTimeout(() => {
+      whaleFoxtailLure.style.display = "none";
+    }, 2200);
+  }
   function applySkin(skinId) {
-    currentSkin = skinId || "cat";
-    petRenderer.loadSkin(currentSkin);
+    currentSkin = skinId || "whale";
+    stopWhalePose();
+    if (currentSkin === "whale") {
+      if (petCharacterView) petCharacterView.style.display = "flex";
+      if (petCanvas) petCanvas.style.display = "none";
+    } else {
+      if (petCharacterView) petCharacterView.style.display = "none";
+      if (petCanvas) petCanvas.style.display = "block";
+      petRenderer.loadSkin(currentSkin);
+    }
     const skinNames = {
+      whale: "\u5927\u80A5\u9C7C (\u9CB8\u9C7C\u5A18)",
       cat: "\u6A58\u5B9D\u55B5 (\u684C\u5BA0\u4F34\u4FA3)",
       fox: "\u7075\u72D0\u5C0F\u4E5D (\u684C\u5BA0\u4F34\u4FA3)",
       spirit: "\u661F\u7075\u9732\u9732 (\u684C\u5BA0\u4F34\u4FA3)"
@@ -1072,6 +1369,7 @@
   }
   petBubble.addEventListener("click", hideBubble);
   function applyState(state) {
+    const previousState = currentState;
     currentState = state;
     const label = stateLabels[state] || state;
     const color = stateColors[state] || "#38bdf8";
@@ -1082,6 +1380,18 @@
     petStatusText.textContent = label.split(" ")[0];
     petStatusDot.style.background = color;
     petStatusDot.style.boxShadow = `0 0 8px ${color}`;
+    if (whaleMouth) {
+      if (state === "speaking") {
+        whaleMouth.style.opacity = "1";
+      } else {
+        whaleMouth.style.opacity = "0";
+      }
+    }
+    if (state === "sleep" && currentSkin === "whale") {
+      playWhalePose("sleep-asleep", 0);
+    } else if (previousState === "sleep" && state !== "sleep" && currentSkin === "whale") {
+      playWhalePose("sleep-waking", 1600);
+    }
     if (state === "idle") {
       const cur = subtitleText.textContent || "";
       if (!cur || cur.startsWith("\u6B63\u5728") || cur.startsWith("\u503E\u542C") || cur.startsWith("\u{1F399}\uFE0F")) {
@@ -1147,11 +1457,26 @@
       window.go.main.App.InteractPet(action).then((res) => {
         if (!res) return;
         petRenderer.triggerCue(res.cue || "jumping", 1200);
+        if (currentSkin === "whale") {
+          if (action === "rice") {
+            playWhalePose("rice", 2600);
+          } else if (action === "turbo") {
+            playWhalePose("turbo", 1600);
+          } else if (action === "grass") {
+            playFoxtailInteraction();
+          } else if (action === "wake") {
+            playWhalePose("sleep-waking", 1600);
+          }
+        }
         const xpLabel = res.xp ? `+5 XP (${res.xp} XP)` : "+5 XP";
         if (action === "pet") {
           petRenderer.spawnHearts(100, 70, `\u2764\uFE0F ${xpLabel}`);
+        } else if (action === "rice" || action === "turbo") {
+          petRenderer.spawnHearts(100, 70, `\u{1F35A} \u5E72\u996D ${xpLabel}`);
         } else if (action === "feed") {
           petRenderer.spawnHearts(100, 70, `\u{1F41F} \u9971\u8179 ${xpLabel}`);
+        } else if (action === "grass") {
+          petRenderer.spawnHearts(100, 70, `\u{1F33E} \u9017\u8349 ${xpLabel}`);
         } else {
           petRenderer.spawnHearts(100, 70, xpLabel);
         }
@@ -1172,6 +1497,36 @@
     e.stopPropagation();
     handlePetAction("feed");
   });
+  if (btnPetRice) {
+    btnPetRice.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handlePetAction("rice");
+    });
+  }
+  if (btnPetTurbo) {
+    btnPetTurbo.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handlePetAction("turbo");
+    });
+  }
+  if (menuActionRice) {
+    menuActionRice.addEventListener("click", () => {
+      handlePetAction("rice");
+      closeContextMenu();
+    });
+  }
+  if (menuActionTurbo) {
+    menuActionTurbo.addEventListener("click", () => {
+      handlePetAction("turbo");
+      closeContextMenu();
+    });
+  }
+  if (menuActionGrass) {
+    menuActionGrass.addEventListener("click", () => {
+      handlePetAction("grass");
+      closeContextMenu();
+    });
+  }
   btnPetStop.addEventListener("click", (e) => {
     e.stopPropagation();
     if (window.go && window.go.main && window.go.main.App) {

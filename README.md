@@ -21,7 +21,8 @@ Avatar 是一套**端云协同、双环驱动（Dual-Loop）、低时延流式�
   - **macOS**：无 Python 依赖纯 Go 单二进制，常驻内存仅 ~25-35MB，极简透明悬浮胶囊，支持硬件级回声消除（AEC）。
   - **Android**：针对 Google Pixel 10 定制的 Material 3 + 11 状态严密状态机前台服务。
 
-> 📖 **关于完整的架构拓扑、时序交互、状态机生命周期与协议细节，请查阅 [系统工程架构设计文档 (docs/architecture.md)](docs/architecture.md)。**
+> 📖 **关于完整的架构拓扑与协议细节，请查阅 [系统工程架构设计文档 (docs/architecture.md)](docs/architecture.md)。**  
+> 🐋 **关于桌面宠物互动、干饭彩蛋与全双工可打断对聊，请查阅 [Desktop Pet 桌面宠物与语音互动指南 (docs/desktop-pet.md)](docs/desktop-pet.md)。**
 
 ---
 
@@ -112,3 +113,4 @@ Avatar/
 所有底层技术设计、协议定义与工程规范请查阅 `docs/` 目录：
 - 🌟 **[系统工程架构文档 (System Architecture)](docs/architecture.md)**：双环架构、客户端分层、云端基础设施、时序图、状态机、REST API 契约与安全机制。
 - 📱 **[Android 移动端开发指南](android/README.md)**：Pixel 10 客户端构建、测试与前台服务配置。
+- 🐋 **[Desktop Pet 桌面宠物与语音互动指南 (docs/desktop-pet.md)](docs/desktop-pet.md)**：macOS 桌面宠物交互规范、干饭动效、嘴型闭环、大肥鱼及全桌宠自由替换说明。

@@ -13,6 +13,13 @@ const particleLayer = document.getElementById("particleLayer");
 const petStatusPill = document.getElementById("petStatusPill");
 const petStatusDot = document.getElementById("petStatusDot");
 const petStatusText = document.getElementById("petStatusText");
+const petCharacterView = document.getElementById("petCharacterView");
+const whaleCharacterBox = document.getElementById("whaleCharacterBox");
+const whaleBaseImg = document.getElementById("whaleBaseImg");
+const whaleMouth = document.getElementById("whaleMouth");
+const whalePoseContainer = document.getElementById("whalePoseContainer");
+const whalePoseImg = document.getElementById("whalePoseImg");
+const whaleFoxtailLure = document.getElementById("whaleFoxtailLure");
 
 const petInputBar = document.getElementById("petInputBar");
 const petTextInput = document.getElementById("petTextInput");
@@ -26,6 +33,8 @@ const btnPetPersona = document.getElementById("btnPetPersona");
 const btnPetToCapsule = document.getElementById("btnPetToCapsule");
 const btnPetDrawer = document.getElementById("btnPetDrawer");
 const btnPetStop = document.getElementById("btnPetStop");
+const btnPetRice = document.getElementById("btnPetRice");
+const btnPetTurbo = document.getElementById("btnPetTurbo");
 
 // 右键菜单
 const petContextMenu = document.getElementById("petContextMenu");
@@ -33,6 +42,9 @@ const menuPetTitle = document.getElementById("menuPetTitle");
 const menuActionPet = document.getElementById("menuActionPet");
 const menuActionFeed = document.getElementById("menuActionFeed");
 const menuActionChat = document.getElementById("menuActionChat");
+const menuActionRice = document.getElementById("menuActionRice");
+const menuActionTurbo = document.getElementById("menuActionTurbo");
+const menuActionGrass = document.getElementById("menuActionGrass");
 const skinSubmenu = document.getElementById("skinSubmenu");
 const personaSubmenu = document.getElementById("personaSubmenu");
 const menuToggleForm = document.getElementById("menuToggleForm");
@@ -81,7 +93,7 @@ const xpLabelText = document.getElementById("xpLabelText");
 
 // ==================== 2. 全局状态与宠物渲染器初始化 ====================
 let currentForm = "pet"; // "pet" | "capsule"
-let currentSkin = "cat"; // "cat" | "fox" | "spirit" | 自定义皮肤 ID
+let currentSkin = "whale"; // 默认大肥鱼
 let currentMode = "hands_free";
 let currentState = "idle";
 let recognition = null;
@@ -135,11 +147,65 @@ function switchForm(targetForm) {
   }
 }
 
+let activePoseTimer = null;
+let isWhalePosePlaying = false;
+let activeWhalePose = null;
+
+function playWhalePose(poseName, durationMs = 0) {
+  if (currentSkin !== "whale" || !petCharacterView || !whaleCharacterBox || !whalePoseContainer || !whalePoseImg) {
+    return;
+  }
+  clearTimeout(activePoseTimer);
+  isWhalePosePlaying = true;
+  activeWhalePose = poseName;
+
+  whaleCharacterBox.style.display = "none";
+  whalePoseContainer.style.display = "flex";
+  whalePoseContainer.className = `whale-pose-container pose-${poseName}`;
+  whalePoseImg.src = `./assets/whale/${poseName}.webp`;
+
+  if (durationMs > 0) {
+    activePoseTimer = setTimeout(() => {
+      stopWhalePose();
+    }, durationMs);
+  }
+}
+
+function stopWhalePose() {
+  clearTimeout(activePoseTimer);
+  isWhalePosePlaying = false;
+  activeWhalePose = null;
+  if (whaleCharacterBox && whalePoseContainer) {
+    whaleCharacterBox.style.display = "flex";
+    whalePoseContainer.style.display = "none";
+  }
+}
+
+function playFoxtailInteraction() {
+  if (currentSkin !== "whale" || !whaleFoxtailLure) return;
+  whaleFoxtailLure.style.display = "block";
+  whaleFoxtailLure.style.left = "62%";
+  whaleFoxtailLure.style.top = "24%";
+  setTimeout(() => {
+    whaleFoxtailLure.style.display = "none";
+  }, 2200);
+}
+
 function applySkin(skinId) {
-  currentSkin = skinId || "cat";
-  petRenderer.loadSkin(currentSkin);
+  currentSkin = skinId || "whale";
+  stopWhalePose();
+
+  if (currentSkin === "whale") {
+    if (petCharacterView) petCharacterView.style.display = "flex";
+    if (petCanvas) petCanvas.style.display = "none";
+  } else {
+    if (petCharacterView) petCharacterView.style.display = "none";
+    if (petCanvas) petCanvas.style.display = "block";
+    petRenderer.loadSkin(currentSkin);
+  }
 
   const skinNames = {
+    whale: "大肥鱼 (鲸鱼娘)",
     cat: "橘宝喵 (桌宠伴侣)",
     fox: "灵狐小九 (桌宠伴侣)",
     spirit: "星灵露露 (桌宠伴侣)",
@@ -234,6 +300,7 @@ petBubble.addEventListener("click", hideBubble);
 
 
 function applyState(state) {
+  const previousState = currentState;
   currentState = state;
   const label = stateLabels[state] || state;
   const color = stateColors[state] || "#38bdf8";
@@ -248,6 +315,22 @@ function applyState(state) {
   petStatusText.textContent = label.split(" ")[0];
   petStatusDot.style.background = color;
   petStatusDot.style.boxShadow = `0 0 8px ${color}`;
+
+  // 3. 严格闭环大肥鱼嘴型状态：只有在 speaking 发音时嘴型才张合，其余状态（思考、倾听、待机）严禁乱动，强制闭合
+  if (whaleMouth) {
+    if (state === "speaking") {
+      whaleMouth.style.opacity = "1";
+    } else {
+      whaleMouth.style.opacity = "0";
+    }
+  }
+
+  // 4. 休眠与唤醒大肥鱼动效联动
+  if (state === "sleep" && currentSkin === "whale") {
+    playWhalePose("sleep-asleep", 0);
+  } else if (previousState === "sleep" && state !== "sleep" && currentSkin === "whale") {
+    playWhalePose("sleep-waking", 1600);
+  }
 
   if (state === "idle") {
     const cur = subtitleText.textContent || "";
@@ -329,11 +412,28 @@ function handlePetAction(action) {
       if (!res) return;
       petRenderer.triggerCue(res.cue || "jumping", 1200);
 
+      // 大肥鱼专属动作呈现
+      if (currentSkin === "whale") {
+        if (action === "rice") {
+          playWhalePose("rice", 2600);
+        } else if (action === "turbo") {
+          playWhalePose("turbo", 1600);
+        } else if (action === "grass") {
+          playFoxtailInteraction();
+        } else if (action === "wake") {
+          playWhalePose("sleep-waking", 1600);
+        }
+      }
+
       const xpLabel = res.xp ? `+5 XP (${res.xp} XP)` : "+5 XP";
       if (action === "pet") {
         petRenderer.spawnHearts(100, 70, `❤️ ${xpLabel}`);
+      } else if (action === "rice" || action === "turbo") {
+        petRenderer.spawnHearts(100, 70, `🍚 干饭 ${xpLabel}`);
       } else if (action === "feed") {
         petRenderer.spawnHearts(100, 70, `🐟 饱腹 ${xpLabel}`);
+      } else if (action === "grass") {
+        petRenderer.spawnHearts(100, 70, `🌾 逗草 ${xpLabel}`);
       } else {
         petRenderer.spawnHearts(100, 70, xpLabel);
       }
@@ -360,6 +460,40 @@ btnPetFeed.addEventListener("click", (e) => {
   e.stopPropagation();
   handlePetAction("feed");
 });
+if (btnPetRice) {
+  btnPetRice.addEventListener("click", (e) => {
+    e.stopPropagation();
+    handlePetAction("rice");
+  });
+}
+
+if (btnPetTurbo) {
+  btnPetTurbo.addEventListener("click", (e) => {
+    e.stopPropagation();
+    handlePetAction("turbo");
+  });
+}
+
+if (menuActionRice) {
+  menuActionRice.addEventListener("click", () => {
+    handlePetAction("rice");
+    closeContextMenu();
+  });
+}
+
+if (menuActionTurbo) {
+  menuActionTurbo.addEventListener("click", () => {
+    handlePetAction("turbo");
+    closeContextMenu();
+  });
+}
+
+if (menuActionGrass) {
+  menuActionGrass.addEventListener("click", () => {
+    handlePetAction("grass");
+    closeContextMenu();
+  });
+}
 
 btnPetStop.addEventListener("click", (e) => {
   e.stopPropagation();

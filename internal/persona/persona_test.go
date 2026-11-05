@@ -18,8 +18,8 @@ func TestPersonaSlotSwitchAndRotate(t *testing.T) {
 	}
 
 	slot := mgr.GetActiveSlot()
-	if slot.ID != "companion" {
-		t.Fatalf("expected default companion, got %s", slot.ID)
+	if slot.ID != "whale" {
+		t.Fatalf("expected default whale, got %s", slot.ID)
 	}
 
 	// 切换到 jarvis

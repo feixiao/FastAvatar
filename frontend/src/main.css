@@ -365,6 +365,221 @@ body {
   image-rendering: pixelated;
 }
 
+/* ==================== 大肥鱼专属高精度呈现层 ==================== */
+.pet-character-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.whale-character-box {
+  position: relative;
+  width: 130px;
+  height: 174px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center bottom;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: whale-idle 3.2s ease-in-out infinite;
+}
+
+.whale-base-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 8px 16px rgba(37, 99, 235, 0.18));
+}
+
+/* 嘴部动作驱动 (只有在说话时张合，其余状态强制闭合锁紧) */
+.whale-mouth {
+  position: absolute;
+  left: 45.2%;
+  top: 52%;
+  width: 4.8px;
+  height: 2.8px;
+  border-radius: 50%;
+  background: #991b1b;
+  opacity: 0;
+  transform: scaleY(0.1) scaleX(0.8);
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+/* 状态动画驱动 */
+.desktop-pet-container[data-state="idle"] .whale-character-box {
+  animation: whale-idle 3.2s ease-in-out infinite;
+}
+
+.desktop-pet-container[data-state="listening"] .whale-character-box {
+  animation: whale-listening 1.6s ease-in-out infinite alternate;
+}
+.desktop-pet-container[data-state="listening"] .whale-mouth {
+  opacity: 0 !important;
+  animation: none !important;
+}
+
+.desktop-pet-container[data-state="thinking"] .whale-character-box {
+  animation: whale-thinking 2s ease-in-out infinite;
+}
+.desktop-pet-container[data-state="thinking"] .whale-mouth {
+  opacity: 0 !important;
+  animation: none !important;
+}
+
+.desktop-pet-container[data-state="speaking"] .whale-character-box {
+  animation: whale-speaking 0.55s ease-in-out infinite alternate;
+}
+.desktop-pet-container[data-state="speaking"] .whale-mouth {
+  opacity: 1;
+  animation: whale-mouth-speak 0.22s ease-in-out infinite alternate;
+}
+
+.desktop-pet-container[data-state="sleep"] .whale-character-box {
+  opacity: 0.85;
+  transform: translateY(6px) scale(0.96);
+  animation: whale-sleep 4s ease-in-out infinite;
+}
+
+@keyframes whale-idle {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(0.6deg);
+  }
+}
+
+@keyframes whale-listening {
+  0% {
+    transform: translateY(0) rotate(1.2deg) scale(1.02, 0.99);
+  }
+  100% {
+    transform: translateY(-3px) rotate(2deg) scale(1.03, 1.01);
+  }
+}
+
+@keyframes whale-thinking {
+  0%, 100% {
+    transform: translateY(-2px) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-7px) rotate(1deg);
+  }
+}
+
+@keyframes whale-speaking {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    transform: translateY(-4px) scale(1.02, 0.98);
+  }
+}
+
+@keyframes whale-sleep {
+  0%, 100% {
+    transform: translateY(5px) rotate(1deg);
+  }
+  50% {
+    transform: translateY(8px) rotate(1.5deg);
+  }
+}
+
+@keyframes whale-mouth-speak {
+  0% {
+    transform: scaleY(0.15) scaleX(0.85);
+  }
+  50% {
+    transform: scaleY(1.4) scaleX(1.1);
+  }
+  100% {
+    transform: scaleY(2.2) scaleX(1.25);
+  }
+}
+
+/* 动态动作图集播放容器 */
+.whale-pose-container {
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+}
+
+.whale-pose-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  max-width: none;
+  image-rendering: -webkit-optimize-contrast;
+}
+
+.whale-pose-container.pose-rice .whale-pose-img {
+  width: 400%;
+  animation: pet-pose-steps 1.3s steps(4) infinite;
+}
+
+.whale-pose-container.pose-turbo .whale-pose-img {
+  width: 400%;
+  animation: pet-pose-steps 0.2s steps(4) infinite;
+}
+
+.whale-pose-container.pose-sleep-drowsy .whale-pose-img {
+  width: 400%;
+  animation: pet-pose-steps 1.8s steps(4) infinite;
+}
+
+.whale-pose-container.pose-sleep-asleep .whale-pose-img {
+  width: 400%;
+  animation: pet-pose-steps 3.2s steps(4) infinite;
+}
+
+.whale-pose-container.pose-sleep-waking .whale-pose-img {
+  width: 400%;
+  animation: pet-pose-steps 1.6s steps(4) infinite;
+}
+
+@keyframes pet-pose-steps {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+.whale-foxtail-lure {
+  position: absolute;
+  width: 34px;
+  height: 68px;
+  pointer-events: none;
+  z-index: 4;
+  animation: foxtail-tickle 2s ease-in-out infinite;
+}
+
+.whale-foxtail-lure img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+@keyframes foxtail-tickle {
+  0%, 100% { transform: rotate(10deg); }
+  50% { transform: rotate(-18deg) scale(1.1); }
+}
+
 .particle-layer {
   position: absolute;
   inset: 0;

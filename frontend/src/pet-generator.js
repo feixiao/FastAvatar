@@ -35,6 +35,9 @@ function renderSpritesheet(ctx, skinId) {
       ctx.translate(cx, cy);
 
       switch (skinId) {
+        case "whale":
+          drawWhaleFrame(ctx, row, col);
+          break;
         case "fox":
           drawFoxFrame(ctx, row, col);
           break;
@@ -49,6 +52,275 @@ function renderSpritesheet(ctx, skinId) {
 
       ctx.restore();
     }
+  }
+}
+
+// ==================== 0. 大肥鱼 / 鲸鱼娘 (Whale) ====================
+function drawWhaleFrame(ctx, row, col) {
+  const whaleBlue = "#2563eb"; // 鲸鱼蓝
+  const whaleDark = "#1e3a8a"; // 鲸鱼兜帽/深发色
+  const whaleBelly = "#f8fafc"; // 纯白肚皮
+  const skinColor = "#ffe4d6"; // 萌系脸蛋
+  const eyeColor = "#0284c7"; // 蔚蓝大眼睛
+  const blushColor = "rgba(244, 114, 182, 0.65)";
+  const waterColor = "#38bdf8"; // 水花/喷泉蓝
+
+  let bobY = 0;
+  let stretchX = 1;
+  let stretchY = 1;
+  let eyeState = "open";
+  let mouthState = "smile";
+  let finWave = 0;
+  let tailAngle = Math.sin(col * 0.8) * 0.25;
+  let leanX = 0;
+  let blush = true;
+  let fxType = null;
+  let spoutHeight = 6;
+
+  switch (row) {
+    case 0: // idle 待机浮动
+      bobY = Math.sin((col / 6) * Math.PI * 2) * 2.5;
+      stretchY = 1 + Math.sin((col / 6) * Math.PI * 2) * 0.03;
+      stretchX = 1 - Math.sin((col / 6) * Math.PI * 2) * 0.03;
+      if (col === 2 || col === 3) eyeState = "blink";
+      tailAngle = Math.sin(col * 0.9) * 0.35;
+      spoutHeight = 6 + Math.sin(col * 0.8) * 3;
+      break;
+
+    case 1: // running-right 游动向右
+      bobY = Math.abs(Math.sin((col / 4) * Math.PI)) * -6;
+      leanX = 0.12;
+      tailAngle = -0.4 + Math.sin(col * 1.2) * 0.25;
+      finWave = Math.sin(col * 0.8) * 8;
+      break;
+
+    case 2: // running-left 游动向左
+      bobY = Math.abs(Math.sin((col / 4) * Math.PI)) * -6;
+      leanX = -0.12;
+      tailAngle = 0.4 - Math.sin(col * 1.2) * 0.25;
+      finWave = -Math.sin(col * 0.8) * 8;
+      break;
+
+    case 3: // waving 说话 / 发音张嘴
+      bobY = Math.sin(col * 1.5) * 3;
+      mouthState = col % 2 === 0 ? "open" : "smile";
+      finWave = -14 - (col % 2) * 6;
+      tailAngle = 0.25;
+      spoutHeight = 8 + (col % 2) * 4;
+      break;
+
+    case 4: // jumping 开心跳跃 / 投喂白饭
+      bobY = -Math.sin((col / 5) * Math.PI) * 22;
+      stretchY = col === 0 ? 0.85 : col === 2 ? 1.15 : 1;
+      stretchX = col === 0 ? 1.15 : col === 2 ? 0.9 : 1;
+      eyeState = "happy";
+      mouthState = "open";
+      fxType = "hearts";
+      spoutHeight = 12;
+      break;
+
+    case 5: // failed 委屈/嘟嘴
+      bobY = 3;
+      eyeState = "dizzy";
+      mouthState = "sad";
+      fxType = "sweat";
+      tailAngle = 0.1;
+      break;
+
+    case 6: // waiting 倾听 (严格闭嘴)
+      bobY = Math.sin((col / 6) * Math.PI * 2) * 1.2;
+      leanX = 0.06;
+      eyeState = "listening";
+      mouthState = "closed"; // 严格闭嘴！
+      fxType = "wave";
+      tailAngle = Math.sin(col * 0.5) * 0.15;
+      break;
+
+    case 7: // running 冲刺游
+      bobY = Math.abs(Math.sin((col / 3) * Math.PI)) * -8;
+      leanX = 0.18;
+      tailAngle = -0.5;
+      mouthState = "open";
+      break;
+
+    case 8: // review 思考 (严格闭嘴)
+      bobY = Math.sin(col * 0.8) * 1.8;
+      leanX = -0.05;
+      eyeState = "thinking";
+      mouthState = "closed"; // 严格闭嘴！
+      fxType = "thought";
+      break;
+  }
+
+  ctx.translate(0, bobY);
+  ctx.scale(stretchX, stretchY);
+  ctx.rotate(leanX);
+
+  // 1. 鲸鱼大尾巴 (背后)
+  ctx.save();
+  ctx.translate(0, 36);
+  ctx.rotate(tailAngle);
+  ctx.fillStyle = whaleBlue;
+  ctx.beginPath();
+  ctx.moveTo(-10, 0);
+  ctx.quadraticCurveTo(-24, 18, -32, 28);
+  ctx.quadraticCurveTo(-16, 26, 0, 16);
+  ctx.quadraticCurveTo(16, 26, 32, 28);
+  ctx.quadraticCurveTo(24, 18, 10, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // 2. 鲸鱼兜帽/身体外壳 (圆滚滚蓝色)
+  ctx.beginPath();
+  ctx.ellipse(0, 4, 46, 42, 0, 0, Math.PI * 2);
+  ctx.fillStyle = whaleBlue;
+  ctx.fill();
+
+  // 3. 头顶小喷泉/水花
+  ctx.save();
+  ctx.translate(0, -38);
+  ctx.fillStyle = waterColor;
+  ctx.beginPath();
+  ctx.arc(0, -spoutHeight, 3.5, 0, Math.PI * 2);
+  ctx.arc(-5, -spoutHeight * 0.7, 2.5, 0, Math.PI * 2);
+  ctx.arc(5, -spoutHeight * 0.7, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 4. 白色大肚皮
+  ctx.beginPath();
+  ctx.ellipse(0, 18, 30, 24, 0, 0, Math.PI * 2);
+  ctx.fillStyle = whaleBelly;
+  ctx.fill();
+
+  // 5. 脸部开窗区域 (萌系皮肤)
+  ctx.beginPath();
+  ctx.ellipse(0, -4, 32, 26, 0, 0, Math.PI * 2);
+  ctx.fillStyle = skinColor;
+  ctx.fill();
+
+  // 6. 齐刘海与发型 (深蓝发丝)
+  ctx.fillStyle = whaleDark;
+  ctx.beginPath();
+  ctx.moveTo(-30, -10);
+  ctx.quadraticCurveTo(-20, -28, 0, -28);
+  ctx.quadraticCurveTo(20, -28, 30, -10);
+  ctx.quadraticCurveTo(15, -16, 0, -12);
+  ctx.quadraticCurveTo(-15, -16, -30, -10);
+  ctx.fill();
+
+  // 7. 大眼睛
+  drawWhaleEyes(ctx, eyeState, eyeColor);
+
+  // 8. 腮红
+  if (blush || eyeState === "happy") {
+    ctx.fillStyle = blushColor;
+    ctx.beginPath();
+    ctx.ellipse(-20, 2, 6, 3.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(20, 2, 6, 3.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 9. 嘴巴
+  ctx.strokeStyle = "#991b1b";
+  ctx.lineWidth = 1.8;
+  ctx.lineCap = "round";
+  if (mouthState === "smile") {
+    ctx.beginPath();
+    ctx.arc(0, 3, 3.5, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+  } else if (mouthState === "open") {
+    ctx.beginPath();
+    ctx.ellipse(0, 5, 4.5, 5.5, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#e11d48";
+    ctx.fill();
+    ctx.fillStyle = "#fda4af";
+    ctx.beginPath();
+    ctx.ellipse(0, 7, 3, 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (mouthState === "closed") {
+    // 严格闭嘴细线
+    ctx.beginPath();
+    ctx.moveTo(-3, 4);
+    ctx.lineTo(3, 4);
+    ctx.stroke();
+  } else if (mouthState === "sad") {
+    ctx.beginPath();
+    ctx.arc(0, 6, 4, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  }
+
+  // 10. 左右鲸鱼鳍/小手
+  ctx.fillStyle = whaleBlue;
+  // 左鳍
+  ctx.save();
+  ctx.translate(-34, 12 + (row === 3 ? finWave : 0));
+  ctx.rotate(0.3 + (row === 3 ? -0.4 : 0));
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 12, 6, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // 右鳍
+  ctx.save();
+  ctx.translate(34, 12);
+  ctx.rotate(-0.3);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 12, 6, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 11. 特效装饰
+  if (fxType === "hearts") {
+    drawHeart(ctx, -26, -38, 6, "#f43f5e");
+    drawHeart(ctx, 26, -42, 8, "#fb7185");
+  } else if (fxType === "sweat") {
+    drawSweatDrop(ctx, 28, -28);
+  } else if (fxType === "wave") {
+    drawSoundWaves(ctx, -38, -6, col);
+    drawSoundWaves(ctx, 38, -6, col);
+  } else if (fxType === "thought") {
+    drawThoughtBubble(ctx, 26, -44, col);
+  }
+}
+
+function drawWhaleEyes(ctx, state, eyeColor) {
+  if (state === "blink") {
+    ctx.strokeStyle = "#1e3a8a";
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-19, -4);
+    ctx.quadraticCurveTo(-14, 0, -9, -4);
+    ctx.moveTo(9, -4);
+    ctx.quadraticCurveTo(14, 0, 19, -4);
+    ctx.stroke();
+  } else if (state === "happy") {
+    ctx.strokeStyle = "#1e3a8a";
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-20, -2);
+    ctx.quadraticCurveTo(-14, -8, -8, -2);
+    ctx.moveTo(8, -2);
+    ctx.quadraticCurveTo(14, -8, 20, -2);
+    ctx.stroke();
+  } else if (state === "dizzy") {
+    ctx.strokeStyle = "#1e3a8a";
+    ctx.lineWidth = 1.8;
+    drawSpiral(ctx, -14, -4, 4);
+    drawSpiral(ctx, 14, -4, 4);
+  } else {
+    let offX = 0;
+    let offY = 0;
+    if (state === "thinking") {
+      offX = 1;
+      offY = -2;
+    } else if (state === "listening") {
+      offY = 1;
+    }
+    drawSingleEye(ctx, -14, -4, eyeColor, offX, offY, 1.15);
+    drawSingleEye(ctx, 14, -4, eyeColor, offX, offY, 1.15);
   }
 }
 
@@ -123,15 +395,14 @@ function drawCatFrame(ctx, row, col) {
       tailAngle = 0.1;
       break;
 
-    case 6: // waiting 倾听
+    case 6: // waiting 倾听 (严格闭嘴)
       bobY = Math.sin((col / 6) * Math.PI * 2) * 1.5;
       leanX = 0.08;
       eyeState = "listening";
-      mouthState = "round";
+      mouthState = "closed";
       fxType = "wave";
       tailAngle = Math.sin(col * 0.6) * 0.2;
       break;
-
     case 7: // running 冲刺
       bobY = Math.abs(Math.sin((col / 3) * Math.PI)) * -10;
       leanX = 0.2;
@@ -139,11 +410,11 @@ function drawCatFrame(ctx, row, col) {
       mouthState = "open";
       break;
 
-    case 8: // review 思考
+    case 8: // review 思考 (严格闭嘴)
       bobY = Math.sin(col * 0.8) * 2;
       leanX = -0.06;
       eyeState = "thinking";
-      mouthState = "round";
+      mouthState = "closed";
       fxType = "thought";
       break;
   }
@@ -277,6 +548,11 @@ function drawCatFrame(ctx, row, col) {
     ctx.beginPath();
     ctx.ellipse(0, 7, 3, 3, 0, 0, Math.PI * 2);
     ctx.fill();
+  } else if (mouthState === "closed") {
+    ctx.beginPath();
+    ctx.moveTo(-4, 3);
+    ctx.lineTo(4, 3);
+    ctx.stroke();
   } else if (mouthState === "round") {
     ctx.beginPath();
     ctx.arc(0, 4, 3, 0, Math.PI * 2);
