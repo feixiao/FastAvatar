@@ -46,6 +46,22 @@
   -webkit-user-select: none;
 }
 
+/* 自定义极简精致滚动条 */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 body {
   background: transparent;
   width: 100vw;
@@ -55,6 +71,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-start;
   padding: 6px;
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
@@ -75,7 +92,7 @@ body {
 /* ==================== 1. 挺括纸感极简胶囊 (Capsule) ==================== */
 .capsule {
   position: relative;
-  width: 348px;
+  width: 350px;
   height: 66px;
   background: var(--paper-bg);
   border: 1px solid var(--paper-border);
@@ -83,8 +100,8 @@ body {
   box-shadow: var(--paper-shadow);
   display: flex;
   align-items: center;
-  padding: 0 14px;
-  gap: 12px;
+  padding: 0 10px 0 12px;
+  gap: 8px;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 10;
 }
@@ -150,6 +167,7 @@ body {
 /* 状态文字与副标题 */
 .info-container {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -161,7 +179,10 @@ body {
 .status-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  white-space: nowrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 
 .status-indicator {
@@ -171,45 +192,55 @@ body {
   background: var(--apple-blue);
   box-shadow: 0 0 6px var(--apple-blue);
   transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .status-text {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .persona-badge {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  padding: 1px 7px;
+  padding: 1px 6px;
   border-radius: 6px;
   background: var(--apple-blue-dim);
   border: 1px solid var(--apple-blue-border);
   color: var(--apple-blue);
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .persona-badge:hover {
   background: #dbeafe;
 }
 
 .mode-badge {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
-  padding: 1px 6px;
+  padding: 1px 5px;
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.05);
   color: var(--text-tertiary);
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .mode-badge:hover {
   background: rgba(0, 0, 0, 0.08);
 }
 
 .subtitle-text {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -221,14 +252,15 @@ body {
 .action-container {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   z-index: 2;
+  flex-shrink: 0;
 }
 
 .action-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 16px;
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
   background: var(--paper-surface);
   border: 1px solid var(--paper-border);
   display: flex;
@@ -237,6 +269,7 @@ body {
   cursor: pointer;
   color: var(--text-secondary);
   transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
 .action-btn:hover {
@@ -296,8 +329,9 @@ body {
 /* ==================== 2. 灵动桌面宠物 (Desktop Pet) ==================== */
 .desktop-pet-container {
   position: relative;
-  width: 210px;
-  height: 240px;
+  width: 220px;
+  height: 250px;
+  margin-top: 55px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -307,15 +341,19 @@ body {
 /* 对话气泡 (Things 3 纯白圆角卡片) */
 .pet-bubble {
   position: absolute;
-  top: -10px;
-  max-width: 200px;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px) scale(0.95);
+  max-width: 260px;
+  min-width: 130px;
+  max-height: 110px;
+  overflow-y: auto;
   background: var(--paper-bg);
   border: 1px solid var(--paper-border);
   border-radius: 14px;
   padding: 8px 12px;
   box-shadow: var(--paper-shadow);
   opacity: 0;
-  transform: translateY(6px) scale(0.95);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
   z-index: 20;
@@ -323,7 +361,7 @@ body {
 
 .pet-bubble.visible {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translateX(-50%) translateY(0) scale(1);
   pointer-events: auto;
 }
 
@@ -380,6 +418,7 @@ body {
   position: relative;
   width: 130px;
   height: 174px;
+  margin-bottom: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -590,7 +629,7 @@ body {
 /* 桌宠状态胶囊 */
 .pet-status-pill {
   position: absolute;
-  bottom: 8px;
+  bottom: 0px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -603,8 +642,8 @@ body {
   font-weight: 500;
   color: var(--text-primary);
   backdrop-filter: blur(8px);
+  z-index: 5;
 }
-
 .pet-status-dot {
   width: 6px;
   height: 6px;
@@ -615,8 +654,10 @@ body {
 /* 桌宠输入条 */
 .pet-input-bar {
   position: absolute;
-  bottom: -40px;
-  width: 190px;
+  bottom: -36px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+  width: 210px;
   height: 34px;
   background: var(--paper-bg);
   border: 1px solid var(--paper-border);
@@ -626,7 +667,6 @@ body {
   align-items: center;
   padding: 0 6px 0 12px;
   opacity: 0;
-  transform: translateY(-8px);
   pointer-events: none;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 15;
@@ -634,7 +674,7 @@ body {
 
 .pet-input-bar.open {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateX(-50%) translateY(0);
   pointer-events: auto;
 }
 
@@ -667,8 +707,8 @@ body {
 /* 桌宠悬浮工具条 */
 .pet-toolbar {
   position: absolute;
-  top: 10px;
-  right: -42px;
+  top: 0px;
+  right: -36px;
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid var(--paper-border);
   border-radius: 20px;
@@ -676,21 +716,21 @@ body {
   display: flex;
   flex-direction: column;
   padding: 4px;
-  gap: 4px;
+  gap: 3px;
   opacity: 0;
-  transform: translateX(-6px);
+  transform: translateX(-4px);
   pointer-events: none;
   transition: all 0.2s ease;
   z-index: 16;
   backdrop-filter: blur(16px);
 }
 
-.desktop-pet-container:hover .pet-toolbar {
+.desktop-pet-container:hover .pet-toolbar,
+.pet-toolbar:hover {
   opacity: 1;
   transform: translateX(0);
   pointer-events: auto;
 }
-
 .pet-tool-btn {
   width: 30px;
   height: 30px;
@@ -725,7 +765,7 @@ body {
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 12px;
   padding: 5px;
-  min-width: 170px;
+  min-width: 175px;
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.15);
   display: none;
   flex-direction: column;
@@ -734,10 +774,10 @@ body {
   color: var(--text-primary);
 }
 
+.pet-context-menu.open,
 .pet-context-menu.visible {
   display: flex;
 }
-
 .menu-item {
   padding: 6px 10px;
   border-radius: 6px;
@@ -803,6 +843,10 @@ body {
   display: flex;
   flex-direction: column;
 }
+.submenu.flip-left {
+  left: auto !important;
+  right: 100% !important;
+}
 
 /* ==================== 3. 伴侣手账管理中枢 (Things 3 Drawer) ==================== */
 .manage-drawer {
@@ -810,8 +854,9 @@ body {
   top: 10px;
   left: 50%;
   transform: translateX(-50%) translateY(20px) scale(0.96);
-  width: 340px;
-  max-height: 480px;
+  width: 344px;
+  height: 500px;
+  max-height: 500px;
   background: var(--paper-bg);
   border: 1px solid var(--paper-border);
   border-radius: 20px;
@@ -830,25 +875,27 @@ body {
 
 /* 手账头部 */
 .drawer-header {
-  padding: 16px 18px 12px;
+  padding: 14px 16px 10px;
   border-bottom: 1px solid var(--paper-border-subtle);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   position: relative;
 }
 
 .drawer-title-group {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
+  padding-right: 32px;
 }
 
 .drawer-title {
   font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-primary);
+  white-space: nowrap;
 }
 
 .drawer-streak-star {
@@ -916,7 +963,7 @@ body {
 .drawer-content {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 18px;
+  padding: 16px 18px 28px;
 }
 
 .tab-pane {
@@ -989,19 +1036,26 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 6px;
   margin-bottom: 4px;
 }
 .skin-card-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
 }
 .skin-card-badge {
-  font-size: 11px;
+  font-size: 10px;
   padding: 1px 5px;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.05);
   color: var(--text-tertiary);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .skin-card-desc {
   font-size: 12px;
@@ -1043,6 +1097,8 @@ body {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .btn-sm:hover {
   background: var(--apple-blue-hover);
@@ -1084,6 +1140,7 @@ body {
 }
 .add-row input {
   flex: 1;
+  min-width: 0;
   background: var(--paper-surface);
   border: 1px solid var(--paper-border);
   border-radius: 8px;
@@ -1145,14 +1202,51 @@ body {
 .slot-card {
   background: var(--paper-surface);
   border: 1px solid var(--paper-border);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 10px 12px;
   cursor: pointer;
   transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.slot-card:hover {
+  background: #ffffff;
+  border-color: rgba(0, 81, 186, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 .slot-card.active {
   background: var(--apple-blue-dim);
   border-color: var(--apple-blue);
+}
+.slot-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+.slot-badge {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.badge-btn {
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--paper-border);
+  background: var(--paper-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.slot-card.active .badge-btn {
+  background: var(--apple-blue);
+  border-color: var(--apple-blue);
+  color: #ffffff;
 }
 .slot-name {
   font-size: 13px;
@@ -1227,5 +1321,11 @@ body.mode-capsule #capsule {
 }
 body.mode-capsule #desktopPet,
 body.mode-capsule #petInputBar {
+  display: none !important;
+}
+body.drawer-open #desktopPet,
+body.drawer-open #capsule,
+body.drawer-open #inputDrawer,
+body.drawer-open #petInputBar {
   display: none !important;
 }

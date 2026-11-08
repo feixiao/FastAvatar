@@ -195,7 +195,7 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
             sum += s * s
         }
         let rms = sqrt(sum / Float(frames))
-        if rms > 0.0005 {
+        if rms > 0.005 {
             sendJSON(["event": "vad", "speaking": hasSpeech, "energy": rms])
         }
 

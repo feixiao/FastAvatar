@@ -20,8 +20,8 @@ func main() {
 	// Create application with options
 	err := wails.Run(&options.App{
 		Title:         "Avatar",
-		Width:         260,
-		Height:        320,
+		Width:         320,
+		Height:        360,
 		Frameless:     true,
 		AlwaysOnTop:   true,
 		DisableResize: true,

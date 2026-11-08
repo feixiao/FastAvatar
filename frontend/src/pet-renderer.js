@@ -127,8 +127,13 @@ export class PetRenderer {
   loop() {
     if (this.isDestroyed) return;
 
+    if (this.skinId === "whale" || this.canvas.style.display === "none") {
+      this.timer = setTimeout(() => this.loop(), 300);
+      return;
+    }
+
     if (!this.assets || !this.track) {
-      this.timer = requestAnimationFrame(() => this.loop());
+      this.timer = setTimeout(() => this.loop(), 100);
       return;
     }
 

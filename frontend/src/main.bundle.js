@@ -1046,8 +1046,12 @@
     }
     loop() {
       if (this.isDestroyed) return;
+      if (this.skinId === "whale" || this.canvas.style.display === "none") {
+        this.timer = setTimeout(() => this.loop(), 300);
+        return;
+      }
       if (!this.assets || !this.track) {
-        this.timer = requestAnimationFrame(() => this.loop());
+        this.timer = setTimeout(() => this.loop(), 100);
         return;
       }
       const elapsed = performance.now() - this.startedAt;
@@ -1168,6 +1172,7 @@
   var menuOpenDrawer = document.getElementById("menuOpenDrawer");
   var menuQuitApp = document.getElementById("menuQuitApp");
   var capsule = document.getElementById("capsule");
+  var orbContainer = document.getElementById("orbContainer");
   var statusIndicator = document.getElementById("statusIndicator");
   var statusText = document.getElementById("statusText");
   var personaBadge = document.getElementById("personaBadge");
@@ -1193,8 +1198,11 @@
   var newProfVal = document.getElementById("newProfVal");
   var btnAddProfile = document.getElementById("btnAddProfile");
   var episodeList = document.getElementById("episodeList");
+  var newEpContent = document.getElementById("newEpContent");
+  var btnAddEpisode = document.getElementById("btnAddEpisode");
   var slotList = document.getElementById("slotList");
   var chkAutoSchedule = document.getElementById("chkAutoSchedule");
+  var bondStreakHeader = document.getElementById("bondStreakHeader");
   var bondLevelText = document.getElementById("bondLevelText");
   var bondStreakText = document.getElementById("bondStreakText");
   var xpBarFill = document.getElementById("xpBarFill");
@@ -1208,11 +1216,11 @@
   var sleepTimeout = null;
   var petRenderer = new PetRenderer(petCanvas, particleLayer);
   var stateLabels = {
-    idle: "\u5F85\u547D (Idle)",
-    listening: "\u503E\u542C\u4E2D...",
-    thinking: "\u601D\u8003\u4E2D...",
-    speaking: "\u8BF4\u8BDD\u4E2D...",
-    sleep: "\u6253\u76F9\u4E2D (Zzz)",
+    idle: "\u5F85\u547D",
+    listening: "\u503E\u542C\u4E2D",
+    thinking: "\u601D\u8003\u4E2D",
+    speaking: "\u8BF4\u8BDD\u4E2D",
+    sleep: "\u6253\u76F9\u4E2D",
     error: "\u5F02\u5E38"
   };
   var stateColors = {
@@ -1280,8 +1288,9 @@
       whaleFoxtailLure.style.display = "none";
     }, 2200);
   }
-  function applySkin(skinId) {
-    currentSkin = skinId || "whale";
+  function applySkin(skinId, notifyBackend = true) {
+    const targetSkin = skinId || "whale";
+    currentSkin = targetSkin;
     stopWhalePose();
     if (currentSkin === "whale") {
       if (petCharacterView) petCharacterView.style.display = "flex";
@@ -1297,45 +1306,62 @@
       fox: "\u7075\u72D0\u5C0F\u4E5D (\u684C\u5BA0\u4F34\u4FA3)",
       spirit: "\u661F\u7075\u9732\u9732 (\u684C\u5BA0\u4F34\u4FA3)"
     };
-    menuPetTitle.textContent = skinNames[currentSkin] || `${currentSkin} (\u684C\u5BA0\u4F34\u4FA3)`;
-    if (window.go && window.go.main && window.go.main.App) {
+    if (menuPetTitle) {
+      menuPetTitle.textContent = skinNames[currentSkin] || `${currentSkin} (\u684C\u5BA0\u4F34\u4FA3)`;
+    }
+    if (notifyBackend && window.go && window.go.main && window.go.main.App) {
       window.go.main.App.SetPetSkin(currentSkin);
     }
     refreshSkinUI();
   }
-  function refreshSkins() {
-    if (!window.go || !window.go.main || !window.go.main.App) return;
-    window.go.main.App.GetSkinsList().then((list) => {
-      if (!list || !Array.isArray(list)) return;
-      skinGrid.innerHTML = "";
-      list.forEach((s) => {
-        const card = document.createElement("div");
-        card.className = `skin-card ${s.id === currentSkin ? "active" : ""}`;
-        card.innerHTML = `
-        <div class="skin-card-header">
-          <span class="skin-card-title">${s.display_name}</span>
-          <span class="skin-card-badge">${s.id === currentSkin ? "\u5F53\u524D\u4F7F\u7528" : s.type === "builtin" ? "\u5185\u7F6E" : "\u81EA\u5B9A\u4E49"}</span>
-        </div>
-        <div class="skin-card-desc">${s.description || "\u8F7B\u89E6\u5207\u6362"}</div>
-      `;
-        card.addEventListener("click", () => {
-          applySkin(s.id);
-        });
-        skinGrid.appendChild(card);
+  var defaultSkins = [
+    { id: "whale", display_name: "\u5927\u80A5\u9C7C (\u9CB8\u9C7C\u5A18)", description: "\u5446\u840C\u6E29\u548C\u3001\u7231\u5403\u767D\u996D\uFF0C\u5634\u578B\u968F\u8BF4\u8BDD\u8D77\u4F0F\u81EA\u7136\u5F20\u5408", type: "builtin" },
+    { id: "cat", display_name: "\u6A58\u5B9D\u55B5", description: "\u8F6F\u840C\u53EF\u7231\u7684\u6A58\u732B\u4F34\u4FA3\uFF0C\u6D3B\u6CFC\u597D\u52A8\uFF0C\u62E5\u6709\u7728\u773C\u7B49\u5B8C\u6574\u5E27", type: "builtin" },
+    { id: "fox", display_name: "\u7075\u72D0\u5C0F\u4E5D", description: "\u4ED9\u6C14\u7075\u52A8\u7684\u6CBB\u6108\u7CFB\u8D64\u72D0\uFF0C\u6447\u7740\u6BDB\u8338\u8338\u5927\u5C3E\u5DF4", type: "builtin" },
+    { id: "spirit", display_name: "\u661F\u7075\u9732\u9732", description: "\u8F6F\u840C\u53D1\u5149\u7684\u5947\u5E7B\u5C0F\u6C34\u6EF4\u661F\u7075\uFF0C\u5F8B\u52A8\u8DF3\u8DC3", type: "builtin" }
+  ];
+  function renderSkinList(list) {
+    skinGrid.innerHTML = "";
+    list.forEach((s) => {
+      const card = document.createElement("div");
+      card.className = `skin-card ${s.id === currentSkin ? "active" : ""}`;
+      card.innerHTML = `
+      <div class="skin-card-header">
+        <span class="skin-card-title">${s.display_name}</span>
+        <span class="skin-card-badge">${s.id === currentSkin ? "\u5F53\u524D\u4F7F\u7528" : s.type === "builtin" ? "\u5185\u7F6E" : "\u81EA\u5B9A\u4E49"}</span>
+      </div>
+      <div class="skin-card-desc">${s.description || "\u8F7B\u89E6\u5207\u6362"}</div>
+    `;
+      card.addEventListener("click", () => {
+        applySkin(s.id);
       });
-      skinSubmenu.innerHTML = "";
-      list.forEach((s) => {
-        const item = document.createElement("div");
-        item.className = "menu-item";
-        item.textContent = `${s.id === currentSkin ? "\u2713 " : ""}${s.display_name}`;
-        item.addEventListener("click", (e) => {
-          e.stopPropagation();
-          applySkin(s.id);
-          closeContextMenu();
-        });
-        skinSubmenu.appendChild(item);
-      });
+      skinGrid.appendChild(card);
     });
+    skinSubmenu.innerHTML = "";
+    list.forEach((s) => {
+      const item = document.createElement("div");
+      item.className = "menu-item";
+      item.textContent = `${s.id === currentSkin ? "\u2713 " : ""}${s.display_name}`;
+      item.addEventListener("click", (e) => {
+        e.stopPropagation();
+        applySkin(s.id);
+        closeContextMenu();
+      });
+      skinSubmenu.appendChild(item);
+    });
+  }
+  function refreshSkins() {
+    if (window.go && window.go.main && window.go.main.App) {
+      window.go.main.App.GetSkinsList().then((list) => {
+        if (list && Array.isArray(list) && list.length > 0) {
+          renderSkinList(list);
+        } else {
+          renderSkinList(defaultSkins);
+        }
+      }).catch(() => renderSkinList(defaultSkins));
+    } else {
+      renderSkinList(defaultSkins);
+    }
   }
   function refreshSkinUI() {
     const cards = skinGrid.querySelectorAll(".skin-card");
@@ -1368,18 +1394,35 @@
     petBubble.classList.remove("visible");
   }
   petBubble.addEventListener("click", hideBubble);
+  var thinkingWatchdog = null;
+  function scheduleThinkingWatchdog() {
+    clearTimeout(thinkingWatchdog);
+    thinkingWatchdog = setTimeout(() => {
+      if (currentState === "thinking") {
+        showBubble("\u23F3 \u56DE\u590D\u8D85\u65F6\uFF0C\u8BF7\u68C0\u67E5\u5927\u6A21\u578B\u8FDE\u63A5", 4e3);
+        applyState("idle");
+      }
+    }, 18e3);
+  }
   function applyState(state) {
     const previousState = currentState;
     currentState = state;
     const label = stateLabels[state] || state;
     const color = stateColors[state] || "#38bdf8";
-    capsule.className = `capsule state-${state}`;
-    statusText.textContent = label;
-    desktopPet.dataset.state = state;
+    if (state === "thinking") {
+      scheduleThinkingWatchdog();
+    } else {
+      clearTimeout(thinkingWatchdog);
+    }
+    if (capsule) capsule.className = `capsule state-${state}`;
+    if (statusText) statusText.textContent = label;
+    if (desktopPet) desktopPet.dataset.state = state;
     petRenderer.setState(state);
-    petStatusText.textContent = label.split(" ")[0];
-    petStatusDot.style.background = color;
-    petStatusDot.style.boxShadow = `0 0 8px ${color}`;
+    if (petStatusText) petStatusText.textContent = label.split(" ")[0];
+    if (petStatusDot) {
+      petStatusDot.style.background = color;
+      petStatusDot.style.boxShadow = `0 0 8px ${color}`;
+    }
     if (whaleMouth) {
       if (state === "speaking") {
         whaleMouth.style.opacity = "1";
@@ -1414,6 +1457,12 @@
   var dragStartY = 0;
   var isDragging = false;
   var lastMoveTime = 0;
+  function resetDragState() {
+    dragStartX = 0;
+    dragStartY = 0;
+    isDragging = false;
+    petRenderer.setDragDirection("");
+  }
   petStage.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
     dragStartX = e.clientX;
@@ -1444,13 +1493,14 @@
     const dx = e.clientX - dragStartX;
     const dy = e.clientY - dragStartY;
     const wasClick = Math.hypot(dx, dy) < 6;
-    dragStartX = 0;
-    dragStartY = 0;
-    petRenderer.setDragDirection("");
+    resetDragState();
     if (wasClick && currentForm === "pet") {
       handlePetAction("poke");
     }
   });
+  window.addEventListener("pointercancel", resetDragState);
+  window.addEventListener("blur", resetDragState);
+  window.addEventListener("mouseleave", resetDragState);
   function handlePetAction(action) {
     resetSleepTimer();
     if (window.go && window.go.main && window.go.main.App) {
@@ -1572,7 +1622,7 @@
     const val = petTextInput.value.trim();
     if (val && window.go && window.go.main && window.go.main.App) {
       window.go.main.App.SendTextMessage(val);
-      showBubble("\u4F60\u8BF4: " + val, 3e4);
+      showBubble("\u4F60\u8BF4: " + val, 5e3);
       petTextInput.value = "";
       petInputBar.classList.remove("open");
       applyState("thinking");
@@ -1592,19 +1642,29 @@
   });
   function openContextMenu(x, y) {
     petContextMenu.classList.add("open");
+    petContextMenu.classList.add("visible");
     const winW = window.innerWidth;
     const winH = window.innerHeight;
     const menuW = 185;
-    const menuH = 290;
+    const menuH = 300;
     let left = Math.min(x, winW - menuW - 10);
     let top = Math.min(y, winH - menuH - 10);
     left = Math.max(10, left);
     top = Math.max(10, top);
     petContextMenu.style.left = `${left}px`;
     petContextMenu.style.top = `${top}px`;
+    const submenus = petContextMenu.querySelectorAll(".submenu");
+    submenus.forEach((sub) => {
+      if (left + menuW + 145 > winW) {
+        sub.classList.add("flip-left");
+      } else {
+        sub.classList.remove("flip-left");
+      }
+    });
   }
   function closeContextMenu() {
     petContextMenu.classList.remove("open");
+    petContextMenu.classList.remove("visible");
   }
   window.addEventListener("click", (e) => {
     if (!petContextMenu.contains(e.target)) {
@@ -1666,6 +1726,7 @@
   function setDrawerOpen(open) {
     isDrawerOpen = open;
     if (open) {
+      document.body.classList.add("drawer-open");
       manageDrawer.classList.add("open");
       inputDrawer.classList.remove("open");
       petInputBar.classList.remove("open");
@@ -1677,11 +1738,45 @@
       refreshPersonas();
       refreshBond();
     } else {
+      document.body.classList.remove("drawer-open");
       manageDrawer.classList.remove("open");
       if (window.go && window.go.main && window.go.main.App) {
         window.go.main.App.SetWindowExpanded(false);
       }
     }
+  }
+  if (orbContainer) {
+    orbContainer.addEventListener("click", () => {
+      if (window.go && window.go.main && window.go.main.App) {
+        window.go.main.App.Interrupt();
+      }
+      applyState("idle");
+      showBubble("\u5DF2\u91CD\u7F6E\u5E76\u5F85\u547D~", 2e3);
+    });
+  }
+  if (subtitleText) {
+    subtitleText.addEventListener("click", () => {
+      const text = subtitleText.textContent;
+      if (text && text.length > 20) {
+        alert(text);
+      }
+    });
+  }
+  if (btnAddEpisode && newEpContent) {
+    btnAddEpisode.addEventListener("click", () => {
+      const val = newEpContent.value.trim();
+      if (val && window.go && window.go.main && window.go.main.App) {
+        window.go.main.App.AddEpisode(val, ["\u5907\u5FD8"]).then(() => {
+          newEpContent.value = "";
+          refreshMemory();
+        });
+      }
+    });
+    newEpContent.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        btnAddEpisode.click();
+      }
+    });
   }
   btnMemory.addEventListener("click", () => setDrawerOpen(!isDrawerOpen));
   btnCloseDrawer.addEventListener("click", () => setDrawerOpen(false));
@@ -1747,42 +1842,71 @@
       });
     }
   });
-  function refreshPersonas() {
-    if (!window.go || !window.go.main || !window.go.main.App) return;
-    window.go.main.App.GetPersonaData().then((data) => {
-      if (!data) return;
-      chkAutoSchedule.checked = data.auto_schedule;
-      slotList.innerHTML = "";
-      personaSubmenu.innerHTML = "";
-      data.slots.forEach((s) => {
-        const isAct = s.id === data.active_slot_id;
-        const card = document.createElement("div");
-        card.className = `slot-card ${isAct ? "active" : ""}`;
-        card.innerHTML = `
-        <div class="slot-left">
-          <span class="slot-badge">${s.badge || "\u{1F3AD}"}</span>
-          <div>
-            <div class="slot-name">${s.name}</div>
-            <div class="slot-desc">${s.tone_description || ""}</div>
-          </div>
+  var defaultPersonas = {
+    active_slot_id: "whale",
+    auto_schedule: true,
+    slots: [
+      { id: "whale", name: "\u5927\u80A5\u9C7C (\u9CB8\u9C7C\u5A18)", badge: "\u{1F40B}", tone_description: "\u6E29\u548C\u5F00\u6717\u3001\u7231\u5403\u767D\u996D\uFF0C\u50CF\u597D\u670B\u53CB\u95F2\u804A" },
+      { id: "companion", name: "\u77E5\u5FC3\u4F34\u4FA3", badge: "\u{1F319}", tone_description: "\u6E29\u67D4\u5171\u60C5\u3001\u677E\u5F1B\u968F\u6027\uFF0C\u5173\u6CE8\u5BF9\u65B9\u60C5\u7EEA" },
+      { id: "jarvis", name: "\u9AD8\u6548\u5E55\u50DA", badge: "\u26A1", tone_description: "\u7406\u6027\u4E25\u8C28\u3001\u7ED3\u679C\u5BFC\u5411\u3001\u6761\u7406\u5206\u660E" },
+      { id: "coder", name: "\u6781\u5BA2\u642D\u5B50", badge: "\u{1F4BB}", tone_description: "\u76F4\u5207\u8981\u70B9\u3001\u4EE3\u7801\u7CBE\u70BC\u3001\u6781\u5BA2\u7F8E\u5B66" }
+    ]
+  };
+  function renderPersonaList(data) {
+    chkAutoSchedule.checked = data.auto_schedule;
+    slotList.innerHTML = "";
+    personaSubmenu.innerHTML = "";
+    data.slots.forEach((s) => {
+      const isAct = s.id === data.active_slot_id;
+      const card = document.createElement("div");
+      card.className = `slot-card ${isAct ? "active" : ""}`;
+      card.innerHTML = `
+      <div class="slot-left">
+        <span class="slot-badge">${s.badge || "\u{1F3AD}"}</span>
+        <div style="min-width:0;">
+          <div class="slot-name">${s.name}</div>
+          <div class="slot-desc">${s.tone_description || ""}</div>
         </div>
-        <button class="badge-btn">${isAct ? "\u5F53\u524D\u6FC0\u6D3B" : "\u542F\u7528"}</button>
-      `;
-        card.addEventListener("click", () => {
+      </div>
+      <button class="badge-btn">${isAct ? "\u5F53\u524D\u6FC0\u6D3B" : "\u542F\u7528"}</button>
+    `;
+      card.addEventListener("click", () => {
+        if (window.go && window.go.main && window.go.main.App) {
           window.go.main.App.SetActivePersona(s.id).then(() => refreshPersonas());
-        });
-        slotList.appendChild(card);
-        const item = document.createElement("div");
-        item.className = "menu-item";
-        item.textContent = `${isAct ? "\u2713 " : ""}${s.badge || ""} ${s.name}`;
-        item.addEventListener("click", (e) => {
-          e.stopPropagation();
-          window.go.main.App.SetActivePersona(s.id).then(() => refreshPersonas());
-          closeContextMenu();
-        });
-        personaSubmenu.appendChild(item);
+        } else {
+          data.active_slot_id = s.id;
+          renderPersonaList(data);
+        }
       });
+      slotList.appendChild(card);
+      const item = document.createElement("div");
+      item.className = "menu-item";
+      item.textContent = `${isAct ? "\u2713 " : ""}${s.badge || ""} ${s.name}`;
+      item.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (window.go && window.go.main && window.go.main.App) {
+          window.go.main.App.SetActivePersona(s.id).then(() => refreshPersonas());
+        } else {
+          data.active_slot_id = s.id;
+          renderPersonaList(data);
+        }
+        closeContextMenu();
+      });
+      personaSubmenu.appendChild(item);
     });
+  }
+  function refreshPersonas() {
+    if (window.go && window.go.main && window.go.main.App) {
+      window.go.main.App.GetPersonaData().then((data) => {
+        if (data && data.slots && data.slots.length > 0) {
+          renderPersonaList(data);
+        } else {
+          renderPersonaList(defaultPersonas);
+        }
+      }).catch(() => renderPersonaList(defaultPersonas));
+    } else {
+      renderPersonaList(defaultPersonas);
+    }
   }
   chkAutoSchedule.addEventListener("change", (e) => {
     if (window.go && window.go.main && window.go.main.App) {
@@ -1798,6 +1922,9 @@
     if (!bond) return;
     bondLevelText.textContent = bond.level_name || `Lv.${bond.level}`;
     bondStreakText.textContent = `\u{1F525} \u5DF2\u8FDE\u7EED\u966A\u4F34 ${bond.streak_days} \u5929`;
+    if (bondStreakHeader) {
+      bondStreakHeader.textContent = `\u8FDE\u7EED\u966A\u4F34 ${bond.streak_days} \u5929`;
+    }
     const thresholds = [0, 100, 300, 700, 1500, 3e3];
     const nextTarget = thresholds[bond.level] || 1500;
     const pct = Math.min(100, Math.round(bond.xp / nextTarget * 100));
@@ -1909,28 +2036,39 @@
       clearTimeout(pttWatchdogTimer);
       resetSleepTimer();
       subtitleText.textContent = "\u4F60\u8BF4: " + text;
-      showBubble("\u4F60\u8BF4: " + text, 3e4);
+      subtitleText.title = text;
+      showBubble("\u4F60\u8BF4: " + text, 5e3);
       applyState("thinking");
     });
     window.runtime.EventsOn("avatar:mic_energy", (energy) => {
-      if ((currentState === "listening" || currentState === "idle") && energy > 0.04) {
+      if ((currentState === "listening" || currentState === "idle") && energy > 0.05) {
         resetSleepTimer();
       }
     });
     window.runtime.EventsOn("avatar:speech", (sentence) => {
+      clearTimeout(thinkingWatchdog);
       resetSleepTimer();
       subtitleText.textContent = sentence;
+      subtitleText.title = sentence;
       showBubble(sentence, Math.max(4e3, sentence.length * 300));
     });
     window.runtime.EventsOn("avatar:error", (err) => {
+      clearTimeout(thinkingWatchdog);
       subtitleText.textContent = "\u8FDE\u63A5\u5F02\u5E38: " + err;
-      showBubble("\u8FDE\u63A5\u5F02\u5E38: " + err, 6e3);
+      subtitleText.title = err;
+      showBubble("\u8FDE\u63A5\u5F02\u5E38: " + err, 5e3);
+      applyState("error");
+      setTimeout(() => {
+        if (currentState === "error") {
+          applyState("idle");
+        }
+      }, 3500);
     });
     window.runtime.EventsOn("avatar:display_form", (f) => {
       applyDisplayForm(f);
     });
     window.runtime.EventsOn("avatar:pet_skin", (s) => {
-      applySkin(s);
+      applySkin(s, false);
     });
     window.runtime.EventsOn("avatar:mode", (m) => {
       currentMode = m;
@@ -1960,7 +2098,7 @@
   window.addEventListener("DOMContentLoaded", () => {
     if (window.go && window.go.main && window.go.main.App) {
       window.go.main.App.GetDisplayForm().then((form) => applyDisplayForm(form));
-      window.go.main.App.GetPetSkin().then((skin) => applySkin(skin));
+      window.go.main.App.GetPetSkin().then((skin) => applySkin(skin, false));
       window.go.main.App.GetMode().then((m) => {
         currentMode = m;
         modeBadge.textContent = m === "hands_free" ? "\u514D\u5524\u9192" : "\u5FEB\u6377\u952E";
@@ -1970,7 +2108,7 @@
       });
     } else {
       applyDisplayForm("pet");
-      applySkin("cat");
+      applySkin("whale", false);
     }
     applyState("idle");
     initPTTKeyboard();

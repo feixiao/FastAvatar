@@ -31,6 +31,8 @@ type App struct {
 	skinMgr    *skin.Manager
 	asrEngine  asr.Engine
 	mu         sync.Mutex
+	isExpanded bool
+	lastVAD    time.Time
 }
 func (a *App) emitEvent(eventName string, data ...interface{}) {
 	if a.ctx != nil {
@@ -155,7 +157,17 @@ func (a *App) startup(ctx context.Context) {
 				}
 			}()
 		}, func(speaking bool, energy float64) {
-			a.emitEvent("avatar:mic_energy", energy)
+			now := time.Now()
+			a.mu.Lock()
+			shouldEmit := now.Sub(a.lastVAD) >= 120*time.Millisecond
+			if shouldEmit {
+				a.lastVAD = now
+			}
+			a.mu.Unlock()
+
+			if shouldEmit {
+				a.emitEvent("avatar:mic_energy", energy)
+			}
 			if speaking {
 				if a.pipeline.State() == engine.StateSpeaking {
 					a.pipeline.Interrupt()
@@ -201,7 +213,7 @@ func (a *App) startup(ctx context.Context) {
 	if a.cfg.DisplayForm == "capsule" {
 		runtime.WindowSetSize(a.ctx, 360, 80)
 	} else {
-		runtime.WindowSetSize(a.ctx, 260, 320)
+		runtime.WindowSetSize(a.ctx, 320, 360)
 	}
 
 	// 异步检测 LLM 服务连通性并提示
@@ -363,18 +375,21 @@ func (a *App) GetPersonaData() persona.PersonaData {
 	}
 	return a.personaMgr.GetData()
 }
-// SetWindowExpanded 动态调整窗口大小（紧凑胶囊 vs 展开管理抽屉）
+// SetWindowExpanded 动态调整窗口大小（紧凑胶囊/桌宠 vs 展开管理抽屉）
 func (a *App) SetWindowExpanded(expanded bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.isExpanded = expanded
 	if a.ctx == nil {
 		return
 	}
 	if expanded {
-		runtime.WindowSetSize(a.ctx, 360, 480)
+		runtime.WindowSetSize(a.ctx, 360, 520)
 	} else {
 		if a.cfg.DisplayForm == "capsule" {
 			runtime.WindowSetSize(a.ctx, 360, 80)
 		} else {
-			runtime.WindowSetSize(a.ctx, 260, 320)
+			runtime.WindowSetSize(a.ctx, 320, 360)
 		}
 	}
 }
@@ -448,16 +463,21 @@ func (a *App) SetDisplayForm(form string) string {
 	if form != "capsule" {
 		form = "pet"
 	}
+	prevForm := a.cfg.DisplayForm
 	a.cfg.DisplayForm = form
 	_ = config.SaveConfig(a.cfg)
 
 	if a.ctx != nil {
-		if form == "capsule" {
-			runtime.WindowSetSize(a.ctx, 360, 80)
-		} else {
-			runtime.WindowSetSize(a.ctx, 260, 320)
+		if !a.isExpanded {
+			if form == "capsule" {
+				runtime.WindowSetSize(a.ctx, 360, 80)
+			} else {
+				runtime.WindowSetSize(a.ctx, 320, 360)
+			}
 		}
-		runtime.EventsEmit(a.ctx, "avatar:display_form", form)
+		if prevForm != form {
+			runtime.EventsEmit(a.ctx, "avatar:display_form", form)
+		}
 	}
 	return form
 }
@@ -478,7 +498,10 @@ func (a *App) SetPetSkin(skinID string) string {
 	defer a.mu.Unlock()
 
 	if skinID == "" {
-		skinID = "cat"
+		skinID = "whale"
+	}
+	if a.cfg.PetSkin == skinID {
+		return skinID
 	}
 	a.cfg.PetSkin = skinID
 	_ = config.SaveConfig(a.cfg)

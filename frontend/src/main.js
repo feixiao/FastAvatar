@@ -55,6 +55,7 @@ const menuQuitApp = document.getElementById("menuQuitApp");
 
 // 胶囊 DOM
 const capsule = document.getElementById("capsule");
+const orbContainer = document.getElementById("orbContainer");
 const statusIndicator = document.getElementById("statusIndicator");
 const statusText = document.getElementById("statusText");
 const personaBadge = document.getElementById("personaBadge");
@@ -66,7 +67,6 @@ const btnInput = document.getElementById("btnInput");
 const btnInterrupt = document.getElementById("btnInterrupt");
 const inputDrawer = document.getElementById("inputDrawer");
 const textInput = document.getElementById("textInput");
-
 // 中枢抽屉 DOM
 const manageDrawer = document.getElementById("manageDrawer");
 const btnCloseDrawer = document.getElementById("btnCloseDrawer");
@@ -84,13 +84,15 @@ const newProfKey = document.getElementById("newProfKey");
 const newProfVal = document.getElementById("newProfVal");
 const btnAddProfile = document.getElementById("btnAddProfile");
 const episodeList = document.getElementById("episodeList");
+const newEpContent = document.getElementById("newEpContent");
+const btnAddEpisode = document.getElementById("btnAddEpisode");
 const slotList = document.getElementById("slotList");
 const chkAutoSchedule = document.getElementById("chkAutoSchedule");
+const bondStreakHeader = document.getElementById("bondStreakHeader");
 const bondLevelText = document.getElementById("bondLevelText");
 const bondStreakText = document.getElementById("bondStreakText");
 const xpBarFill = document.getElementById("xpBarFill");
 const xpLabelText = document.getElementById("xpLabelText");
-
 // ==================== 2. 全局状态与宠物渲染器初始化 ====================
 let currentForm = "pet"; // "pet" | "capsule"
 let currentSkin = "whale"; // 默认大肥鱼
@@ -106,11 +108,11 @@ const petRenderer = new PetRenderer(petCanvas, particleLayer);
 
 // 状态文字与主题色映射
 const stateLabels = {
-  idle: "待命 (Idle)",
-  listening: "倾听中...",
-  thinking: "思考中...",
-  speaking: "说话中...",
-  sleep: "打盹中 (Zzz)",
+  idle: "待命",
+  listening: "倾听中",
+  thinking: "思考中",
+  speaking: "说话中",
+  sleep: "打盹中",
   error: "异常",
 };
 
@@ -191,8 +193,9 @@ function playFoxtailInteraction() {
   }, 2200);
 }
 
-function applySkin(skinId) {
-  currentSkin = skinId || "whale";
+function applySkin(skinId, notifyBackend = true) {
+  const targetSkin = skinId || "whale";
+  currentSkin = targetSkin;
   stopWhalePose();
 
   if (currentSkin === "whale") {
@@ -210,52 +213,67 @@ function applySkin(skinId) {
     fox: "灵狐小九 (桌宠伴侣)",
     spirit: "星灵露露 (桌宠伴侣)",
   };
-  menuPetTitle.textContent = skinNames[currentSkin] || `${currentSkin} (桌宠伴侣)`;
-  if (window.go && window.go.main && window.go.main.App) {
+  if (menuPetTitle) {
+    menuPetTitle.textContent = skinNames[currentSkin] || `${currentSkin} (桌宠伴侣)`;
+  }
+  if (notifyBackend && window.go && window.go.main && window.go.main.App) {
     window.go.main.App.SetPetSkin(currentSkin);
   }
   refreshSkinUI();
 }
 
 // 刷新皮肤卡片与子菜单
-function refreshSkins() {
-  if (!window.go || !window.go.main || !window.go.main.App) return;
+const defaultSkins = [
+  { id: "whale", display_name: "大肥鱼 (鲸鱼娘)", description: "呆萌温和、爱吃白饭，嘴型随说话起伏自然张合", type: "builtin" },
+  { id: "cat", display_name: "橘宝喵", description: "软萌可爱的橘猫伴侣，活泼好动，拥有眨眼等完整帧", type: "builtin" },
+  { id: "fox", display_name: "灵狐小九", description: "仙气灵动的治愈系赤狐，摇着毛茸茸大尾巴", type: "builtin" },
+  { id: "spirit", display_name: "星灵露露", description: "软萌发光的奇幻小水滴星灵，律动跳跃", type: "builtin" },
+];
 
-  window.go.main.App.GetSkinsList().then((list) => {
-    if (!list || !Array.isArray(list)) return;
-
-    // 1. 渲染抽屉内的皮肤网格
-    skinGrid.innerHTML = "";
-    list.forEach((s) => {
-      const card = document.createElement("div");
-      card.className = `skin-card ${s.id === currentSkin ? "active" : ""}`;
-      card.innerHTML = `
-        <div class="skin-card-header">
-          <span class="skin-card-title">${s.display_name}</span>
-          <span class="skin-card-badge">${s.id === currentSkin ? "当前使用" : s.type === "builtin" ? "内置" : "自定义"}</span>
-        </div>
-        <div class="skin-card-desc">${s.description || "轻触切换"}</div>
-      `;
-      card.addEventListener("click", () => {
-        applySkin(s.id);
-      });
-      skinGrid.appendChild(card);
+function renderSkinList(list) {
+  skinGrid.innerHTML = "";
+  list.forEach((s) => {
+    const card = document.createElement("div");
+    card.className = `skin-card ${s.id === currentSkin ? "active" : ""}`;
+    card.innerHTML = `
+      <div class="skin-card-header">
+        <span class="skin-card-title">${s.display_name}</span>
+        <span class="skin-card-badge">${s.id === currentSkin ? "当前使用" : s.type === "builtin" ? "内置" : "自定义"}</span>
+      </div>
+      <div class="skin-card-desc">${s.description || "轻触切换"}</div>
+    `;
+    card.addEventListener("click", () => {
+      applySkin(s.id);
     });
-
-    // 2. 渲染右键菜单内的皮肤子项
-    skinSubmenu.innerHTML = "";
-    list.forEach((s) => {
-      const item = document.createElement("div");
-      item.className = "menu-item";
-      item.textContent = `${s.id === currentSkin ? "✓ " : ""}${s.display_name}`;
-      item.addEventListener("click", (e) => {
-        e.stopPropagation();
-        applySkin(s.id);
-        closeContextMenu();
-      });
-      skinSubmenu.appendChild(item);
-    });
+    skinGrid.appendChild(card);
   });
+
+  skinSubmenu.innerHTML = "";
+  list.forEach((s) => {
+    const item = document.createElement("div");
+    item.className = "menu-item";
+    item.textContent = `${s.id === currentSkin ? "✓ " : ""}${s.display_name}`;
+    item.addEventListener("click", (e) => {
+      e.stopPropagation();
+      applySkin(s.id);
+      closeContextMenu();
+    });
+    skinSubmenu.appendChild(item);
+  });
+}
+
+function refreshSkins() {
+  if (window.go && window.go.main && window.go.main.App) {
+    window.go.main.App.GetSkinsList().then((list) => {
+      if (list && Array.isArray(list) && list.length > 0) {
+        renderSkinList(list);
+      } else {
+        renderSkinList(defaultSkins);
+      }
+    }).catch(() => renderSkinList(defaultSkins));
+  } else {
+    renderSkinList(defaultSkins);
+  }
 }
 
 function refreshSkinUI() {
@@ -299,24 +317,43 @@ function hideBubble() {
 petBubble.addEventListener("click", hideBubble);
 
 
+let thinkingWatchdog = null;
+function scheduleThinkingWatchdog() {
+  clearTimeout(thinkingWatchdog);
+  thinkingWatchdog = setTimeout(() => {
+    if (currentState === "thinking") {
+      showBubble("⏳ 回复超时，请检查大模型连接", 4000);
+      applyState("idle");
+    }
+  }, 18000);
+}
+
 function applyState(state) {
   const previousState = currentState;
   currentState = state;
   const label = stateLabels[state] || state;
   const color = stateColors[state] || "#38bdf8";
 
+  if (state === "thinking") {
+    scheduleThinkingWatchdog();
+  } else {
+    clearTimeout(thinkingWatchdog);
+  }
+
   // 1. 更新胶囊 UI
-  capsule.className = `capsule state-${state}`;
-  statusText.textContent = label;
+  if (capsule) capsule.className = `capsule state-${state}`;
+  if (statusText) statusText.textContent = label;
 
   // 2. 更新桌宠 UI
-  desktopPet.dataset.state = state;
+  if (desktopPet) desktopPet.dataset.state = state;
   petRenderer.setState(state);
-  petStatusText.textContent = label.split(" ")[0];
-  petStatusDot.style.background = color;
-  petStatusDot.style.boxShadow = `0 0 8px ${color}`;
+  if (petStatusText) petStatusText.textContent = label.split(" ")[0];
+  if (petStatusDot) {
+    petStatusDot.style.background = color;
+    petStatusDot.style.boxShadow = `0 0 8px ${color}`;
+  }
 
-  // 3. 严格闭环大肥鱼嘴型状态：只有在 speaking 发音时嘴型才张合，其余状态（思考、倾听、待机）严禁乱动，强制闭合
+  // 3. 严格闭环大肥鱼嘴型状态：只有在 speaking 发音时嘴型才张合，其余状态强制闭合锁紧
   if (whaleMouth) {
     if (state === "speaking") {
       whaleMouth.style.opacity = "1";
@@ -361,6 +398,13 @@ let dragStartY = 0;
 let isDragging = false;
 let lastMoveTime = 0;
 
+function resetDragState() {
+  dragStartX = 0;
+  dragStartY = 0;
+  isDragging = false;
+  petRenderer.setDragDirection("");
+}
+
 petStage.addEventListener("pointerdown", (e) => {
   if (e.button !== 0) return; // 仅左键
   dragStartX = e.clientX;
@@ -394,9 +438,7 @@ window.addEventListener("pointerup", (e) => {
   const dy = e.clientY - dragStartY;
   const wasClick = Math.hypot(dx, dy) < 6;
 
-  dragStartX = 0;
-  dragStartY = 0;
-  petRenderer.setDragDirection("");
+  resetDragState();
 
   if (wasClick && currentForm === "pet") {
     // 视为单击戳了桌宠一下
@@ -404,6 +446,9 @@ window.addEventListener("pointerup", (e) => {
   }
 });
 
+window.addEventListener("pointercancel", resetDragState);
+window.addEventListener("blur", resetDragState);
+window.addEventListener("mouseleave", resetDragState);
 // 抚摸互动
 function handlePetAction(action) {
   resetSleepTimer();
@@ -548,7 +593,7 @@ function submitPetText() {
   const val = petTextInput.value.trim();
   if (val && window.go && window.go.main && window.go.main.App) {
     window.go.main.App.SendTextMessage(val);
-    showBubble("你说: " + val, 30000);
+    showBubble("你说: " + val, 5000);
     petTextInput.value = "";
     petInputBar.classList.remove("open");
     applyState("thinking");
@@ -573,10 +618,11 @@ petStage.addEventListener("contextmenu", (e) => {
 
 function openContextMenu(x, y) {
   petContextMenu.classList.add("open");
+  petContextMenu.classList.add("visible");
   const winW = window.innerWidth;
   const winH = window.innerHeight;
   const menuW = 185;
-  const menuH = 290;
+  const menuH = 300;
 
   let left = Math.min(x, winW - menuW - 10);
   let top = Math.min(y, winH - menuH - 10);
@@ -585,10 +631,20 @@ function openContextMenu(x, y) {
 
   petContextMenu.style.left = `${left}px`;
   petContextMenu.style.top = `${top}px`;
+
+  const submenus = petContextMenu.querySelectorAll(".submenu");
+  submenus.forEach((sub) => {
+    if (left + menuW + 145 > winW) {
+      sub.classList.add("flip-left");
+    } else {
+      sub.classList.remove("flip-left");
+    }
+  });
 }
 
 function closeContextMenu() {
   petContextMenu.classList.remove("open");
+  petContextMenu.classList.remove("visible");
 }
 
 window.addEventListener("click", (e) => {
@@ -665,6 +721,7 @@ btnDoImportSkin.addEventListener("click", () => {
 function setDrawerOpen(open) {
   isDrawerOpen = open;
   if (open) {
+    document.body.classList.add("drawer-open");
     manageDrawer.classList.add("open");
     inputDrawer.classList.remove("open");
     petInputBar.classList.remove("open");
@@ -676,11 +733,48 @@ function setDrawerOpen(open) {
     refreshPersonas();
     refreshBond();
   } else {
+    document.body.classList.remove("drawer-open");
     manageDrawer.classList.remove("open");
     if (window.go && window.go.main && window.go.main.App) {
       window.go.main.App.SetWindowExpanded(false);
     }
   }
+}
+
+if (orbContainer) {
+  orbContainer.addEventListener("click", () => {
+    if (window.go && window.go.main && window.go.main.App) {
+      window.go.main.App.Interrupt();
+    }
+    applyState("idle");
+    showBubble("已重置并待命~", 2000);
+  });
+}
+
+if (subtitleText) {
+  subtitleText.addEventListener("click", () => {
+    const text = subtitleText.textContent;
+    if (text && text.length > 20) {
+      alert(text);
+    }
+  });
+}
+
+if (btnAddEpisode && newEpContent) {
+  btnAddEpisode.addEventListener("click", () => {
+    const val = newEpContent.value.trim();
+    if (val && window.go && window.go.main && window.go.main.App) {
+      window.go.main.App.AddEpisode(val, ["备忘"]).then(() => {
+        newEpContent.value = "";
+        refreshMemory();
+      });
+    }
+  });
+  newEpContent.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      btnAddEpisode.click();
+    }
+  });
 }
 
 btnMemory.addEventListener("click", () => setDrawerOpen(!isDrawerOpen));
@@ -762,50 +856,75 @@ btnAddProfile.addEventListener("click", () => {
 
 // ==================== 9. 人格卡槽管理 ====================
 
-function refreshPersonas() {
-  if (!window.go || !window.go.main || !window.go.main.App) return;
+const defaultPersonas = {
+  active_slot_id: "whale",
+  auto_schedule: true,
+  slots: [
+    { id: "whale", name: "大肥鱼 (鲸鱼娘)", badge: "🐋", tone_description: "温和开朗、爱吃白饭，像好朋友闲聊" },
+    { id: "companion", name: "知心伴侣", badge: "🌙", tone_description: "温柔共情、松弛随性，关注对方情绪" },
+    { id: "jarvis", name: "高效幕僚", badge: "⚡", tone_description: "理性严谨、结果导向、条理分明" },
+    { id: "coder", name: "极客搭子", badge: "💻", tone_description: "直切要点、代码精炼、极客美学" },
+  ]
+};
 
-  window.go.main.App.GetPersonaData().then((data) => {
-    if (!data) return;
-    chkAutoSchedule.checked = data.auto_schedule;
+function renderPersonaList(data) {
+  chkAutoSchedule.checked = data.auto_schedule;
+  slotList.innerHTML = "";
+  personaSubmenu.innerHTML = "";
 
-    // 渲染卡槽
-    slotList.innerHTML = "";
-    personaSubmenu.innerHTML = "";
-
-    data.slots.forEach((s) => {
-      const isAct = s.id === data.active_slot_id;
-
-      // 抽屉卡片
-      const card = document.createElement("div");
-      card.className = `slot-card ${isAct ? "active" : ""}`;
-      card.innerHTML = `
-        <div class="slot-left">
-          <span class="slot-badge">${s.badge || "🎭"}</span>
-          <div>
-            <div class="slot-name">${s.name}</div>
-            <div class="slot-desc">${s.tone_description || ""}</div>
-          </div>
+  data.slots.forEach((s) => {
+    const isAct = s.id === data.active_slot_id;
+    const card = document.createElement("div");
+    card.className = `slot-card ${isAct ? "active" : ""}`;
+    card.innerHTML = `
+      <div class="slot-left">
+        <span class="slot-badge">${s.badge || "🎭"}</span>
+        <div style="min-width:0;">
+          <div class="slot-name">${s.name}</div>
+          <div class="slot-desc">${s.tone_description || ""}</div>
         </div>
-        <button class="badge-btn">${isAct ? "当前激活" : "启用"}</button>
-      `;
-      card.addEventListener("click", () => {
+      </div>
+      <button class="badge-btn">${isAct ? "当前激活" : "启用"}</button>
+    `;
+    card.addEventListener("click", () => {
+      if (window.go && window.go.main && window.go.main.App) {
         window.go.main.App.SetActivePersona(s.id).then(() => refreshPersonas());
-      });
-      slotList.appendChild(card);
-
-      // 右键子菜单
-      const item = document.createElement("div");
-      item.className = "menu-item";
-      item.textContent = `${isAct ? "✓ " : ""}${s.badge || ""} ${s.name}`;
-      item.addEventListener("click", (e) => {
-        e.stopPropagation();
-        window.go.main.App.SetActivePersona(s.id).then(() => refreshPersonas());
-        closeContextMenu();
-      });
-      personaSubmenu.appendChild(item);
+      } else {
+        data.active_slot_id = s.id;
+        renderPersonaList(data);
+      }
     });
+    slotList.appendChild(card);
+
+    const item = document.createElement("div");
+    item.className = "menu-item";
+    item.textContent = `${isAct ? "✓ " : ""}${s.badge || ""} ${s.name}`;
+    item.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (window.go && window.go.main && window.go.main.App) {
+        window.go.main.App.SetActivePersona(s.id).then(() => refreshPersonas());
+      } else {
+        data.active_slot_id = s.id;
+        renderPersonaList(data);
+      }
+      closeContextMenu();
+    });
+    personaSubmenu.appendChild(item);
   });
+}
+
+function refreshPersonas() {
+  if (window.go && window.go.main && window.go.main.App) {
+    window.go.main.App.GetPersonaData().then((data) => {
+      if (data && data.slots && data.slots.length > 0) {
+        renderPersonaList(data);
+      } else {
+        renderPersonaList(defaultPersonas);
+      }
+    }).catch(() => renderPersonaList(defaultPersonas));
+  } else {
+    renderPersonaList(defaultPersonas);
+  }
 }
 
 chkAutoSchedule.addEventListener("change", (e) => {
@@ -826,6 +945,9 @@ function updateBondUI(bond) {
   if (!bond) return;
   bondLevelText.textContent = bond.level_name || `Lv.${bond.level}`;
   bondStreakText.textContent = `🔥 已连续陪伴 ${bond.streak_days} 天`;
+  if (bondStreakHeader) {
+    bondStreakHeader.textContent = `连续陪伴 ${bond.streak_days} 天`;
+  }
 
   const thresholds = [0, 100, 300, 700, 1500, 3000];
   const nextTarget = thresholds[bond.level] || 1500;
@@ -953,28 +1075,39 @@ if (window.runtime) {
     clearTimeout(pttWatchdogTimer);
     resetSleepTimer();
     subtitleText.textContent = "你说: " + text;
-    showBubble("你说: " + text, 30000);
+    subtitleText.title = text;
+    showBubble("你说: " + text, 5000);
     applyState("thinking");
   });
   window.runtime.EventsOn("avatar:mic_energy", (energy) => {
-    if ((currentState === "listening" || currentState === "idle") && energy > 0.04) {
+    if ((currentState === "listening" || currentState === "idle") && energy > 0.05) {
       resetSleepTimer();
     }
   });
   window.runtime.EventsOn("avatar:speech", (sentence) => {
+    clearTimeout(thinkingWatchdog);
     resetSleepTimer();
     subtitleText.textContent = sentence;
+    subtitleText.title = sentence;
     showBubble(sentence, Math.max(4000, sentence.length * 300));
   });
   window.runtime.EventsOn("avatar:error", (err) => {
+    clearTimeout(thinkingWatchdog);
     subtitleText.textContent = "连接异常: " + err;
-    showBubble("连接异常: " + err, 6000);
+    subtitleText.title = err;
+    showBubble("连接异常: " + err, 5000);
+    applyState("error");
+    setTimeout(() => {
+      if (currentState === "error") {
+        applyState("idle");
+      }
+    }, 3500);
   });
   window.runtime.EventsOn("avatar:display_form", (f) => {
     applyDisplayForm(f);
   });
   window.runtime.EventsOn("avatar:pet_skin", (s) => {
-    applySkin(s);
+    applySkin(s, false);
   });
   window.runtime.EventsOn("avatar:mode", (m) => {
     currentMode = m;
@@ -1009,7 +1142,7 @@ window.addEventListener("DOMContentLoaded", () => {
   // 获取后端保存的形态和皮肤
   if (window.go && window.go.main && window.go.main.App) {
     window.go.main.App.GetDisplayForm().then((form) => applyDisplayForm(form));
-    window.go.main.App.GetPetSkin().then((skin) => applySkin(skin));
+    window.go.main.App.GetPetSkin().then((skin) => applySkin(skin, false));
     window.go.main.App.GetMode().then((m) => {
       currentMode = m;
       modeBadge.textContent = m === "hands_free" ? "免唤醒" : "快捷键";
@@ -1019,7 +1152,7 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   } else {
     applyDisplayForm("pet");
-    applySkin("cat");
+    applySkin("whale", false);
   }
 
   applyState("idle");
