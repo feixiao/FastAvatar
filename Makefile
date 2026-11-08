@@ -80,23 +80,31 @@ install-apk: android-install ## 安装 Android Debug APK 到设备 (android-inst
 
 install: android-install ## 安装应用到设备 (默认安装 Android APK)
 
-livekit-check:
-	@if nc -z -w 1 localhost 7880 2>/dev/null; then \
-		echo "\033[32m[LiveKit]\033[0m SFU 已在运行 (:7880)"; \
-	elif docker info >/dev/null 2>&1; then \
-		echo "\033[33m[LiveKit]\033[0m 正在后台自动拉起 LiveKit SFU 容器 (:7880)..."; \
-		docker compose -f server/docker-compose.yaml up -d && \
-		echo "\033[32m[LiveKit]\033[0m SFU 容器已就绪 (:7880)"; \
+server: ## 统一通过 Docker Compose 启动全套云端后台服务 (LiveKit SFU + Go Gateway + Agent Worker)
+	@if [ -f server/.env ]; then \
+		docker compose --env-file server/.env -f server/docker-compose.yaml up -d --build; \
 	else \
-		echo "\033[33m[LiveKit 提示]\033[0m Docker 守护进程未启动，跳过自动拉起。云端网关继续启动 (:8088)，如需使用 WebRTC 流媒体请先启动 Docker"; \
+		docker compose -f server/docker-compose.yaml up -d --build; \
 	fi
+	@echo "\033[32m[Cloud Server]\033[0m 后台服务集群已在 Docker Compose 中启动:"
+	@echo "  - Go 实时网关:   http://localhost:8088"
+	@echo "  - LiveKit SFU:   http://localhost:7880"
+	@echo "  - 查看服务日志: make server-logs"
+	@echo "  - 停止后台服务: make server-stop"
 
-server: livekit-check ## 启动本地轻量云端实时网关服务 (8088 端口，自动拉起 LiveKit SFU)
+server-dev: ## 本地宿主机直接运行 Go 实时网关 (开发调试用，仅容器化运行 LiveKit)
+	@if ! nc -z -w 1 localhost 7880 2>/dev/null; then \
+		docker compose -f server/docker-compose.yaml up -d livekit; \
+	fi
 	go run ./server/cmd/main.go
 
-livekit-stop: ## 停止后台运行的 LiveKit SFU 容器
-	@docker compose -f server/docker-compose.yaml down
+server-logs: ## 查看后台容器集群实时日志
+	docker compose -f server/docker-compose.yaml logs -f
 
+server-stop: ## 停止后台容器集群
+	docker compose -f server/docker-compose.yaml down
+
+livekit-stop: server-stop ## 停止后台运行的 LiveKit SFU 与网关容器 (server-stop 别名)
 build: asr ## 编译可执行二进制文件
 	@mkdir -p build/bin
 	go build -tags $(TAGS) -ldflags="$(LDFLAGS)" -o build/bin/Avatar .

@@ -28,11 +28,20 @@ Avatar 是一套**端云协同、双环驱动（Dual-Loop）、低时延流式�
 
 ## 🚀 快速开始
 
-### 1. 启动云端实时服务 (LiveKit SFU + Go Gateway)
+### 1. 统一启动云端后台服务 (Docker Compose)
 
 ```bash
-# 自动检测并在后台拉起 LiveKit SFU 容器 (:7880)，随后启动 Go 云端实时网关 (:8088)
+# 复制环境变量配置文件（可选，默认自动接入本地 Ollama，或配置云端商业大模型）
+cp server/.env.example server/.env
+
+# 一键启动后台容器集群 (LiveKit SFU :7880 + Go 实时网关 :8088 + Python Agent Worker)
 make server
+
+# 查看后台服务运行日志
+make server-logs
+
+# 停止后台服务集群
+make server-stop
 ```
 
 ### 2. 启动桌面端应用 (macOS)
@@ -58,9 +67,11 @@ make test-e2e
 
 | 指令 | 说明 |
 | :--- | :--- |
-| **`make server`** | 启动 LiveKit SFU 容器及本地轻量云端实时网关（端口 :8088） |
+| **`make server`** | 统一通过 Docker Compose 后台启动全套云端服务集群（LiveKit SFU + Go 网关 :8088 + Worker） |
+| **`make server-stop`** | 停止所有后台容器服务 |
+| **`make server-logs`** | 查看后台容器集群实时运行日志 |
+| `make server-dev` | 仅容器化启动 LiveKit，本地直接编译运行 Go 网关（用于开发调试） |
 | **`make test-e2e`** | 运行端云协同端到端对接与毫秒级协同打断集成测试 |
-| `make run` / `make dev` | 编译 ASR 并直接运行桌面端（开发模式） |
 | `make start` | 一键打包并直接启动 macOS 原生 App |
 | `make package` | 编译并打包为 macOS 原生应用（生成 `build/bin/Avatar.app`） |
 | `make build` | 仅编译桌面端可执行二进制文件 |
