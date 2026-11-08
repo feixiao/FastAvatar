@@ -1,4 +1,4 @@
-.PHONY: help run dev build package start test test-e2e server server-dev server-logs server-stop clean asr android-test android-build android-install install-apk install apk
+.PHONY: help run dev build package start start-log test test-e2e server server-dev server-logs server-stop clean asr android-test android-build android-install install-apk install apk
 
 JAVA_HOME ?= $(shell if [ -d "/Applications/Android Studio.app/Contents/jbr/Contents/Home" ]; then echo "/Applications/Android Studio.app/Contents/jbr/Contents/Home"; fi)
 ANDROID_HOME ?= $(shell if [ -d "/Users/fx/Library/Android/sdk" ]; then echo "/Users/fx/Library/Android/sdk"; fi)
@@ -112,8 +112,11 @@ package: ## 打包为 macOS 原生应用 (build/bin/Avatar.app)
 	@chmod +x ./package_mac.sh
 	./package_mac.sh
 
-start: package ## 打包并直接启动 macOS App
+start: package ## 打包并直接启动 macOS App (后台运行)
 	open build/bin/Avatar.app
+
+start-log: package ## 打包并在终端前台启动 App (直接输出完整实时日志)
+	./build/bin/Avatar.app/Contents/MacOS/Avatar
 
 clean: ## 清理构建产物与临时文件
 	rm -rf build/bin

@@ -77,7 +77,8 @@ make test-e2e
 | **`make server-logs`** | 查看后台容器实时运行日志 |
 | `make server-dev` | 本地宿主机直接秒级运行 Go 实时网关（零 Docker 依赖，开发调试推荐） |
 | **`make test-e2e`** | 运行端云协同端到端对接与毫秒级协同打断集成测试 |
-| `make start` | 一键打包并直接启动 macOS 原生 App |
+| `make start` | 一键打包并启动 macOS 原生 App（后台运行） |
+| **`make start-log`** | 打包并在当前终端前台启动 App（可直接查看完整实时日志） |
 | `make package` | 编译并打包为 macOS 原生应用（生成 `build/bin/Avatar.app`） |
 | `make build` | 仅编译桌面端可执行二进制文件 |
 | `make asr` | 编译 macOS 原生离线语音识别组件（`bin/avatar-asr`） |
