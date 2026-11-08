@@ -209,7 +209,7 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 	r.splitter.Reset()
 
 	// 意图复杂度仲裁：决定使用端侧小模型还是云端大模型
-	isComplex := dispatcher.IsComplexQuery(task.GoalSnapshot)
+	isComplex, complexReason := dispatcher.CheckComplexity(task.GoalSnapshot)
 	var activeClient *llm.Client
 	var activeModel string
 	var activeTemp float64
@@ -267,7 +267,7 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 	var err error
 	if routeLabel == "CLOUD_GATEWAY" && cloudGw != nil {
 		activeModel = "cloud"
-		fmt.Printf("[模型调度] 通道: CLOUD_GATEWAY (:8088) | 角色: %s | 用户输入: %q\n", activePersonaName, task.GoalSnapshot)
+		fmt.Printf("[模型调度] 决策: 【走云端】通道: CLOUD_GATEWAY (:8088) | 原因: %s | 角色: %s | 用户提问: %q\n", complexReason, activePersonaName, task.GoalSnapshot)
 		if routeCb != nil {
 			routeCb(routeLabel, activeModel, false)
 		}
@@ -285,11 +285,14 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 			return nil
 		})
 	} else {
-		fmt.Printf("[模型调度] 通道: %s | 模型: %s | 用户输入: %q\n", routeLabel, activeModel, task.GoalSnapshot)
+		if isComplex {
+			fmt.Printf("[模型调度] 决策: 【本地降级】通道: %s (云端网关未就绪，降级端侧) | 模型: %s | 原因: %s | 用户提问: %q\n", routeLabel, activeModel, complexReason, task.GoalSnapshot)
+		} else {
+			fmt.Printf("[模型调度] 决策: 【本地端侧】通道: %s | 模型: %s | 原因: %s | 状态: 100%% 本地推理，未走云端 | 用户提问: %q\n", routeLabel, activeModel, complexReason, task.GoalSnapshot)
+		}
 		if routeCb != nil {
 			routeCb(routeLabel, activeModel, !isComplex)
 		}
-
 		req := llm.ChatCompletionRequest{
 			Model:       activeModel,
 			Messages:    msgs,

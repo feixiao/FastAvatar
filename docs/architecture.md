@@ -1,15 +1,17 @@
 # Avatar 系统工程架构文档 (System Architecture)
 
-> **版本**：v2.0 (Dual-Loop Agent Harness Specification)  
-> **适用范围**：macOS Desktop (Go + Wails + Swift Native ASR)、Android Mobile / In-Vehicle AAOS (Pixel 参考样机 & 车规 QNX 抽象层)、C++17 跨平台高可靠核心运行时 (`core/`)、Cloud Realtime Agent Harness (Go + LiveKit SFU + Python Agent)
+> **版本**：v2.1 (Unified Edge TTS & End-to-End Text Streaming Specification)  
+> **适用范围**：macOS Desktop (Go + Wails + Swift Native ASR)、Android Mobile / In-Vehicle AAOS (Pixel 参考样机 & 车规 QNX 抽象层)、C++17 跨平台高可靠核心运行时 (`core/`)、Cloud Realtime Agent Gateway (Go SSE Streaming Gateway)
 
 ---
 
 ## 1. 系统全景架构图 (System Architecture Panorama)
 
-Avatar 采用**端云双环 Agent Harness 架构（Dual-Loop Agent Harness Architecture）**：
-- **端侧极速快环 Harness（Local Fast Loop ≤ 150ms）**：端侧感知、毫秒级意图短路拦截与分流路由器（Intent Arbiter & Fast Dispatcher）、本地车控安全看门狗（Safety Guardrail）、三层分层记忆底座（Three-Tier Memory Vault）、多模态人格引擎（Persona Engine）、离线发音与端侧伴生模型（Sidecar SLM），断网物理隔离可用，深度适配车机算力与车规安全约束；
-- **云端认知慢环 Harness（Cloud Realtime Loop P50 ≤ 800ms）**：在用户显式授权前提下，通过 LiveKit SFU 与 Go 网关建立全双工实时音视频通道，结合 Python 云端 Agent 编排、工具 Skill 网关、系统提示词版本管理、安全护栏与多模型路由，承接开放式多轮推理与首句微切分流式播报，并支持毫秒级协同打断（Barge-in）。
+Avatar 采用**端云双环 + 全链路传文本 + 端侧统一语音合成（Dual-Loop + End-to-End Text Streaming + Unified Edge TTS）**架构：
+- **端侧极速快环 Harness（Local Fast Loop ≤ 150ms）**：端侧声学感知、毫秒级意图短路拦截与分流路由器（Intent Arbiter & Fast Dispatcher）、本地车控安全看门狗（Safety Guardrail）、三层分层记忆底座（Three-Tier Memory Vault）、多模态人格引擎（Persona Engine）与端侧伴生小模型（Sidecar SLM），断网物理隔离可用；
+- **云端认知慢环 Harness（Cloud Realtime Loop P50 ≤ 800ms）**：在用户显式授权前提下，客户端通过轻量级 HTTP SSE / WebSocket 通道（`POST /api/v1/chat`）向 Go 云端实时网关发起对话，云端仅负责将大模型的 **Token 文本流**以最快速度推回端侧，不再下发重型音视频流；
+- **端侧统一合成（Unified Edge TTS，根除音色割裂）**：无论是**端侧快环（A）**产出的本地回复，还是**云端慢环（B）**流式推回的文本 Token（经端侧 `SentenceSplitter` 首句 4~6 字微切分），**100% 统一收口到端侧同一个高质量离线 TTS 引擎（基于 `sherpa-onnx` 本地神经 TTS / 平台合成器）发声**。从根源上保证端云音色绝对一致，同时让毫秒级打断（Barge-in ≤ 80ms）直接在端侧清空播报队列即可闭环。
+
 ```mermaid
 flowchart TB
     %% ======================= 端侧设备 =======================
@@ -21,74 +23,75 @@ flowchart TB
             ComposeUI["Android: Jetpack Compose Material 3<br/>(VoiceAgentScreen / MemorySheet / PersonaSheet)"]
         end
 
-        subgraph PerceptionLayer["2. 感知与信号处理 (Perception & VAD)"]
+        subgraph PerceptionLayer["2. 感知与信号处理 (Perception & Local ASR)"]
             AEC["硬件级回声消除 (AEC)"]
             VAD["离线双模 VAD (能量阈值 RMS / 状态检测)"]
             MacASR["macOS: Native Swift ASR CLI<br/>(AVAudioEngine + SFSpeechRecognizer)"]
-            AndroidASR["Android: 平台 AudioRecord + 流式感知"]
+            AndroidASR["Android: Sherpa-ONNX / 平台流式语音识别"]
             AEC --> VAD --> MacASR & AndroidASR
         end
 
         subgraph DispatcherLayer["3. 意图嗅探与分流路由 (Fast Dispatcher &lt; 1ms)"]
-            Dispatcher["FastDispatcher 规则引擎<br/>(关键词匹配 / 正则槽位提取 / 授权状态机)"]
+            Dispatcher["FastDispatcher / IntentArbiter<br/>(关键词匹配 / 正则槽位提取 / 授权状态机)"]
         end
 
-        subgraph LocalFastLoop["4. 端侧极速快环 (Local Fast Loop ≤ 150ms · 零网络依赖)"]
+        subgraph LocalFastLoop["4. 端侧极速快环 A (Local Fast Loop ≤ 150ms · 零网络依赖)"]
             direction TB
             MemVault["本地记忆底座 (Memory Vault)<br/>Profile KV + Episodic Tags + 二阶段确认<br/>(~/.avatar/memory.json / memory_vault.json)"]
             PersonaMgr["多模态人格引擎 (Persona Slots & Bond)<br/>幕僚 💼 / 伴侣 🌙 / 损友 🔥<br/>(时段调度 / 亲密度羁绊流转)"]
-            LocalTTS["本地离线合成/播报<br/>(macOS say / Android TTS Engine)"]
-            LocalSidecar["本地伴生模型 (Sidecar SLM)<br/>(llama-server 伴生进程 / 本地 GGUF)"]
+            LocalSidecar["本地伴生模型 (Sidecar SLM)<br/>(MNN-LLM / llama-server 本地小模型)"]
         end
 
-        subgraph CloudBridge["5. 云端协同网关客户端 (Cloud Bridge & Media Gating)"]
+        subgraph CloudBridge["5. 云端流式文本协同客户端 (Cloud Text Stream Client)"]
             direction TB
-            MediaGating["媒体门禁 (Audio Track Gating)<br/>默认 isAudioMuted = true 物理锁闭"]
+            ConsentGate["隐私授权门禁 (Consent Gate)<br/>未授权严禁文本上云"]
             BargeInCtrl["全双工打断控制器 (Barge-In Controller &lt; 80ms)"]
-            LiveKitClient["LiveKit WebRTC 传输客户端<br/>(Opus / PCM 流式音轨)"]
-            SignalingClient["云端 REST 信令客户端 (Token / Interrupt / Close)"]
+            StreamClient["SSE / WebSocket 文本流客户端<br/>(POST /api/v1/chat 极速 Token 接收)"]
+            SignalingClient["云端控制信令客户端 (Token / Interrupt / Close)"]
+        end
+
+        subgraph UnifiedVoice["6. 端侧统一断句与语音合成中枢 (Unified Edge TTS)"]
+            direction TB
+            EdgeSplitter["端侧首句微切分器 (SentenceSplitter)<br/>(4~6 字标点极速切句, 后续 15~25 字平滑合并)"]
+            UnifiedTTS["端侧统一高质量离线 TTS<br/>(Sherpa-ONNX 神经语音合成 / 统一声纹底座)"]
+            EdgeSplitter --> UnifiedTTS
         end
 
         %% 端侧内部连线
         ClientUI <--> PerceptionLayer
         PerceptionLayer --> Dispatcher
-        Dispatcher -- "【本地记忆指令】" --> MemVault --> LocalTTS
-        Dispatcher -- "【人格切换指令】" --> PersonaMgr --> LocalTTS
-        Dispatcher -. "【端侧小模型优先】" .-> LocalSidecar --> LocalTTS
-        Dispatcher -- "【开放式对话 · 已授权且在线】" --> MediaGating --> LiveKitClient
+        Dispatcher -- "【A1: 本地记忆指令】" --> MemVault --> UnifiedTTS
+        Dispatcher -- "【A2: 人格切换指令】" --> PersonaMgr --> UnifiedTTS
+        Dispatcher -. "【A3: 端侧小模型优先】" .-> LocalSidecar --> EdgeSplitter
+        Dispatcher -- "【B: 开放式对话 · 已授权且在线】" --> ConsentGate --> StreamClient
+        StreamClient -- "实时 Token 文本流" --> EdgeSplitter
         PerceptionLayer -. "【声学打断 Barge-in】" .-> BargeInCtrl
-        BargeInCtrl --> LocalTTS & SignalingClient
+        BargeInCtrl -- "1. 瞬间清空端侧队列与发音 (<80ms)" --> EdgeSplitter & UnifiedTTS
+        BargeInCtrl -- "2. 异步通知云端取消推理" --> SignalingClient
     end
 
     %% ======================= 云端服务 =======================
-    subgraph CloudSpace["云端实时基础设施 · Cloud Platform (:8088 / :7880)"]
+    subgraph CloudSpace["云端实时基础设施 · Cloud Platform (:8088)"]
         direction TB
 
-        subgraph CloudGateway["6. Go 云端实时网关 (Avatar Cloud Gateway :8088)"]
+        subgraph CloudGateway["7. Go 云端实时网关 (Avatar Cloud Gateway :8088)"]
             GW_Auth["鉴权与授权校验 (Auth & Consent Guard)<br/>(POST /api/v1/auth/token)"]
+            GW_Chat["SSE 流式对话网关 (Token Stream Proxy)<br/>(POST /api/v1/chat -> text/event-stream)"]
             GW_Interrupt["协同打断调度器 (Barge-in Sync)<br/>(POST /api/v1/session/interrupt)"]
             GW_Session["会话状态机与遥测审计 (Zero-Retention Telemetry)<br/>(NEW -> READY -> PROCESSING -> STREAMING -> CLOSED)"]
         end
 
-        subgraph CloudSFU["7. LiveKit SFU 流媒体集群 (:7880)"]
-            SFU_AudioIn["WebRTC Ingress (客户端上行音轨)"]
-            SFU_AudioOut["WebRTC Egress (流式下行音轨)"]
-            SFU_Data["DataChannel (双向低时延信令)"]
+        subgraph CloudAI["8. 认知对话大模型与编排 (Cloud LLM Runtime)"]
+            CloudLLM["多模型推理集群 / Agent 沙箱<br/>(OpenAI 兼容 SSE / DeepSeek / Qwen / Ollama)"]
         end
 
-        subgraph CloudAI["8. 认知对话大模型与编排 (Realtime AI Runtime)"]
-            SentenceSplitter["首句微切分器 (SentenceSplitter)<br/>(4~6 字标点快速断句, P50 ≤ 800ms TTFA)"]
-            CloudLLM["全双工实时多模态 LLM / Agent 沙箱<br/>(OpenAI 兼容 SSE / WebSocket / LiveKit Agent)"]
-        end
-
-        GW_Auth --> SFU_AudioIn
-        SFU_AudioIn --> CloudLLM --> SentenceSplitter --> SFU_AudioOut
-        GW_Interrupt -. "立即取消 Context" .-> CloudLLM
+        GW_Chat <== "流式 Token 生成" ==> CloudLLM
+        GW_Interrupt -. "立即触发 context.CancelFunc()" .-> GW_Chat & CloudLLM
     end
 
     %% ======================= 端云协同连线 =======================
     SignalingClient <== "HTTPS / REST (Token / 打断 / 关闭)" ==> CloudGateway
-    LiveKitClient <== "WebRTC Audio / DataChannel" ==> CloudSFU
+    StreamClient <== "HTTPS SSE 极速文本 Token 流" ==> GW_Chat
 ```
 
 ---

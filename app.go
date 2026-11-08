@@ -148,6 +148,11 @@ func (a *App) startup(ctx context.Context) {
 
 	// 注册端云双模型意图路由遥测
 	a.pipeline.SetModelRouteCallback(func(route string, model string, isEdge bool) {
+		if route == "CLOUD_GATEWAY" || !isEdge {
+			fmt.Printf("[端云遥测] 本轮对话经由【云端网关】(%s) 调度处理完成\n", a.cfg.CloudServerURL)
+		} else {
+			fmt.Printf("[端云遥测] 本轮对话经由【本地端侧小模型】(%s) 本地处理完成，零网络开销\n", model)
+		}
 		a.emitEvent("avatar:model_route", map[string]interface{}{
 			"route":   route,
 			"model":   model,
@@ -229,13 +234,18 @@ func (a *App) startup(ctx context.Context) {
 
 	// 若开启了联网大模型授权，异步完成云端网关握手与 Token 获取
 	if a.cfg.CloudConsent && a.cloudClient != nil {
+		fmt.Printf("[云端网关] 联网大模型授权已开启 (cloud_consent=true)，正在向网关 (%s) 建立连接...\n", a.cfg.CloudServerURL)
 		go func() {
 			ctxToken, cancelToken := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancelToken()
-			if res, err := a.cloudClient.AcquireSessionToken(ctxToken, true); err == nil {
+			if res, err := a.cloudClient.AcquireSessionToken(ctxToken, true); err != nil {
+				fmt.Printf("[云端网关] 初始握手失败: %v\n", err)
+			} else {
 				fmt.Printf("[云端网关] 成功建立会话 Room: %s\n", res.RoomName)
 			}
 		}()
+	} else {
+		fmt.Printf("[云端网关] 初始状态: 联网授权未开启 (cloud_consent=false)，处于纯离线隐私保护模式\n")
 	}
 
 	// 初始广播形态与桌宠外观配置
@@ -258,11 +268,14 @@ func (a *App) startup(ctx context.Context) {
 		if a.cfg.CloudConsent {
 			req, err := http.NewRequestWithContext(ctxTest, http.MethodGet, a.cfg.CloudServerURL+"/health", nil)
 			if err != nil {
+				fmt.Printf("[服务探活] 云端网关请求创建失败 (%s): %v\n", a.cfg.CloudServerURL, err)
 				a.emitEvent("avatar:error", fmt.Sprintf("云端网关异常: %v", err))
 			} else if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != http.StatusOK {
+				fmt.Printf("[服务探活] 云端网关未启动或不可达 (%s)。如需使用大模型，请运行 make server\n", a.cfg.CloudServerURL)
 				a.emitEvent("avatar:error", fmt.Sprintf("云端网关未启动 (%s)。如需使用大模型，请运行 make server 启动网关。", a.cfg.CloudServerURL))
 			} else {
 				_ = resp.Body.Close()
+				fmt.Printf("[服务探活] 云端网关连通正常 (HTTP 200 OK): %s\n", a.cfg.CloudServerURL)
 			}
 		}
 	}()
@@ -298,9 +311,11 @@ func (a *App) SendTextMessage(text string) error {
 	if text == "" {
 		return nil
 	}
+	fmt.Printf("[文本输入] %s\n", text)
 	go func() {
 		err := a.pipeline.Chat(context.Background(), text)
 		if err != nil {
+			fmt.Printf("[对聊失败] %v\n", err)
 			a.emitEvent("avatar:error", fmt.Sprintf("Chat error: %v", err))
 		}
 	}()
@@ -485,6 +500,8 @@ func (a *App) CheckEngineStatus() map[string]bool {
 	}
 	ollamaOk := llm.ProbeEndpoint(ctx, "http://127.0.0.1:11434/v1", "")
 
+	fmt.Printf("[服务状态] 探活检测 | 端侧SLM: %v (%s) | 云端网关: %v (%s) | 联网授权: %v\n", edgeOk, a.cfg.LLM.Edge.BaseURL, cloudGatewayOk, a.cfg.CloudServerURL, a.cfg.CloudConsent)
+
 	return map[string]bool{
 		"local_sidecar": edgeOk,
 		"edge_slm":      edgeOk,
@@ -493,7 +510,6 @@ func (a *App) CheckEngineStatus() map[string]bool {
 		"ollama":        ollamaOk,
 	}
 }
-
 // GetDualModelInfo 获取当前生效的端侧小模型与云端大模型配置信息
 func (a *App) GetDualModelInfo() map[string]string {
 	a.mu.Lock()
@@ -513,15 +529,19 @@ func (a *App) SetCloudConsent(consented bool) bool {
 	_ = config.SaveConfig(a.cfg)
 	a.mu.Unlock()
 
+	fmt.Printf("[云端配置] 联网大模型授权变更 -> cloud_consent=%v\n", consented)
 	a.pipeline.SetCloudConsent(consented)
 	a.emitEvent("avatar:cloud_consent", consented)
 
 	if consented && a.cloudClient != nil {
+		fmt.Printf("[云端网关] 授权开启，正在向网关 (%s) 申请会话 Token...\n", a.cfg.CloudServerURL)
 		go func() {
 			ctxToken, cancelToken := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancelToken()
 			_, _ = a.cloudClient.AcquireSessionToken(ctxToken, true)
 		}()
+	} else {
+		fmt.Printf("[云端网关] 联网授权已关闭，后续开放式问题将不再上云，严格保护本地隐私\n")
 	}
 	return consented
 }
@@ -556,6 +576,7 @@ func (a *App) SetCloudServerURL(url string) string {
 	a.cloudClient = cloud.NewClient(url, "user_mac", "mac_client_01", "mac")
 	a.pipeline.SetCloudClient(a.cloudClient)
 	a.mu.Unlock()
+	fmt.Printf("[云端配置] 云端网关服务地址更新为: %s\n", url)
 	return url
 }
 

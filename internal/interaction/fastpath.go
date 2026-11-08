@@ -1,6 +1,7 @@
 package interaction
 
 import (
+	"fmt"
 	"sync"
 
 	"avatar/internal/dispatcher"
@@ -65,6 +66,7 @@ func (f *FastPathHandler) Evaluate(userInput string) (handled bool, confirmation
 		case dispatcher.RouteLocalPersona:
 			if f.personaMgr != nil {
 				if intercepted, confirm, slot := f.personaMgr.TryInterceptPersonaSwitch(userInput); intercepted {
+					fmt.Printf("[端云分流] 决策: 【本地快环】%s | %s -> 100%% 端侧本地处理，未走云端\n", route.Target, route.Reason)
 					return true, confirm, &slot
 				}
 			}
@@ -73,18 +75,25 @@ func (f *FastPathHandler) Evaluate(userInput string) (handled bool, confirmation
 			if f.vault != nil {
 				res := f.vault.TryInterceptMemoryCommand(userInput)
 				if res.Intercepted {
+					fmt.Printf("[端云分流] 决策: 【本地快环】%s | %s -> 100%% 端侧本地处理，零云端网络开销 (Zero-Retention)\n", route.Target, route.Reason)
 					return true, res.Confirmation, nil
 				}
 			}
 
 		case dispatcher.RouteLocalOnly:
+			fmt.Printf("[端云分流] 决策: 【隐私拦截】%s | %s -> 未走云端，本地直接回复\n", route.Target, route.Reason)
 			return true, "云端实时服务尚未开启授权。为保护您的隐私，当前仅可在本地为您记录偏好与回忆。", nil
 
 		case dispatcher.RouteOffline:
+			fmt.Printf("[端云分流] 决策: 【离线拦截】%s | %s -> 未走云端，本地直接回复\n", route.Target, route.Reason)
 			return true, "当前处于离线模式，云端对话暂时不可用。但您的本地记忆仍可正常响应。", nil
 
-		case dispatcher.RouteCloudChat, dispatcher.RouteEdgeChat:
-			// Let it pass to background task runner or LiveKit cloud realtime agent
+		case dispatcher.RouteCloudChat:
+			fmt.Printf("[端云分流] 决策: 【走云端】%s | %s -> 穿透至云端实时网关 (:8088)\n", route.Target, route.Reason)
+			return false, "", nil
+
+		case dispatcher.RouteEdgeChat:
+			fmt.Printf("[端云分流] 决策: 【本地端侧】%s | %s -> 走端侧小模型 (EDGE_SLM)，未走云端\n", route.Target, route.Reason)
 			return false, "", nil
 		}
 	}
@@ -92,6 +101,7 @@ func (f *FastPathHandler) Evaluate(userInput string) (handled bool, confirmation
 	// Fallback to direct checks if dispatcher is nil
 	if f.personaMgr != nil {
 		if intercepted, confirm, slot := f.personaMgr.TryInterceptPersonaSwitch(userInput); intercepted {
+			fmt.Printf("[端云分流] 决策: 【本地快环】LOCAL_PERSONA -> 100%% 端侧本地处理，未走云端\n")
 			return true, confirm, &slot
 		}
 	}
@@ -99,9 +109,9 @@ func (f *FastPathHandler) Evaluate(userInput string) (handled bool, confirmation
 	if f.vault != nil {
 		res := f.vault.TryInterceptMemoryCommand(userInput)
 		if res.Intercepted {
+			fmt.Printf("[端云分流] 决策: 【本地快环】LOCAL_MEMORY -> 100%% 端侧本地处理，零云端网络开销 (Zero-Retention)\n")
 			return true, res.Confirmation, nil
 		}
 	}
-
 	return false, "", nil
 }

@@ -83,8 +83,11 @@ func NewClient(serverURL, userID, deviceID, clientType string) *Client {
 // AcquireSessionToken requests token from server gateway.
 func (c *Client) AcquireSessionToken(ctx context.Context, cloudConsent bool) (*TokenResponse, error) {
 	if !cloudConsent {
+		fmt.Printf("[云端鉴权] 拒绝上云: 未开启联网大模型授权 (cloud_consent=false)，严格禁止上云\n")
 		return nil, ErrConsentRequired
 	}
+
+	fmt.Printf("[云端鉴权] 【走云端】向网关申请会话 Token -> POST %s/api/v1/auth/token | User: %s | Device: %s | Platform: %s\n", c.serverURL, c.userID, c.deviceID, c.clientType)
 
 	payload, err := json.Marshal(map[string]interface{}{
 		"user_id":       c.userID,
@@ -104,11 +107,13 @@ func (c *Client) AcquireSessionToken(ctx context.Context, cloudConsent bool) (*T
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		fmt.Printf("[云端鉴权] 【走云端】网关连接失败: %v (请确认是否已运行 make server 启动网关)\n", err)
 		return nil, fmt.Errorf("failed to reach auth gateway: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("[云端鉴权] 【走云端】网关拒绝握手: HTTP %d\n", resp.StatusCode)
 		return nil, fmt.Errorf("auth gateway rejected with status %d", resp.StatusCode)
 	}
 
@@ -123,6 +128,7 @@ func (c *Client) AcquireSessionToken(ctx context.Context, cloudConsent bool) (*T
 	c.state = StateConnected
 	c.mu.Unlock()
 
+	fmt.Printf("[云端鉴权] 【走云端】会话建立成功 | 专属隔离房间: %s | 客户端状态: %s\n", res.RoomName, StateConnected)
 	return &res, nil
 }
 
@@ -137,6 +143,7 @@ func (c *Client) StartTurn(turnID string) error {
 
 	c.activeTurnID = turnID
 	c.isAudioMuted = false // Open media gate for open-ended turn
+	fmt.Printf("[云端门禁] 【走云端】开启媒体音频推流门禁 (isAudioMuted=false) | TurnID: %s | Room: %s\n", turnID, c.currentRoom)
 	return nil
 }
 
@@ -148,6 +155,7 @@ func (c *Client) FinishTurn(turnID string) {
 	if c.activeTurnID == turnID {
 		c.activeTurnID = ""
 		c.isAudioMuted = true // Re-mute media gate
+		fmt.Printf("[云端门禁] 【走云端】回合结束，闭锁媒体音频门禁 (isAudioMuted=true) | TurnID: %s\n", turnID)
 	}
 }
 
@@ -155,13 +163,18 @@ func (c *Client) FinishTurn(turnID string) {
 func (c *Client) InterruptActiveTurn(ctx context.Context, turnID, reason string) error {
 	c.mu.Lock()
 	room := c.currentRoom
+	if turnID == "" {
+		turnID = c.activeTurnID
+	}
 	c.activeTurnID = ""
 	c.isAudioMuted = true // Mute audio instantly (< 50ms)
 	c.mu.Unlock()
 
-	if room == "" {
+	if room == "" || turnID == "" {
 		return nil
 	}
+
+	fmt.Printf("[云端打断] 【走云端】向网关下发级联打断信令 -> POST %s/api/v1/session/interrupt | TurnID: %s | Room: %s | 原因: %s | 媒体门禁已闭锁\n", c.serverURL, turnID, room, reason)
 
 	payload, _ := json.Marshal(map[string]string{
 		"session_id": room,
@@ -177,10 +190,12 @@ func (c *Client) InterruptActiveTurn(ctx context.Context, turnID, reason string)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		fmt.Printf("[云端打断] 【走云端】打断信令网络发送失败: %v\n", err)
 		return fmt.Errorf("interrupt signal failed: %w", err)
 	}
 	defer resp.Body.Close()
 
+	fmt.Printf("[云端打断] 【走云端】云端网关已成功接收并响应打断信令 (HTTP %d)\n", resp.StatusCode)
 	return nil
 }
 
@@ -199,6 +214,8 @@ func (c *Client) CloseSession(ctx context.Context) error {
 		return nil
 	}
 
+	fmt.Printf("[云端会话] 【走云端】向网关请求关闭会话 -> POST %s/api/v1/session/close | Room: %s\n", c.serverURL, room)
+
 	payload, _ := json.Marshal(map[string]string{
 		"session_id": room,
 	})
@@ -211,10 +228,12 @@ func (c *Client) CloseSession(ctx context.Context) error {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return err
+		fmt.Printf("[云端会话] 【走云端】关闭会话网络失败: %v\n", err)
+		return fmt.Errorf("close signal failed: %w", err)
 	}
 	defer resp.Body.Close()
 
+	fmt.Printf("[云端会话] 【走云端】会话已正常关闭 (HTTP %d)\n", resp.StatusCode)
 	return nil
 }
 
@@ -238,6 +257,9 @@ func (c *Client) Chat(ctx context.Context, turnID, message, persona string) (*Ch
 	room := c.currentRoom
 	c.mu.RUnlock()
 
+	start := time.Now()
+	fmt.Printf("[云端请求] 【走云端】向网关发起全量对话 -> POST %s/api/v1/chat | TurnID: %s | Room: %s | 角色: %s | 输入: %q\n", c.serverURL, turnID, room, persona, message)
+
 	payload, err := json.Marshal(map[string]interface{}{
 		"session_id": room,
 		"turn_id":    turnID,
@@ -258,11 +280,13 @@ func (c *Client) Chat(ctx context.Context, turnID, message, persona string) (*Ch
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		fmt.Printf("[云端响应] 【走云端】请求失败: %v | TurnID: %s\n", err, turnID)
 		return nil, fmt.Errorf("do chat request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("[云端响应] 【走云端】网关返回异常状态: HTTP %d | TurnID: %s\n", resp.StatusCode, turnID)
 		return nil, fmt.Errorf("chat request failed with status: %d", resp.StatusCode)
 	}
 
@@ -270,6 +294,7 @@ func (c *Client) Chat(ctx context.Context, turnID, message, persona string) (*Ch
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
 		return nil, fmt.Errorf("decode chat response: %w", err)
 	}
+	fmt.Printf("[云端响应] 【走云端】收到完整回复 | TurnID: %s | 耗时: %v\n", turnID, time.Since(start))
 	return &res, nil
 }
 
@@ -278,6 +303,9 @@ func (c *Client) ChatStream(ctx context.Context, turnID, message, persona string
 	c.mu.RLock()
 	room := c.currentRoom
 	c.mu.RUnlock()
+
+	start := time.Now()
+	fmt.Printf("[云端流式] 【走云端】发起 SSE 流式推理 -> POST %s/api/v1/chat | TurnID: %s | Room: %s | 角色: %s | 输入: %q\n", c.serverURL, turnID, room, persona, message)
 
 	payload, err := json.Marshal(map[string]interface{}{
 		"session_id": room,
@@ -301,18 +329,24 @@ func (c *Client) ChatStream(ctx context.Context, turnID, message, persona string
 
 	resp, err := c.streamClient.Do(req)
 	if err != nil {
+		fmt.Printf("[云端流式] 【走云端】流式请求发起失败: %v | TurnID: %s\n", err, turnID)
 		return fmt.Errorf("do stream request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("[云端流式] 【走云端】网关返回异常状态: HTTP %d | TurnID: %s\n", resp.StatusCode, turnID)
 		return fmt.Errorf("stream request failed with status: %d", resp.StatusCode)
 	}
 
 	reader := bufio.NewReader(resp.Body)
+	var tokenCount int
+	var firstTokenOnce sync.Once
+
 	for {
 		select {
 		case <-ctx.Done():
+			fmt.Printf("[云端流式] 【走云端】上下文取消 (Context Done): %v | TurnID: %s\n", ctx.Err(), turnID)
 			return ctx.Err()
 		default:
 		}
@@ -338,6 +372,11 @@ func (c *Client) ChatStream(ctx context.Context, turnID, message, persona string
 		}
 
 		if chunk.Chunk != "" && onChunk != nil {
+			firstTokenOnce.Do(func() {
+				ttft := time.Since(start)
+				fmt.Printf("[云端流式] 【走云端】收到首包 Token (TTFT: %v) | TurnID: %s\n", ttft, turnID)
+			})
+			tokenCount++
 			if err := onChunk(chunk.Chunk); err != nil {
 				return err
 			}
@@ -348,5 +387,7 @@ func (c *Client) ChatStream(ctx context.Context, turnID, message, persona string
 		}
 	}
 
+	totalElapsed := time.Since(start)
+	fmt.Printf("[云端流式] 【走云端】流式生成完成 | TurnID: %s | 总耗时: %v | 收到Token数: %d\n", turnID, totalElapsed, tokenCount)
 	return nil
 }

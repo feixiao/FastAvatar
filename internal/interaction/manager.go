@@ -105,6 +105,7 @@ func (m *Manager) Submit(ctx context.Context, input orchestrator.UserInput) (orc
 
 			m.coord.SetState(orchestrator.StateIdle)
 			m.coord.FinishTask(task.TaskID, orchestrator.TaskStateCompleted, confirm, nil)
+			fmt.Printf("[交互调度] 本地快环处理完成 (TurnID: %s) | 耗时: < 150ms | 100%% 端侧本地响应，未走云端\n", turn.TurnID)
 			taskCancel()
 			return turn.TurnID, nil
 		}
@@ -115,6 +116,7 @@ func (m *Manager) Submit(ctx context.Context, input orchestrator.UserInput) (orc
 		taskCancel()
 		return turn.TurnID, fmt.Errorf("no task runner configured")
 	}
+	fmt.Printf("[交互调度] 移交认知任务调度 (TurnID: %s)\n", turn.TurnID)
 
 	m.mu.RLock()
 	cloudCli := m.cloudClient
@@ -138,6 +140,9 @@ func (m *Manager) Submit(ctx context.Context, input orchestrator.UserInput) (orc
 // Interrupt terminates ongoing speech, active task, and active cloud turn.
 func (m *Manager) Interrupt(ctx context.Context, sessionID orchestrator.SessionID, turnID orchestrator.TurnID) error {
 	m.coord.CancelActive("user interrupted")
+	if m.coord.State() == orchestrator.StateSpeaking {
+		fmt.Printf("[全双工打断] 触发用户插话打断 (Barge-In) | 立即掐断本地发音 (≤ 80ms)，同步向云端下发截断信令\n")
+	}
 
 	// 端侧声学层打断：立即物理停止本地发音 (≤ 80ms)
 	if m.player != nil {

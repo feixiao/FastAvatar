@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"avatar/internal/memory"
 	"avatar/internal/persona"
 	"avatar/internal/tts"
+	"avatar/server"
 )
 
 func TestAppVoiceIntegration(t *testing.T) {
@@ -99,11 +101,10 @@ func TestLiveLLMConversation(t *testing.T) {
 }
 
 func TestLiveLLMConversationWithASR(t *testing.T) {
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(1500 * time.Millisecond)
 	app := NewApp()
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-
 	if !llm.ProbeEndpoint(ctx, app.cfg.LLM.BaseURL, app.cfg.LLM.APIKey) {
 		t.Skipf("skipping live test, no active LLM endpoint found at %s", app.cfg.LLM.BaseURL)
 	}
@@ -189,5 +190,66 @@ func TestApp_CloudConsentAndEngineStatus(t *testing.T) {
 	info := app.GetDualModelInfo()
 	if info["cloud_gateway"] == "" {
 		t.Fatalf("expected cloud_gateway in dual model info")
+	}
+}
+
+func TestApp_CloudRoutingAndLogging(t *testing.T) {
+	tokenSvc := server.NewTokenService(server.TokenConfig{
+		APIKey:    "testkey",
+		APISecret: "secretsecretsecret123456789012345",
+	})
+	cloudSrv := server.NewCloudServer(tokenSvc)
+	ts := httptest.NewServer(cloudSrv.Routes())
+	defer ts.Close()
+
+	app := NewApp()
+	origURL := app.GetCloudServerURL()
+	origConsent := app.GetCloudConsent()
+	defer func() {
+		app.SetCloudServerURL(origURL)
+		app.SetCloudConsent(origConsent)
+	}()
+
+	app.SetCloudServerURL(ts.URL)
+	app.SetCloudConsent(true)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	res, err := app.cloudClient.AcquireSessionToken(ctx, true)
+	if err != nil {
+		t.Fatalf("failed to acquire session token: %v", err)
+	}
+	if res.RoomName == "" {
+		t.Fatalf("expected non-empty room name")
+	}
+
+	var routeRecorded string
+	app.pipeline.SetModelRouteCallback(func(route string, model string, isEdge bool) {
+		routeRecorded = route
+	})
+
+	err = app.pipeline.Chat(context.Background(), "帮我记一下明天的会议在下午三点")
+	if err != nil {
+		t.Fatalf("memory command failed: %v", err)
+	}
+	if routeRecorded != "" {
+		t.Fatalf("expected fast-path memory command not to invoke cognitive model, got %s", routeRecorded)
+	}
+
+	err = app.pipeline.Chat(context.Background(), "为什么天空是蓝色的？请详细分析物理原理")
+	if err != nil {
+		t.Fatalf("complex query chat failed: %v", err)
+	}
+	if routeRecorded != "CLOUD_GATEWAY" {
+		t.Fatalf("expected complex query to route to CLOUD_GATEWAY, got %s", routeRecorded)
+	}
+
+	routeRecorded = ""
+	err = app.SendTextMessage("编写一段代码实现快速排序算法")
+	if err != nil {
+		t.Fatalf("SendTextMessage failed: %v", err)
+	}
+	time.Sleep(300 * time.Millisecond)
+	if routeRecorded != "CLOUD_GATEWAY" {
+		t.Fatalf("expected text message to route to CLOUD_GATEWAY, got %s", routeRecorded)
 	}
 }
