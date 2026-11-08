@@ -45,24 +45,31 @@ func main() {
 	llmAPIKey := os.Getenv("LLM_API_KEY")
 	llmModel := os.Getenv("LLM_MODEL")
 
-	if llmBaseURL != "" {
-		if llmModel == "" {
-			llmModel = "default"
+	if llmBaseURL == "" {
+		llmBaseURL = "http://127.0.0.1:1234/v1" // 默认对接宿主机 LM Studio
+	}
+	if llmModel == "" {
+		llmModel = "default"
+	}
+
+	ctxProbe, cancelProbe := context.WithTimeout(context.Background(), 800*time.Millisecond)
+	if llm.ProbeEndpoint(ctxProbe, llmBaseURL, llmAPIKey) {
+		if firstModel, err := llm.FetchFirstModel(ctxProbe, llmBaseURL, llmAPIKey); err == nil && firstModel != "" && llmModel == "default" {
+			llmModel = firstModel
 		}
 		llmCli := llm.NewClient(llmBaseURL, llmAPIKey)
 		cloudSrv.SetLLM(llmCli, llmModel)
 		log.Printf("[Cloud Gateway] Upstream LLM bound: %s (model: %s)", llmBaseURL, llmModel)
+	} else if detectedURL, detectedModel, ok := llm.AutoDetectEndpoint(ctxProbe); ok {
+		llmCli := llm.NewClient(detectedURL, "")
+		cloudSrv.SetLLM(llmCli, detectedModel)
+		log.Printf("[Cloud Gateway] Auto-detected local LLM: %s (model: %s)", detectedURL, detectedModel)
 	} else {
-		ctxProbe, cancelProbe := context.WithTimeout(context.Background(), 800*time.Millisecond)
-		if detectedURL, detectedModel, ok := llm.AutoDetectEndpoint(ctxProbe); ok {
-			llmCli := llm.NewClient(detectedURL, "")
-			cloudSrv.SetLLM(llmCli, detectedModel)
-			log.Printf("[Cloud Gateway] Auto-detected local LLM: %s (model: %s)", detectedURL, detectedModel)
-		} else {
-			log.Printf("[Cloud Gateway] No upstream LLM specified; using fallback mock persona responder")
-		}
-		cancelProbe()
+		llmCli := llm.NewClient(llmBaseURL, llmAPIKey)
+		cloudSrv.SetLLM(llmCli, llmModel)
+		log.Printf("[Cloud Gateway] Upstream LLM configured to %s (model: %s)", llmBaseURL, llmModel)
 	}
+	cancelProbe()
 
 	log.Printf("[Cloud Gateway] Listening on :%s (LiveKit SFU: %s)", port, livekitURL)
 	if err := http.ListenAndServe(":"+port, cloudSrv.Routes()); err != nil {

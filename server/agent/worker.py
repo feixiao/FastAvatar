@@ -60,9 +60,9 @@ async def entrypoint(ctx):
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
     # Read upstream LLM configuration
-    llm_base_url = os.getenv("LLM_BASE_URL", "http://127.0.0.1:8000/v1")
-    llm_api_key = os.getenv("LLM_API_KEY", "dummy-key")
-    llm_model = os.getenv("LLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+    llm_base_url = os.getenv("LLM_BASE_URL", "http://127.0.0.1:1234/v1")
+    llm_api_key = os.getenv("LLM_API_KEY", "")
+    llm_model = os.getenv("LLM_MODEL", "default")
 
     # Determine initial persona from room metadata or environment
     persona_key = os.getenv("AGENT_PERSONA", "assistant")

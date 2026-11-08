@@ -17,8 +17,8 @@ ENV PYTHONUNBUFFERED=1
 ENV LIVEKIT_URL=ws://livekit:7880
 ENV LIVEKIT_API_KEY=devkey
 ENV LIVEKIT_API_SECRET=secret_avatar_livekit_key_2026
-ENV LLM_BASE_URL=http://host.docker.internal:8000/v1
-ENV LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
+ENV LLM_BASE_URL=http://host.docker.internal:1234/v1
+ENV LLM_MODEL=default
 ENV AGENT_PERSONA=assistant
 
 CMD ["python", "worker.py", "start"]
