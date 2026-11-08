@@ -221,12 +221,13 @@ flowchart LR
   * **强类型校验与安全前置拦截**：通过 `SystemAlarmTool`、`MusicPlaybackTool`、`WeatherQueryTool` 拦截解析参数；
   * **VHAL 抽象互锁**：在调用底层硬件动作前，检查车辆物理信号状态（车速、挡位），杜绝行车过程中执行高危控制指令。
 
-### 5. 云端全双工实时网关与端云协同打断 (Cloud Gateway & LiveKit SFU)
-* **核心代码**：[`server/server.go`](../server/server.go) 与 [`server/agent/worker.py`](../server/agent/worker.py)
+### 5. 云端流式网关与全链路文本协同 (Cloud Gateway & Unified Edge TTS)
+* **核心代码**：[`server/server.go`](../server/server.go) 与 [`internal/cloud/client.go`](../internal/cloud/client.go)
 * **关键实现逻辑**：
   * **Go 实时控制网关（`:8088`）**：负责端侧授权验证（`cloud_consented`）、会话生命周期流转（`NEW -> READY -> PROCESSING -> STREAMING -> CLOSED`）、协同打断接口（`POST /api/v1/session/interrupt`）；
-  * **LiveKit SFU（`:7880`）**：承载全双工 WebRTC 上下行音频流，实现弱网抗抖动与流媒体极速转发；
-  * **Python Agent Worker**：利用 LiveKit Agent 框架串联 Silero VAD、流式 STT/LLM、TTS，并在端侧触发打断时，即刻级联取消云端下游推流。
+  * **全链路传文本 (SSE Token Stream)**：上游大模型生成 Token 经由 `/api/v1/chat` (text/event-stream) 毫秒级下发，零音视频带宽与流媒体服务器运维负担；
+  * **端侧统一语音合成 (Unified Edge TTS · 零音色割裂)**：无论是本地快环 A 还是云端慢环 B，最终文字全部汇入端侧同一个离线神经 TTS 引擎（如 `sherpa-onnx` / 平台原生合成器）发声，彻底根除“本地机械音 vs 云端真人音”的人格割裂；
+  * **协同打断立即强杀**：端侧触发打断时，端侧瞬间清空本地待播切句并闭音，云端网关收到中断信令后立即执行 `CancelFunc()` 强杀正在生成的 LLM 推理线程。
 
 ---
 

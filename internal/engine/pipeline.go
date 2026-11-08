@@ -32,6 +32,7 @@ type Pipeline struct {
 	fastPath    *interaction.FastPathHandler
 	taskRunner  *task.Runner
 	toolsReg    *tools.Registry
+	synthesizer tts.Synthesizer
 }
 
 // NewPipeline creates a new modular Pipeline composed of coordinator, interaction manager, task runner and tools.
@@ -66,6 +67,24 @@ func NewPipeline(
 		fastPath:    fastPath,
 		taskRunner:  taskRunner,
 		toolsReg:    toolsReg,
+		synthesizer: synthesizer,
+	}
+}
+
+// Synthesizer returns the unified speech synthesizer instance shared across local and cloud turns.
+func (p *Pipeline) Synthesizer() tts.Synthesizer {
+	return p.synthesizer
+}
+
+// UpdateVoiceConfig updates the voice and rate across the unified TTS synthesizer.
+func (p *Pipeline) UpdateVoiceConfig(voice string, rate int) {
+	if vc, ok := p.synthesizer.(tts.VoiceConfigurable); ok {
+		if voice != "" {
+			vc.SetVoice(voice)
+		}
+		if rate > 0 {
+			vc.SetRate(rate)
+		}
 	}
 }
 
@@ -83,9 +102,13 @@ func (p *Pipeline) SetCallbacks(
 		p.interaction.SetSpeechChunkCallback(onSpeech)
 		p.taskRunner.SetSpeechChunkCallback(onSpeech)
 	}
-	if onPersona != nil {
-		p.interaction.SetPersonaSyncCallback(onPersona)
-	}
+	// Synchronize voice timbre & speaking rate to the unified edge TTS on persona switch
+	p.interaction.SetPersonaSyncCallback(func(slot persona.PersonaSlot) {
+		p.UpdateVoiceConfig(slot.VoiceOverride, slot.RateOverride)
+		if onPersona != nil {
+			onPersona(slot)
+		}
+	})
 	if onBond != nil {
 		p.taskRunner.SetBondSyncCallback(onBond)
 	}

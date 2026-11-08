@@ -127,11 +127,11 @@ Avatar (macOS Desktop)
 │   ├── NativeMacASR (internal/asr: 管道管理 cmd/avatar-asr 伴生 Swift 进程)
 │   │   └── cmd/avatar-asr/main.swift (AVAudioEngine + SFSpeechRecognizer + 能量计算)
 │   ├── SentenceSplitter (internal/splitter: 标点断句算法，4 字符阈值微切句)
-│   ├── TTSSynthesizer (internal/tts: 调用系统 mac_say，支持音色/语速动态覆盖)
+│   ├── TTSSynthesizer (internal/tts: 端侧统一语音合成器，实现 VoiceConfigurable，快环 A 与慢环 B 100% 共享发声底座)
 │   └── SidecarManager (internal/sidecar: 探测并拉起本地 llama-server GGUF 小模型)
 │
 └── Cloud Integration Client (internal/cloud)
-    └── Client (Token 交换、云端实时打断同步、会话终止管理)
+    └── Client (Token 交换、/api/v1/chat SSE 极速文本流拉取、云端打断同步、会话终止管理)
 ```
 
 ### 2.2 Android 移动端与车机端架构 (Pixel 10 / AAOS 参考平台)
@@ -167,7 +167,7 @@ Avatar (Android / AAOS Client)
 │   └── MemoryVault (memory: 两阶段口语确认本地隐私记忆隔离存储)
 │
 └── Cloud & Diagnostics (com.avatar.android.core)
-    ├── CloudClient (cloud: LiveKit 媒体推流与 /api/v1/ 协同信令)
+    ├── CloudClient (cloud: /api/v1/chat SSE 文本流接收与 /api/v1/ 协同信令)
     └── DiagnosticLogger (diagnostics: 脱敏运行指标与错误审计 diagnostics.log)
 ```
 
@@ -206,20 +206,15 @@ core (C++17 High-Reliability Native Harness)
 
 ## 3. 云端实时网关与基础设施架构 (Cloud Architecture)
 
-云端作为认知慢环基础设施，由 Go 实时网关与 LiveKit SFU 配合构成：
+在**「全链路传文本 + 端侧统一 TTS」**架构下，云端聚焦于**认知推理与极速 Token 流分发**，由轻量化 Go 实时网关承载：
 
 ```
-Cloud Infrastructure (:8088 & :7880)
-├── Go Realtime Gateway (:8088)
-│   ├── Routes (/health, /api/v1/auth/token, /api/v1/session/interrupt, /api/v1/session/close)
-│   ├── TokenService (server/auth.go: 验证 cloud_consented，签发 LiveKit JWT Token)
-│   ├── CloudServer (server/server.go: 维护 ActiveSession 状态机与中断信号分发)
-│   └── Zero-Retention Telemetry (仅记录 SessionID、耗时、平台、错误码；零音频/零转写持久化)
-│
-└── LiveKit SFU Media Server (:7880 / :7881 / :7882)
-    ├── WebRTC Ingress (接收端侧已授权语音流)
-    ├── DataChannel (低延时双向实时控制)
-    └── WebRTC Egress (流式广播合成音频包至端侧 JitterBuffer)
+Cloud Infrastructure (:8088)
+└── Go Realtime Gateway (:8088)
+    ├── Routes (/health, /api/v1/auth/token, /api/v1/chat, /api/v1/session/interrupt, /api/v1/session/close)
+    ├── TokenService (server/auth.go: 验证 cloud_consented，签发短效会话凭证)
+    ├── CloudServer (server/server.go: 维护 ActiveSession 状态机、SSE 流式 Token 代理、并发打断 CancelFunc 强杀)
+    └── Zero-Retention Telemetry (仅记录 SessionID、耗时、平台、错误码；零音频/零转写持久化)
 ```
 
 ---
@@ -228,7 +223,7 @@ Cloud Infrastructure (:8088 & :7880)
 
 ### 4.1 端侧极速快环时序图 (Local Fast Loop ≤ 150ms)
 
-当用户发起本地记忆管理（如偏好记录）或人格流转指令时，系统在端侧直接完成全流程，网络媒体门禁物理锁闭，数据绝对不出端。
+当用户发起本地记忆管理（如偏好记录）或人格流转指令时，系统在端侧直接完成全流程，网络媒体门禁物理锁闭，数据绝对不出端，并由**端侧统一 TTS** 输出播报。
 
 ```mermaid
 sequenceDiagram
@@ -237,7 +232,7 @@ sequenceDiagram
     participant Audio as 音频感知 (AEC/VAD)
     participant Dispatcher as FastDispatcher (<1ms)
     participant LocalEngine as 本地引擎 (Memory / Persona)
-    participant LocalTTS as 本地 TTS / 反馈
+    participant UnifiedTTS as 端侧统一 TTS (Sherpa-ONNX / MacSay)
     participant CloudBridge as 云端隧道门禁
 
     User->>Audio: 口语输入 ("记一下我喝美式咖啡" / "切换到伴侣模式")
@@ -246,12 +241,12 @@ sequenceDiagram
     
     alt 命中记忆意图 (RouteLocalMemory)
         Dispatcher->>LocalEngine: MemoryVault.StageProfile() (两阶段暂存)
-        LocalEngine-->>LocalTTS: 请求二次确认 ("确定要记住这条偏好吗？")
-        LocalTTS-->>User: 播报确认提示 (总耗时 ≤ 150ms)
+        LocalEngine-->>UnifiedTTS: 请求二次确认 ("确定要记住这条偏好吗？")
+        UnifiedTTS-->>User: 端侧统一音色播报 (总耗时 ≤ 150ms)
     else 命中人格切换意图 (RoutePersonaSwitch)
         Dispatcher->>LocalEngine: PersonaManager.SwitchPersona("companion")
-        LocalEngine-->>LocalTTS: 触发即时确认播报 ("已切换至知心伴侣模式")
-        LocalTTS-->>User: 播放角色应答音效与语音
+        LocalEngine-->>UnifiedTTS: 触发即时确认播报 ("已切换至知心伴侣模式")
+        UnifiedTTS-->>User: 播放角色应答音效与语音
     end
 
     Note over CloudBridge: 媒体门禁保持闭锁 (isAudioMuted=true)，零网络通信
@@ -261,65 +256,68 @@ sequenceDiagram
 
 ### 4.2 云端深度对话流与首字切句时序图 (Cloud Deep Loop)
 
-当用户提出开放式问题且已完成云端显式授权时，端侧开启推流，云端采用 SentenceSplitter 流式断句，确保首字发音时延 (TTFA) 达成 P50 ≤ 800ms。
+当用户提出开放式问题且已完成云端显式授权时，**全链路仅传输文本**：端侧将文本发送给网关，云端采用 SSE 极速下发 LLM Token 流，端侧采用 `SentenceSplitter` 实时断句并送入**端侧同一个 TTS 引擎**合成发声，达成 TTFA P50 ≤ 800ms 且端云音色 100% 一致。
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User as 用户
     participant Client as 客户端核心 (Go / Android)
+    participant Splitter as 端侧微断句器 (SentenceSplitter)
+    participant UnifiedTTS as 端侧统一 TTS (Sherpa-ONNX / MacSay)
     participant Gateway as 云端网关 (:8088)
-    participant SFU as LiveKit SFU (:7880)
-    participant LLM as 云端实时 LLM / Agent
+    participant LLM as 云端实时大模型 (LLM)
 
     Client->>Gateway: POST /api/v1/auth/token (带 cloud_consented: true)
-    Gateway-->>Client: 返回 LiveKit Room Token & WSS 地址
-    Client->>SFU: 建立 WebRTC 对等连接，解开音轨门禁推流
+    Gateway-->>Client: 返回 SessionID 与 Token
     
     User->>Client: 开放式倾诉 / 复杂对话
-    Client->>SFU: 流式音频帧上行 (Opus / PCM)
-    SFU->>LLM: 实时转写与上下文理解
+    Client->>Gateway: POST /api/v1/chat (Accept: text/event-stream)
+    Gateway->>LLM: 组装 Prompt 发起流式推理
     
-    Note over LLM: 流式生成首批 Tokens
-    LLM->>LLM: SentenceSplitter 捕捉首个句末标点 (4~6 字)
-    LLM->>SFU: 极速下发首句音频切片
-    SFU-->>Client: 下行 WebRTC 音频包到达端侧
-    Client-->>User: 开始扬声器播报 (TTFA P50 ≤ 800ms)
+    loop 极速 SSE Token 流下发
+        LLM-->>Gateway: 吐出增量 Token
+        Gateway-->>Client: SSE data: {"chunk": "..."}
+        Client->>Splitter: Push(token) 实时捕捉首个标点 (4~6 字)
+        opt 满足首句或后续句切分
+            Splitter->>UnifiedTTS: 送入切句纯文本
+            UnifiedTTS-->>User: 端侧统一 TTS 立即开始播报 (TTFA P50 ≤ 800ms)
+        end
+    end
     
-    Note over LLM,Client: 后续长句持续平滑流式吐出与播放
+    Note over Client,UnifiedTTS: 快环 A 与慢环 B 100% 共享端侧 TTS 实例，音色完全一致
 ```
 
 ---
 
 ### 4.3 端云协同毫秒级打断时序图 (Barge-In ≤ 80ms)
 
-在智能体播报过程中，一旦用户开嗓插话，端侧在 80ms 内强制掐断本地发音，并向云端同步发送打断信令，中止云端流式生成。
+在智能体播报过程中，一旦用户开嗓插话，端侧在 80ms 内强制掐断本地发音并清空队列，同时向云端同步发送打断信令，强杀云端大模型流式生成。
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User as 用户 (插话打断)
     participant Perception as 本地音频驱动 / VAD
-    participant LocalPlayer as 本地播放器 (Say / AudioTrack)
+    participant UnifiedTTS as 端侧统一 TTS (播放器与队列)
     participant ClientCoord as 客户端协调器 (Coordinator)
     participant CloudGW as 云端网关 (/session/interrupt)
-    participant CloudAgent as 云端对话引擎
+    participant CloudLLM as 云端对话大模型
 
-    Note over LocalPlayer: 正在播报中 (StateSpeaking)
+    Note over UnifiedTTS: 正在播报中 (StateSpeaking)
     User->>Perception: 说话开嗓 (能量突增，触发 VAD 插话)
     
     Perception->>ClientCoord: 触发本地打断信号 (Barge-in Event)
     
     par 本地强行截断 (耗时 ≤ 80ms)
-        ClientCoord->>LocalPlayer: 强制停止发音 (Kill TTS 进程 / AudioTrack.pause)
-        ClientCoord->>ClientCoord: 状态切回 StateListening
+        ClientCoord->>UnifiedTTS: 强制停止发音 (Kill TTS 进程 / AudioTrack.pause) 并清空待播切句
+        ClientCoord->>ClientCoord: 断开当前 SSE 接收流，状态切回 StateListening
     and 云端信令同步
         ClientCoord->>CloudGW: POST /api/v1/session/interrupt (带 SessionID & TurnID)
-        CloudGW->>CloudAgent: 触发 context.CancelFunc() 取消生成
-        CloudAgent-->>CloudGW: 截断 LLM SSE / LiveKit 下行流
+        CloudGW->>CloudLLM: 立即触发 CancelFunc() 掐断大模型推理与下行流
     end
     
-    Note over User,LocalPlayer: 扬声器瞬间静音，智能体无缝切换至倾听状态
+    Note over User,UnifiedTTS: 扬声器瞬间静音，智能体无缝切换至倾听状态
 ```
 
 ---
@@ -336,7 +334,7 @@ stateDiagram-v2
     idle --> listening: 检测到语音输入 / VAD 活跃
     listening --> thinking: 语音结束断句 (Final Transcript)
     listening --> idle: VAD 超时无有效语音输入
-    thinking --> speaking: 首切句音频生成就绪
+    thinking --> speaking: 首切句文本由端侧统一 TTS 合成就绪
     speaking --> listening: 用户开嗓触发本地打断 (Barge-in ≤ 80ms)
     speaking --> idle: 播报完整结束
 ```
@@ -363,12 +361,12 @@ stateDiagram-v2
     ROUTING --> OFFLINE: OfflineBranch (播报离线提示)
     ROUTING --> CLOUD_CONNECTING: CloudBranch
     
-    LOCAL_PROCESSING --> SPEAKING: 本地回执就绪
+    LOCAL_PROCESSING --> SPEAKING: 端侧统一 TTS 播报回执
     LOCAL_ONLY --> SPEAKING
     OFFLINE --> SPEAKING
     
-    CLOUD_CONNECTING --> CLOUD_TURN: LiveKit 音轨打通
-    CLOUD_TURN --> SPEAKING: 首包音频到达
+    CLOUD_CONNECTING --> CLOUD_TURN: 建立 SSE 对话通道
+    CLOUD_TURN --> SPEAKING: 首切句文本到达，端侧统一 TTS 启播
     
     SPEAKING --> LISTENING: 正常播报完成
     SPEAKING --> LISTENING: 用户开嗓打断 (Barge-in)
@@ -387,10 +385,10 @@ stateDiagram-v2
 stateDiagram-v2
     [*] --> NEW: 接收 Token 请求
     NEW --> READY: Token 签发成功，等待客户端接入
-    READY --> PROCESSING: 客户端推流输入到达
-    PROCESSING --> STREAMING: LLM 首句断句吐出，音轨下发中
+    READY --> PROCESSING: 接收到 /api/v1/chat 对话请求
+    PROCESSING --> STREAMING: LLM Token 流通过 SSE 极速下发中
     STREAMING --> READY: 回合流式播报完成
-    STREAMING --> READY: 接收到 POST /session/interrupt 打断
+    STREAMING --> READY: 接收到 POST /session/interrupt 打断 (CancelFunc 强杀)
     READY --> CLOSED: 接收到 POST /session/close 或超时
     CLOSED --> [*]
 ```
@@ -429,13 +427,13 @@ stateDiagram-v2
 | **分流路由引擎** | 极速分流器 | `internal/dispatcher/dispatcher.go` | `FastDispatcher.Evaluate()`, `RouteTarget` |
 | **记忆与人格** | 记忆/人设/羁绊 | `internal/memory/`, `internal/persona/` | `Vault`, `PersonaManager`, `BondManager`, `FastPathHandler` |
 | **桌面编排核心** | 协调状态机 | `internal/orchestrator/`, `internal/engine/` | `Coordinator`, `Pipeline`, `Manager`, `TaskRunner` |
-| **微切词断句** | 流式断句器 | `internal/splitter/splitter.go` | `SentenceSplitter.Feed()`, 4 字符首句快速切割 |
+| **微切词断句** | 流式断句器 | `internal/splitter/splitter.go` | `SentenceSplitter.Push()`, 4 字符首句快速切割 |
+| **端侧统一合成** | 统一离线 TTS | `internal/tts/tts.go`, `android/app/libs/sherpa-onnx-2.0.1.aar` | `Synthesizer`, `VoiceConfigurable`, 快环 A 与慢环 B 100% 共享发声底座 |
 | **移动端应用** | Android 整体 | `android/app/src/main/java/com/avatar/android/` | 原生 Pixel 10 实现，Compose UI + Foreground Service |
 | **移动端状态机** | 11 状态机 | `android/.../core/state/SessionStateMachine.kt` | `SessionState`, 严格状态校验与转移监听 |
 | **移动端隐私** | 音频隐私防护 | `android/.../core/audio/` | `AudioPrivacyGuard`, `AudioFocusHelper`, `AudioPlaybackController` |
-| **云端实时网关** | 实时服务 | `server/server.go`, `server/auth.go` | `CloudServer`, `TokenService`, `/api/v1/session/interrupt` |
-| **云端基础设施** | LiveKit 容器编排 | `server/docker-compose.yaml` | LiveKit SFU (端口 7880/7881/7882) |
-| **集成验收套件** | 端到端打断测试 | `cmd/e2e-test/main.go`, `server/server_test.go` | 验证双环时延、Barge-in 打断与合规护栏 |
+| **云端实时网关** | 实时流式文本服务 | `server/server.go`, `server/auth.go` | `CloudServer`, `TokenService`, `/api/v1/chat` (SSE), `/api/v1/session/interrupt` |
+| **集成验收套件** | 端到端打断测试 | `cmd/e2e-test/main.go`, `server/server_test.go` | 验证双环时延、全链路纯文本传输、端侧统一 TTS 音色一致性、Barge-in 打断与合规护栏 |
 
 ---
 
@@ -443,34 +441,41 @@ stateDiagram-v2
 
 ### 8.1 基础设施与端口拓扑
 
-云端实时基础设施采用两层架构：
-1. **LiveKit SFU 节点集群**：负责 WebRTC 音视频与数据通道（DataChannel）的极速流式分发；
-2. **Go 云端实时网关 (Avatar Cloud Gateway)**：负责设备接入鉴权、动态 Room Token 签发、端云打断信令协同与 Zero-Retention 遥测审计。
+云端实时基础设施采用极简轻量网关架构：
+- **Go 云端实时网关 (Avatar Cloud Gateway :8088)**：负责设备接入鉴权、动态会话 Token 签发、上游大模型 SSE Token 极速代理（`/api/v1/chat`）、端云打断信令协同（CancelFunc 强杀生成）与 Zero-Retention 遥测审计。
 
 ```
                          ┌───────────────────────────────────────────────┐
                          │           客户端 (Client Application)         │
-                         └───────┬───────────────────────────────┬───────┘
-                                 │                               │
-                      HTTPS REST │ :8088              WebRTC WSS │ :7880
-                                 ▼                               ▼
-                 ┌───────────────────────────────┐  ┌───────────────────────────────┐
-                 │  Go Realtime Gateway (:8088)  │  │    LiveKit SFU (:7880)        │
-                 │  • /health                    │  │    • WebRTC TCP (:7881)       │
-                 │  • /api/v1/auth/token         │  │    • WebRTC UDP (:7882/udp)   │
-                 │  • /api/v1/session/interrupt  │  │    • DataChannel 信令隧道     │
-                 │  • /api/v1/session/close      │  │                               │
-                 └───────────────────────────────┘  └───────────────────────────────┘
+                         │   [端侧 ASR] + [SentenceSplitter] + [统一 TTS] │
+                         └───────────────────────┬───────────────────────┘
+                                                 │
+                               HTTPS REST / SSE  │ :8088 (纯文本 Token 流与信令)
+                                                 ▼
+                                 ┌───────────────────────────────┐
+                                 │  Go Realtime Gateway (:8088)  │
+                                 │  • GET  /health               │
+                                 │  • POST /api/v1/auth/token    │
+                                 │  • POST /api/v1/chat (SSE)    │
+                                 │  • POST /api/v1/session/interrupt
+                                 │  • POST /api/v1/session/close │
+                                 └───────────────┬───────────────┘
+                                                 │
+                                                 ▼
+                                 ┌───────────────────────────────┐
+                                 │ Upstream LLM Inference Server │
+                                 │ (vLLM / Ollama / OpenAI API)  │
+                                 └───────────────────────────────┘
 ```
 
 #### 环境变量配置规范
 
 | 环境变量 | 默认值 | 作用范围 | 说明 |
 | :--- | :--- | :--- | :--- |
-| `PORT` | `8088` | 云端网关 | 网关监听的 HTTP REST 服务端口 |
-| `LIVEKIT_URL` | `ws://localhost:7880` | 云端网关 | 内部或公网指向 LiveKit SFU 的信令连接地址 |
-| `LIVEKIT_API_KEY` | `devkey` | 云端网关 & SFU | LiveKit 访问密钥（需与 SFU 保持一致） |
-| `LIVEKIT_API_SECRET` | `secret` | 云端网关 & SFU | LiveKit 签名秘钥（需与 SFU 保持一致） |
+| `PORT` | `8088` | 云端网关 | 网关监听的 HTTP REST & SSE 服务端口 |
+| `LLM_BASE_URL` | `http://127.0.0.1:1234/v1` | 云端网关 | 上游 OpenAI 兼容大模型推理服务端点 |
+| `LLM_API_KEY` | `""` | 云端网关 | 上游大模型服务 API 密钥（由网关安全托管，严禁下发客户端） |
+| `LLM_MODEL` | `default` | 云端网关 | 默认调用的云端大模型名称 |
 
 ---
 
@@ -487,7 +492,7 @@ stateDiagram-v2
   }
   ```
 
-#### 2. LiveKit 房间 Token 签发 (`POST /api/v1/auth/token`)
+#### 2. 会话鉴权与 Token 签发 (`POST /api/v1/auth/token`)
 - **Path**: `/api/v1/auth/token`
 - **Method**: `POST`
 - **Request Headers**: `Content-Type: application/json`
@@ -510,7 +515,7 @@ stateDiagram-v2
     ```
     ERR_CLOUD_NOT_CONSENTED: user has not consented to cloud processing
     ```
-    同时网关记录一条脱敏审计事件 `cloud_session_rejected`，杜绝未授权音频上云。
+    同时网关记录一条脱敏审计事件 `cloud_session_rejected`，杜绝未授权文本上云。
 - **Success Response**: `200 OK`
   ```json
   {
@@ -522,7 +527,35 @@ stateDiagram-v2
   ```
   Token 有效期默认强制设定为 **5 分钟 (300s)** 短时凭证，降低泄露风险。
 
-#### 3. 端侧协同打断通知 (`POST /api/v1/session/interrupt`)
+#### 3. 极速流式文本对话 (`POST /api/v1/chat`)
+- **Path**: `/api/v1/chat`
+- **Method**: `POST`
+- **Request Headers**:
+  - `Content-Type: application/json`
+  - `Accept: text/event-stream`（启用 SSE 极速 Token 流推送）
+- **Request Body**:
+  ```json
+  {
+    "session_id": "room_usr_001_1730000000",
+    "turn_id": "turn_1024",
+    "user_id": "usr_001",
+    "device_id": "dev_mac_01",
+    "message": "为什么海水是蓝色的？",
+    "persona": "companion",
+    "stream": true
+  }
+  ```
+- **SSE 流式响应格式 (`text/event-stream`)**：
+  ```text
+  data: {"turn_id":"turn_1024","chunk":"海水呈现蓝色，"}
+
+  data: {"turn_id":"turn_1024","chunk":"是因为光散射。"}
+
+  data: {"turn_id":"turn_1024","done":true,"latency_ms":380}
+  ```
+  客户端收到 Token 后实时经由端侧 `SentenceSplitter` 切句，并在本地统一 TTS 中播放。
+
+#### 4. 端侧协同打断通知 (`POST /api/v1/session/interrupt`)
 - **Path**: `/api/v1/session/interrupt`
 - **Method**: `POST`
 - **Request Body**:
@@ -536,7 +569,7 @@ stateDiagram-v2
 - **服务端处理机制**：
   1. 根据 `session_id` 检索内存活跃会话 `ActiveSession`；
   2. 立即重置 `ActiveTurn = ""` 并将状态机切回 `SessionStateReady`；
-  3. 广播触发关联 LLM 生成协程的 `context.CancelFunc()`，中断正在合成与排队的音频切片；
+  3. 立即触发生成 Context 的 `CancelFunc()`，强杀正在进行的 LLM 推理并截断 SSE 推送；
   4. 记录脱敏事件 `cloud_turn_cancelled`。
 - **Success Response**: `200 OK`
   ```json
@@ -546,7 +579,7 @@ stateDiagram-v2
   }
   ```
 
-#### 4. 会话显式关闭与资源清理 (`POST /api/v1/session/close`)
+#### 5. 会话显式关闭与资源清理 (`POST /api/v1/session/close`)
 - **Path**: `/api/v1/session/close`
 - **Method**: `POST`
 - **Request Body**:

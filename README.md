@@ -2,23 +2,28 @@
 
 [![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org)
 [![Wails](https://img.shields.io/badge/Wails-v2-DF1A2A?style=flat)](https://wails.io)
-[![LiveKit](https://img.shields.io/badge/LiveKit-SFU-002B49?style=flat)](https://livekit.io)
+[![Architecture](https://img.shields.io/badge/Architecture-Unified%20Edge%20TTS-007ACC?style=flat)](#)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Android-green?style=flat)](#)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Avatar 是一套**端云协同、双环驱动（Dual-Loop）、低时延流式、全双工可打断（Barge-in）**的跨平台智能语音伴侣系统。包含**轻量桌面端（Go + Wails + Swift 原生 ASR）**、**移动端（Pixel 原生 Android）**以及**实时云端网关服务（Go + LiveKit SFU）**。
+Avatar 是一套**端云协同、双环驱动（Dual-Loop）、全链路文本流（SSE）、端侧统一发声（Unified Edge TTS）、毫秒级可打断（Barge-in）**的跨平台智能语音伴侣系统。包含**轻量桌面端（Go + Wails + Swift 原生 ASR，Mac 优先）**、**移动端（Pixel 原生 Android）**以及**极简云端实时网关服务（Go Realtime Gateway :8088）**。
 
 ---
 
 ## 🌟 核心特性
 
-- ⚡️ **端云双环架构 (Dual-Loop)**：
-  - **端侧极速快环（≤ 150ms）**：毫秒级意图分流路由器、本地记忆底座、多模态人格引擎与离线 ASR/TTS，断网物理隔离依然可用。
-  - **云端深度慢环（P50 ≤ 800ms）**：基于 LiveKit SFU 与 Go 实时网关，支持全双工低时延实时音视频流与大模型多轮深度推理。
-- 🎙️ **毫秒级全双工打断 (Barge-in ≤ 80ms)**：用户开嗓瞬间掐断本地发音，端云协同同步截断云端流式生成与下发。
-- 🛡️ **严格隐私合规 (Zero-Retention Guardrail)**：未经用户显式授权严禁上云；云端零留存，严禁在服务端持久化任何用户原始音频或转写内容。
-- 🖥️ **跨平台原生体验**：
-  - **macOS**：无 Python 依赖纯 Go 单二进制，常驻内存仅 ~25-35MB，极简透明悬浮胶囊，支持硬件级回声消除（AEC）。
+- ⚡️ **端云双环 + 全链路传文本架构 (Dual-Loop & Text Streaming)**：
+  - **全链路传文本**：云端只负责认知推理，通过 HTTP SSE（Server-Sent Events）将大模型生成的 Token 文本流以最快速度推给端侧，零音视频流带宽与服务器成本开销。
+  - **端侧极速快环（≤ 150ms）**：毫秒级意图短路拦截器、本地记忆底座、多模态人格引擎与离线伴生小模型（SLM），断网物理隔离依然可用。
+  - **云端深度慢环（P50 ≤ 800ms）**：基于 Go 实时网关，支持流式 SSE 极速吐字、多轮深度推理与首句微切（4~6 字）。
+- 🎙️ **端侧统一语音合成 (Unified Edge TTS · 零音色割裂)**：
+  - 无论是端侧快环 A 还是云端慢环 B，最终文字全部汇入**端侧同一个高质量离线 TTS 引擎发声**，彻底根除“本地机械音 vs 云端真人音”的人格割裂，音色与语速 100% 绝对一致。
+- ⚡️ **毫秒级全双工打断 (Barge-in ≤ 80ms)**：
+  - 用户开嗓瞬间在端侧清空待播切句并掐断扬声器，同时向云端下发中断信令立即强杀大模型生成协程（CancelFunc）。
+- 🛡️ **严格隐私合规 (Zero-Retention Guardrail)**：
+  - 原始音频流绝对不出端，未经用户显式授权严禁文本上云；云端零留存，严禁在服务端持久化任何用户转写内容。
+- 🖥️ **跨平台原生体验 (macOS 优先)**：
+  - **macOS**：无 Python 依赖纯 Go 单二进制，常驻内存仅 ~25-35MB，极简透明悬浮胶囊，支持硬件级回声消除（AEC）与动态声波呼吸。
   - **Android**：针对 Google Pixel 10 定制的 Material 3 + 11 状态严密状态机前台服务。
 
 > 📖 **关于完整的架构拓扑与协议细节，请查阅 [系统工程架构设计文档 (docs/architecture.md)](docs/architecture.md)。**  

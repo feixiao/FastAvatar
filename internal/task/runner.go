@@ -261,7 +261,16 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 
 	var activePersonaName string
 	if r.personaMgr != nil {
-		activePersonaName = r.personaMgr.GetActiveSlot().ID
+		slot := r.personaMgr.GetActiveSlot()
+		activePersonaName = slot.ID
+		if vc, ok := r.ttsEngine.(tts.VoiceConfigurable); ok {
+			if slot.VoiceOverride != "" {
+				vc.SetVoice(slot.VoiceOverride)
+			}
+			if slot.RateOverride > 0 {
+				vc.SetRate(slot.RateOverride)
+			}
+		}
 	}
 
 	var err error

@@ -455,6 +455,9 @@ func (a *App) SetActivePersona(id string) (persona.PersonaSlot, error) {
 	}
 	slot, err := a.personaMgr.SetActiveSlot(id)
 	if err == nil {
+		if a.pipeline != nil {
+			a.pipeline.UpdateVoiceConfig(slot.VoiceOverride, slot.RateOverride)
+		}
 		runtime.EventsEmit(a.ctx, "avatar:persona", slot)
 	}
 	return slot, err
@@ -465,6 +468,9 @@ func (a *App) RotatePersona() persona.PersonaSlot {
 		return persona.PersonaSlot{}
 	}
 	slot := a.personaMgr.RotateSlot()
+	if a.pipeline != nil {
+		a.pipeline.UpdateVoiceConfig(slot.VoiceOverride, slot.RateOverride)
+	}
 	runtime.EventsEmit(a.ctx, "avatar:persona", slot)
 	return slot
 }

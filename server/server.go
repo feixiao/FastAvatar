@@ -37,14 +37,15 @@ const (
 
 // ActiveSession represents an ephemeral in-memory cloud session.
 type ActiveSession struct {
-	SessionID string
-	UserID    string
-	DeviceID  string
-	Platform  string
-	State     SessionState
+	SessionID  string
+	UserID     string
+	DeviceID   string
+	Platform   string
+	State      SessionState
 	ActiveTurn string
-	StartedAt time.Time
-	UpdatedAt time.Time
+	CancelFunc context.CancelFunc
+	StartedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 // CloudServer implements the minimal MVP realtime orchestration service.
@@ -184,13 +185,15 @@ func (s *CloudServer) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	start := time.Now()
-	ctx := r.Context()
+	turnCtx, turnCancel := context.WithCancel(r.Context())
+	defer turnCancel()
 
 	// Update session state if session exists
 	s.mu.Lock()
 	if sess, exists := s.sessions[req.SessionID]; exists {
 		sess.State = SessionStateProcessing
 		sess.ActiveTurn = req.TurnID
+		sess.CancelFunc = turnCancel
 		sess.UpdatedAt = time.Now()
 	}
 	s.mu.Unlock()
@@ -209,7 +212,7 @@ func (s *CloudServer) handleChat(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Connection", "keep-alive")
 
 		var fullReply strings.Builder
-		err := s.streamReply(ctx, req.Message, req.Persona, func(token string) error {
+		err := s.streamReply(turnCtx, req.Message, req.Persona, func(token string) error {
 			fullReply.WriteString(token)
 			chunkPayload, _ := json.Marshal(StreamChunk{
 				TurnID: req.TurnID,
@@ -244,7 +247,7 @@ func (s *CloudServer) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reply, err := s.generateReply(ctx, req.Message, req.Persona)
+	reply, err := s.generateReply(turnCtx, req.Message, req.Persona)
 	latency := time.Since(start).Milliseconds()
 
 	s.finishTurnSession(req.SessionID, req.TurnID, latency, err)
@@ -262,6 +265,7 @@ func (s *CloudServer) finishTurnSession(sessionID, turnID string, latency int64,
 	if sess, exists := s.sessions[sessionID]; exists {
 		sess.State = SessionStateReady
 		sess.ActiveTurn = ""
+		sess.CancelFunc = nil
 		sess.UpdatedAt = time.Now()
 	}
 	s.mu.Unlock()
@@ -377,6 +381,12 @@ func (s *CloudServer) handleInterrupt(w http.ResponseWriter, r *http.Request) {
 		s.mu.Unlock()
 		http.Error(w, "session not found", http.StatusNotFound)
 		return
+	}
+
+	// Trigger immediate cancellation of upstream LLM generation & SSE streaming
+	if sess.CancelFunc != nil {
+		sess.CancelFunc()
+		sess.CancelFunc = nil
 	}
 
 	// Invalidate active turn immediately (PRD 5.3: Discard stale chunks)

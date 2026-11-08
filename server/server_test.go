@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"avatar/internal/llm"
 )
@@ -265,4 +266,84 @@ func TestServer_LLMUnaryAndStreamingChat(t *testing.T) {
 	if !strings.Contains(failRes.Response, "喵呜") {
 		t.Fatalf("expected pet fallback reply on upstream failure, got %s", failRes.Response)
 	}
+}
+
+func TestServer_InterruptCancelsActiveTurn(t *testing.T) {
+	// Upstream LLM that blocks until context is cancelled
+	cancelledChan := make(chan bool, 1)
+	upstreamSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher := w.(http.Flusher)
+		chunkJSON := `{"choices":[{"delta":{"content":"开始"}}]} `
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", chunkJSON)
+		flusher.Flush()
+
+		// Wait for context cancellation
+		<-r.Context().Done()
+		cancelledChan <- true
+	}))
+	defer upstreamSrv.Close()
+
+	tokenSvc := NewTokenService(TokenConfig{
+		APIKey:     "testkey",
+		APISecret:  "secretsecretsecret123456789012345",
+		LiveKitURL: "ws://localhost:7880",
+	})
+	srv := NewCloudServer(tokenSvc)
+	srv.SetLLM(llm.NewClient(upstreamSrv.URL, "key_123"), "qwen-2.5-7b")
+
+	// 1. Establish session
+	tokenReq, _ := json.Marshal(TokenRequest{
+		UserID:       "user_01",
+		DeviceID:     "mac_dev_01",
+		ClientType:   "mac",
+		CloudConsent: true,
+	})
+	wAuth := httptest.NewRecorder()
+	srv.Routes().ServeHTTP(wAuth, httptest.NewRequest(http.MethodPost, "/api/v1/auth/token", bytes.NewReader(tokenReq)))
+	var tokenRes TokenResponse
+	_ = json.Unmarshal(wAuth.Body.Bytes(), &tokenRes)
+	room := tokenRes.RoomName
+
+	// 2. Start streaming chat in a goroutine
+	chatDone := make(chan struct{})
+	go func() {
+		defer close(chatDone)
+		streamReqBody, _ := json.Marshal(ChatRequest{
+			SessionID: room,
+			TurnID:    "turn_interrupt_test",
+			UserID:    "user_01",
+			DeviceID:  "mac_01",
+			Message:   "这是一段很长的思考题",
+			Stream:    true,
+		})
+		wStream := httptest.NewRecorder()
+		srv.Routes().ServeHTTP(wStream, httptest.NewRequest(http.MethodPost, "/api/v1/chat", bytes.NewReader(streamReqBody)))
+	}()
+
+	// Allow goroutine to start and connect to upstream
+	time.Sleep(50 * time.Millisecond)
+
+	// 3. Issue interrupt信令
+	interruptBody, _ := json.Marshal(InterruptRequest{
+		SessionID: room,
+		TurnID:    "turn_interrupt_test",
+		Reason:    "barge_in",
+	})
+	wInterrupt := httptest.NewRecorder()
+	srv.Routes().ServeHTTP(wInterrupt, httptest.NewRequest(http.MethodPost, "/api/v1/session/interrupt", bytes.NewReader(interruptBody)))
+
+	if wInterrupt.Code != http.StatusOK {
+		t.Fatalf("expected 200 from interrupt, got %d", wInterrupt.Code)
+	}
+
+	// 4. Assert upstream received context cancellation
+	select {
+	case <-cancelledChan:
+		// Success: upstream was cancelled by interrupt!
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected upstream to receive cancellation within timeout")
+	}
+
+	<-chatDone
 }

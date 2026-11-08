@@ -13,6 +13,14 @@ type Synthesizer interface {
 	Stop()
 }
 
+// VoiceConfigurable allows runtime adjustment of voice timbre and speaking rate.
+type VoiceConfigurable interface {
+	SetVoice(voice string)
+	SetRate(rate int)
+	GetVoice() string
+	GetRate() int
+}
+
 type MacSaySynthesizer struct {
 	Voice   string
 	Rate    int
@@ -28,6 +36,30 @@ func NewMacSaySynthesizer(voice string, rate int) *MacSaySynthesizer {
 		Voice: voice,
 		Rate:  rate,
 	}
+}
+
+func (m *MacSaySynthesizer) SetVoice(voice string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Voice = voice
+}
+
+func (m *MacSaySynthesizer) SetRate(rate int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Rate = rate
+}
+
+func (m *MacSaySynthesizer) GetVoice() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.Voice
+}
+
+func (m *MacSaySynthesizer) GetRate() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.Rate
 }
 
 func (m *MacSaySynthesizer) Speak(ctx context.Context, text string) error {
@@ -70,25 +102,85 @@ func (m *MacSaySynthesizer) Stop() {
 	}
 }
 
+// SpokenRecord tracks synthesized text along with the active voice and rate.
+type SpokenRecord struct {
+	Text  string
+	Voice string
+	Rate  int
+}
+
 // MockSynthesizer 用于测试与通用环境兜底
 type MockSynthesizer struct {
-	mu     sync.Mutex
-	Spoken []string
+	mu      sync.Mutex
+	Spoken  []string
+	Records []SpokenRecord
+	Voice   string
+	Rate    int
+	stopped bool
 }
 
 func NewMockSynthesizer() *MockSynthesizer {
-	return &MockSynthesizer{}
+	return &MockSynthesizer{
+		Voice: "Ting-Ting",
+		Rate:  180,
+	}
+}
+
+func (m *MockSynthesizer) SetVoice(voice string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Voice = voice
+}
+
+func (m *MockSynthesizer) SetRate(rate int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Rate = rate
+}
+
+func (m *MockSynthesizer) GetVoice() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.Voice
+}
+
+func (m *MockSynthesizer) GetRate() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.Rate
 }
 
 func (m *MockSynthesizer) Speak(ctx context.Context, text string) error {
 	m.mu.Lock()
 	m.Spoken = append(m.Spoken, text)
+	m.Records = append(m.Records, SpokenRecord{
+		Text:  text,
+		Voice: m.Voice,
+		Rate:  m.Rate,
+	})
+	m.stopped = false
 	m.mu.Unlock()
 	return nil
 }
 
 func (m *MockSynthesizer) Stop() {
-	// no-op
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.stopped = true
+}
+
+func (m *MockSynthesizer) IsStopped() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.stopped
+}
+
+func (m *MockSynthesizer) GetRecords() []SpokenRecord {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := make([]SpokenRecord, len(m.Records))
+	copy(cp, m.Records)
+	return cp
 }
 
 // SpeakerClient represents an in-process native speech synthesizer interface.
@@ -108,6 +200,32 @@ func NewNativeDaemonSynthesizer(speaker SpeakerClient, fallback Synthesizer) *Na
 		speaker:  speaker,
 		fallback: fallback,
 	}
+}
+
+func (s *NativeDaemonSynthesizer) SetVoice(v string) {
+	if vc, ok := s.fallback.(VoiceConfigurable); ok {
+		vc.SetVoice(v)
+	}
+}
+
+func (s *NativeDaemonSynthesizer) SetRate(r int) {
+	if vc, ok := s.fallback.(VoiceConfigurable); ok {
+		vc.SetRate(r)
+	}
+}
+
+func (s *NativeDaemonSynthesizer) GetVoice() string {
+	if vc, ok := s.fallback.(VoiceConfigurable); ok {
+		return vc.GetVoice()
+	}
+	return ""
+}
+
+func (s *NativeDaemonSynthesizer) GetRate() int {
+	if vc, ok := s.fallback.(VoiceConfigurable); ok {
+		return vc.GetRate()
+	}
+	return 0
 }
 
 func (s *NativeDaemonSynthesizer) Speak(ctx context.Context, text string) error {
