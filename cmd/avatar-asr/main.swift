@@ -20,6 +20,7 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
     private var isListening: Bool = false
     private var isPttActive: Bool = false
     private var tapInstalled: Bool = false
+    private var currentSessionID: Int = 0
 
     private let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
     private var audioConverter: AVAudioConverter?
@@ -90,6 +91,8 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
         recognitionTask?.cancel()
         recognitionTask = nil
         recognitionRequest = nil
+        currentSessionID += 1
+        let thisSessionID = currentSessionID
         sessionStartTime = Date()
         lastTranscriptionTime = Date.distantPast
         lastText = ""
@@ -111,6 +114,10 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
 
         recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
             guard let self = self else { return }
+            guard thisSessionID == self.currentSessionID else {
+                // Ignore callbacks from old, replaced sessions
+                return
+            }
 
             if let result = result {
                 let text = result.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -146,12 +153,17 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
 
             if let error = error {
                 fputs("[avatar-asr] recognitionTask end/error: \(error.localizedDescription)\n", stderr)
+                let nsErr = error as NSError
+                // Do not restart if explicitly cancelled (code 216)
+                if nsErr.code == 216 {
+                    return
+                }
                 if !self.lastText.isEmpty {
                     fputs("[avatar-asr] Finalized on task end: \(self.lastText)\n", stderr)
                     self.sendJSON(["event": "final", "text": self.lastText])
                     self.lastText = ""
                 } else {
-                    if (error as NSError).code == 201 {
+                    if nsErr.code == 201 {
                         self.sendJSON(["event": "error", "message": "系统听写未开启，请在 macOS 系统设置 -> 键盘 -> 听写中开启"])
                     }
                     if self.mode == "ptt" {
@@ -162,7 +174,8 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
                 self.isFinalizing = false
 
                 if self.mode == "hands_free" && self.isListening {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                        guard let self = self, thisSessionID == self.currentSessionID else { return }
                         self.startRecognitionSession()
                     }
                 }

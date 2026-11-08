@@ -95,12 +95,7 @@ func NewApp() *App {
 				activeRate = slot.RateOverride
 			}
 		}
-		fallbackSynth := tts.NewMacSaySynthesizer(activeVoice, activeRate)
-		if macEng, ok := asrEng.(*asr.NativeMacEngine); ok {
-			synth = tts.NewNativeDaemonSynthesizer(macEng, fallbackSynth)
-		} else {
-			synth = fallbackSynth
-		}
+		synth = tts.NewMacSaySynthesizer(activeVoice, activeRate)
 	} else {
 		synth = tts.NewMockSynthesizer()
 	}
