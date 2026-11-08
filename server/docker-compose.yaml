@@ -1,16 +1,4 @@
 services:
-  livekit:
-    image: livekit/livekit-server:latest
-    container_name: avatar-livekit-server
-    restart: unless-stopped
-    command: --dev
-    ports:
-      - "7880:7880"
-      - "7881:7881"
-      - "7882:7882/udp"
-    environment:
-      - "LIVEKIT_KEYS=devkey: secret_avatar_livekit_key_2026"
-
   cloud-gateway:
     build:
       context: ..
@@ -19,34 +7,11 @@ services:
     restart: unless-stopped
     ports:
       - "8088:8088"
-    depends_on:
-      - livekit
     environment:
       - PORT=8088
-      - LIVEKIT_URL=ws://livekit:7880
-      - LIVEKIT_API_KEY=devkey
-      - LIVEKIT_API_SECRET=secret_avatar_livekit_key_2026
+      - GATEWAY_SECRET_KEY=${GATEWAY_SECRET_KEY:-secret_avatar_gateway_key_2026}
       - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:1234/v1}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-default}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  agent-worker:
-    build:
-      context: ./agent
-      dockerfile: Dockerfile
-    container_name: avatar-agent-worker
-    restart: unless-stopped
-    depends_on:
-      - livekit
-    environment:
-      - LIVEKIT_URL=ws://livekit:7880
-      - LIVEKIT_API_KEY=devkey
-      - LIVEKIT_API_SECRET=secret_avatar_livekit_key_2026
-      - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:1234/v1}
-      - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_MODEL=${LLM_MODEL:-default}
-      - AGENT_PERSONA=${AGENT_PERSONA:-assistant}
     extra_hosts:
       - "host.docker.internal:host-gateway"

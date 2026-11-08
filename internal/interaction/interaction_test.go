@@ -238,9 +238,7 @@ func TestFastPathLocalOnlyAndOfflineHandling(t *testing.T) {
 func TestEdgeCloudCoordination_Interruption(t *testing.T) {
 	// 1. 启动轻量云端实时服务
 	tokenSvc := server.NewTokenService(server.TokenConfig{
-		APIKey:     "testkey",
-		APISecret:  "secretsecretsecret123456789012345",
-		LiveKitURL: "ws://localhost:7880",
+		SecretKey: "secretsecretsecret123456789012345",
 	})
 	cloudSrv := server.NewCloudServer(tokenSvc)
 	ts := httptest.NewServer(cloudSrv.Routes())

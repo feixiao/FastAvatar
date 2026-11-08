@@ -11,9 +11,7 @@ import (
 func TestCloudClient_EndToEndLifecycle(t *testing.T) {
 	// 1. Setup local mock cloud server
 	tokenSvc := server.NewTokenService(server.TokenConfig{
-		APIKey:     "testkey",
-		APISecret:  "secretsecretsecret123456789012345",
-		LiveKitURL: "ws://localhost:7880",
+		SecretKey: "secretsecretsecret123456789012345",
 	})
 	cloudSrv := server.NewCloudServer(tokenSvc)
 	ts := httptest.NewServer(cloudSrv.Routes())
@@ -75,9 +73,7 @@ func TestCloudClient_EndToEndLifecycle(t *testing.T) {
 
 func TestCloudClient_ChatAndStreaming(t *testing.T) {
 	tokenSvc := server.NewTokenService(server.TokenConfig{
-		APIKey:     "testkey",
-		APISecret:  "secretsecretsecret123456789012345",
-		LiveKitURL: "ws://localhost:7880",
+		SecretKey: "secretsecretsecret123456789012345",
 	})
 	cloudSrv := server.NewCloudServer(tokenSvc)
 	ts := httptest.NewServer(cloudSrv.Routes())

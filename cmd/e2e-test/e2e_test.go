@@ -42,10 +42,8 @@ func TestE2E_FullPipelineVerification(t *testing.T) {
 
 	// 2. 云端实时网关 (Cloud Gateway :8088 纯文本 SSE 流式代理)
 	tokenSvc := server.NewTokenService(server.TokenConfig{
-		APIKey:     "test_e2e_key",
-		APISecret:  "secretsecretsecret123456789012345",
-		LiveKitURL: "ws://localhost:7880",
-		TokenTTL:   5 * time.Minute,
+		SecretKey: "secretsecretsecret123456789012345",
+		TokenTTL:  5 * time.Minute,
 	})
 	cloudSrv := server.NewCloudServer(tokenSvc)
 	cloudSrv.SetLLM(llm.NewClient(upstreamLLM.URL, "dummy_key"), "qwen-2.5-7b")

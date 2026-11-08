@@ -16,8 +16,8 @@ data class TokenRequest(
 )
 
 data class TokenResponse(
-    @SerializedName("livekit_url") val liveKitUrl: String,
-    @SerializedName("room_name") val roomName: String,
+    @SerializedName("session_id") val sessionId: String = "",
+    @SerializedName("room_name") val roomName: String = "",
     @SerializedName("token") val token: String,
     @SerializedName("expires_in_seconds") val expiresInSeconds: Long
 )

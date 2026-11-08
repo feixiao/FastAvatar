@@ -135,10 +135,8 @@ func main() {
 	// 1. 启动轻量云端实时服务网关 (Cloud Gateway)
 	// ==========================================
 	tokenSvc := server.NewTokenService(server.TokenConfig{
-		APIKey:     "e2e_key",
-		APISecret:  "secret_avatar_livekit_key_2026",
-		LiveKitURL: "ws://localhost:7880",
-		TokenTTL:   5 * time.Minute,
+		SecretKey: "secret_avatar_gateway_key_2026",
+		TokenTTL:  5 * time.Minute,
 	})
 	cloudSrv := server.NewCloudServer(tokenSvc)
 	cloudSrv.SetLLM(llm.NewClient(upstreamLLM.URL, "dummy_key"), "qwen-2.5-7b")

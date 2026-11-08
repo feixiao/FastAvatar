@@ -17,26 +17,14 @@ func main() {
 		port = "8088"
 	}
 
-	livekitURL := os.Getenv("LIVEKIT_URL")
-	if livekitURL == "" {
-		livekitURL = "ws://localhost:7880"
-	}
-
-	apiKey := os.Getenv("LIVEKIT_API_KEY")
-	if apiKey == "" {
-		apiKey = "devkey"
-	}
-
-	apiSecret := os.Getenv("LIVEKIT_API_SECRET")
-	if apiSecret == "" {
-		apiSecret = "secret_avatar_livekit_key_2026"
+	secretKey := os.Getenv("GATEWAY_SECRET_KEY")
+	if secretKey == "" {
+		secretKey = "secret_avatar_gateway_key_2026"
 	}
 
 	tokenSvc := server.NewTokenService(server.TokenConfig{
-		APIKey:     apiKey,
-		APISecret:  apiSecret,
-		LiveKitURL: livekitURL,
-		TokenTTL:   5 * time.Minute,
+		SecretKey: secretKey,
+		TokenTTL:  5 * time.Minute,
 	})
 
 	cloudSrv := server.NewCloudServer(tokenSvc)
@@ -71,7 +59,7 @@ func main() {
 	}
 	cancelProbe()
 
-	log.Printf("[Cloud Gateway] Listening on :%s (LiveKit SFU: %s)", port, livekitURL)
+	log.Printf("[Cloud Gateway] Listening on :%s (Mode: Realtime Text Streaming & Unified Edge TTS)", port)
 	if err := http.ListenAndServe(":"+port, cloudSrv.Routes()); err != nil {
 		log.Fatalf("Server exited: %v", err)
 	}

@@ -48,7 +48,7 @@ class CloudClientTest {
                 .setResponseCode(200)
                 .setBody("""
                     {
-                        "livekit_url": "ws://localhost:7880",
+                        "session_id": "room_test_123",
                         "room_name": "room_test_123",
                         "token": "jwt_token_sample",
                         "expires_in_seconds": 300
@@ -71,7 +71,7 @@ class CloudClientTest {
         mockServer.enqueue(
             MockResponse().setResponseCode(200).setBody("""
                 {
-                    "livekit_url": "ws://localhost:7880",
+                    "session_id": "room_gate",
                     "room_name": "room_gate",
                     "token": "tok",
                     "expires_in_seconds": 300
@@ -98,7 +98,7 @@ class CloudClientTest {
         mockServer.enqueue(
             MockResponse().setResponseCode(200).setBody("""
                 {
-                    "livekit_url": "ws://localhost:7880",
+                    "session_id": "room_interrupt",
                     "room_name": "room_interrupt",
                     "token": "tok",
                     "expires_in_seconds": 300

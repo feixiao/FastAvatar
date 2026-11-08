@@ -675,14 +675,14 @@
       radarDot.style.boxShadow = "0 0 10px #f59e0b";
       streamSubtitle.innerText = "正在向您播报架构演进策略与测试结论...";
       routeNode.innerHTML = "<span>意图路由器：云端慢环大模型推理 (420ms)</span>";
-      transcriptBody.innerText = "云端 LiveKit SFU 网关已建立全双工实时会话通道，当前慢环推理首字时延为 380ms，已完成流式输出编排。";
+      transcriptBody.innerText = "云端实时网关已建立流式会话通道，当前慢环推理首字时延为 380ms，已完成流式输出编排。";
     });
 
     function triggerBargeInHUD() {
       radarDot.style.background = "#f43f5e";
       radarDot.style.boxShadow = "0 0 12px #f43f5e";
       streamSubtitle.innerText = "[Barge-in 毫秒打断触发] 音频输出已掐断，耗时 72ms...";
-      routeNode.innerHTML = "<span style='color:#f43f5e;'>打断截断触发：向 LiveKit 发送 BargeIn 信号</span>";
+      routeNode.innerHTML = "<span style='color:#f43f5e;'>打断截断触发：向云端网关发送 BargeIn 信号</span>";
       transcriptBody.innerText = "[已截断] 本地与云端发音已实时掐断，等待用户新输入。";
       setTimeout(() => {
         radarDot.style.background = "#10b981";

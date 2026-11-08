@@ -39,7 +39,7 @@ Avatar 是一套**端云协同、双环驱动（Dual-Loop）、全链路文本�
 # 复制环境变量配置文件（可选，默认自动接入本地 Ollama，或配置云端商业大模型）
 cp server/.env.example server/.env
 
-# 一键启动后台容器集群 (LiveKit SFU :7880 + Go 实时网关 :8088 + Python Agent Worker)
+# 一键启动后台网关容器 (Go 实时网关 :8088)
 make server
 
 # 查看后台服务运行日志
@@ -72,10 +72,10 @@ make test-e2e
 
 | 指令 | 说明 |
 | :--- | :--- |
-| **`make server`** | 统一通过 Docker Compose 后台启动全套云端服务集群（LiveKit SFU + Go 网关 :8088 + Worker） |
-| **`make server-stop`** | 停止所有后台容器服务 |
-| **`make server-logs`** | 查看后台容器集群实时运行日志 |
-| `make server-dev` | 仅容器化启动 LiveKit，本地直接编译运行 Go 网关（用于开发调试） |
+| **`make server`** | 统一通过 Docker Compose 后台启动云端轻量网关服务（Go 网关 :8088） |
+| **`make server-stop`** | 停止后台容器服务 |
+| **`make server-logs`** | 查看后台容器实时运行日志 |
+| `make server-dev` | 本地宿主机直接秒级运行 Go 实时网关（零 Docker 依赖，开发调试推荐） |
 | **`make test-e2e`** | 运行端云协同端到端对接与毫秒级协同打断集成测试 |
 | `make start` | 一键打包并直接启动 macOS 原生 App |
 | `make package` | 编译并打包为 macOS 原生应用（生成 `build/bin/Avatar.app`） |
@@ -85,7 +85,6 @@ make test-e2e
 | `make android-test` | 运行 Android 原生客户端单元测试 |
 | `make android-build` (或 `make apk`) | 构建 Android 原生客户端 Debug APK |
 | `make android-install` (或 `make install-apk` / `make install`) | 构建并安装 Android Debug APK 到已连接的设备或模拟器 |
-| `make livekit-stop` | 停止后台运行的 LiveKit SFU 容器 |
 | `make clean` | 清理构建产物与临时文件 |
 
 ---
@@ -93,8 +92,7 @@ make test-e2e
 ## 📂 项目结构
 
 ```
-Avatar/
-├── server/                 # 【云端服务】轻量实时网关 (Go) 与 LiveKit SFU 容器编排
+├── server/                 # 【云端服务】轻量实时网关 (Go) 容器与信令编排
 ├── internal/               # 【核心内部模块】
 │   ├── cloud/              # 端侧与云端服务的长连接协同客户端 (Token / 打断 / 静音)
 │   ├── dispatcher/         # 端侧意图分流路由器 (本地控制 vs 云端慢环决策)

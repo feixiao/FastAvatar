@@ -27,10 +27,10 @@ const (
 )
 
 type TokenResponse struct {
-	LiveKitURL string `json:"livekit_url"`
-	RoomName   string `json:"room_name"`
-	Token      string `json:"token"`
-	ExpiresIn  int64  `json:"expires_in_seconds"`
+	SessionID string `json:"session_id"`
+	RoomName  string `json:"room_name"`
+	Token     string `json:"token"`
+	ExpiresIn int64  `json:"expires_in_seconds"`
 }
 
 type ChatResponse struct {
@@ -122,13 +122,17 @@ func (c *Client) AcquireSessionToken(ctx context.Context, cloudConsent bool) (*T
 		return nil, fmt.Errorf("failed to decode token response: %w", err)
 	}
 
+	sessionID := res.SessionID
+	if sessionID == "" {
+		sessionID = res.RoomName
+	}
 	c.mu.Lock()
-	c.currentRoom = res.RoomName
+	c.currentRoom = sessionID
 	c.currentToken = res.Token
 	c.state = StateConnected
 	c.mu.Unlock()
 
-	fmt.Printf("[云端鉴权] 【走云端】会话建立成功 | 专属隔离房间: %s | 客户端状态: %s\n", res.RoomName, StateConnected)
+	fmt.Printf("[云端鉴权] 【走云端】会话建立成功 | 会话标识: %s | 客户端状态: %s\n", sessionID, StateConnected)
 	return &res, nil
 }
 

@@ -16,9 +16,7 @@ import (
 
 func TestServer_AuthAndConsentGate(t *testing.T) {
 	tokenSvc := NewTokenService(TokenConfig{
-		APIKey:     "testkey",
-		APISecret:  "secretsecretsecret123456789012345",
-		LiveKitURL: "wss://livekit.test.avatar.ai",
+		SecretKey: "secretsecretsecret123456789012345",
 	})
 	srv := NewCloudServer(tokenSvc)
 	handler := srv.Routes()
@@ -81,9 +79,7 @@ func TestServer_AuthAndConsentGate(t *testing.T) {
 
 func TestServer_InterruptAndCloseLifecycle(t *testing.T) {
 	tokenSvc := NewTokenService(TokenConfig{
-		APIKey:     "testkey",
-		APISecret:  "secretsecretsecret123456789012345",
-		LiveKitURL: "wss://livekit.test.avatar.ai",
+		SecretKey: "secretsecretsecret123456789012345",
 	})
 	srv := NewCloudServer(tokenSvc)
 	handler := srv.Routes()
@@ -169,9 +165,7 @@ func TestServer_LLMUnaryAndStreamingChat(t *testing.T) {
 	defer upstreamSrv.Close()
 
 	tokenSvc := NewTokenService(TokenConfig{
-		APIKey:     "testkey",
-		APISecret:  "secretsecretsecret123456789012345",
-		LiveKitURL: "ws://localhost:7880",
+		SecretKey: "secretsecretsecret123456789012345",
 	})
 	srv := NewCloudServer(tokenSvc)
 	srv.SetLLM(llm.NewClient(upstreamSrv.URL, "key_123"), "qwen-2.5-7b")
@@ -285,9 +279,7 @@ func TestServer_InterruptCancelsActiveTurn(t *testing.T) {
 	defer upstreamSrv.Close()
 
 	tokenSvc := NewTokenService(TokenConfig{
-		APIKey:     "testkey",
-		APISecret:  "secretsecretsecret123456789012345",
-		LiveKitURL: "ws://localhost:7880",
+		SecretKey: "secretsecretsecret123456789012345",
 	})
 	srv := NewCloudServer(tokenSvc)
 	srv.SetLLM(llm.NewClient(upstreamSrv.URL, "key_123"), "qwen-2.5-7b")

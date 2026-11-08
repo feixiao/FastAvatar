@@ -195,8 +195,7 @@ func TestApp_CloudConsentAndEngineStatus(t *testing.T) {
 
 func TestApp_CloudRoutingAndLogging(t *testing.T) {
 	tokenSvc := server.NewTokenService(server.TokenConfig{
-		APIKey:    "testkey",
-		APISecret: "secretsecretsecret123456789012345",
+		SecretKey: "secretsecretsecret123456789012345",
 	})
 	cloudSrv := server.NewCloudServer(tokenSvc)
 	ts := httptest.NewServer(cloudSrv.Routes())

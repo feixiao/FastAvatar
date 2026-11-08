@@ -50,8 +50,7 @@ flowchart TB
 
     subgraph Cloud_Harness["云侧 Harness (分布式实时认知基础设施)"]
         direction TB
-        CloudSFU["WebRTC SFU 流媒体集群 (LiveKit 全双工低时延推拉流)"] --> StreamSplitter["首句微断句器 (Sentence Splitter 4~6字断句, TTFA ≤ 800ms)"]
-        StreamSplitter --> AgentOrchestrator["Agent 编排引擎 (LangGraph / 异步 DAG / 循环反思)"]
+        CloudGateway["实时流式认知网关 (Go HTTP SSE 极速 Token 分发)"] --> StreamSplitter["首句微断句器 (Sentence Splitter 4~6字断句, TTFA ≤ 800ms)"]
         
         AgentOrchestrator <--> ModelRouter["多模型动态路由 (Semantic Router / 成本时延分流)"]
         AgentOrchestrator <--> SkillGateway["工具 Skill 网关 (MCP / Function Calling / 安全沙箱)"]
@@ -62,8 +61,8 @@ flowchart TB
         AgentOrchestrator --> DataFlywheel["数据飞轮与评测 (LLM-as-a-judge / Bad Case 自动回流)"]
     end
 
-    EdgeSync <== "WebRTC Audio & gRPC Control Signaling" ==> Collab_Layer
-    Collab_Layer <== "分布式流式连接" ==> CloudSFU
+    EdgeSync <== "HTTP SSE Token Stream & Control Signaling" ==> Collab_Layer
+    Collab_Layer <== "极速流式长连接" ==> CloudGateway
 ```
 
 ### 1. 端侧 Harness（车机端 AAOS/QNX）的七大核心能力
@@ -84,7 +83,7 @@ flowchart TB
 
 | 核心能力 | 技术内涵与云端职责 | 行业典型方案与设计标准 |
 | :--- | :--- | :--- |
-| **1. 实时全双工流媒体网关** | 承接车载 WebRTC / 双向 gRPC 流式长连接；具备**首句微断句切词机制（4~6 字标点快速切句送流式 TTS）**，全力压降首字发音时延 **TTFA ≤ 800ms**。 | LiveKit SFU, mediasoup, 流式 Sentence Splitter |
+| **1. 实时流式认知网关** | 承接端侧 HTTP SSE 文本流长连接；具备**首句微断句切词机制（4~6 字标点快速切句送端侧统一 TTS）**，全力压降首字发音时延 **TTFA ≤ 800ms**。 | Go Realtime Gateway, 流式 Sentence Splitter, SSE Token Stream |
 | **2. 复杂多步 Agent 编排引擎** | 解决深度车务问答、多轮出行规划等非线性任务，支持循环（Cycle）、条件分支、多工具并发规划与反思纠偏（Reflection）。 | LangGraph, 异步原生 DAG 编排引擎, Temporal |
 | **3. 多模型动态路由 (Routing)** | 意图、成本与时延动态分流：闲聊/短句走轻量小模型（MoE / 8B），复杂深度多步规划路由至旗舰推理模型（DeepSeek-R1 / GPT-4o / Claude 3.5 Sonnet）。 | Semantic Router, Token FinOps 算力配额网关, Prompt Cache 共享 |
 | **4. 工具 Skill 网关与安全沙箱** | 提供标准化 Tool Call 网关，对接第三方生态（高德/美团/车联网生态 API）；提供鉴权托管、并发限流、超时隔离与沙箱执行环境。 | MCP (Model Context Protocol), OpenAPI 3.0, Docker/Wasm 沙箱 |
@@ -175,14 +174,12 @@ flowchart LR
         OboeAudio["FullDuplexAudioIO (Oboe/AAudio)"]
     end
 
-    subgraph CloudInfra["云端实时集群 (server/)"]
-        GoGW["server.go (:8088)<br/>(会话状态机/打断协同/零保留遥测)"]
-        LiveKitSFU["LiveKit SFU (:7880)<br/>(WebRTC 低时延全双工音轨)"]
-        PyWorker["worker.py<br/>(Silero VAD + LLM + TTS 级联)"]
+    subgraph CloudInfra["云端实时认知网关 (server/)"]
+        GoGW["server.go (:8088)<br/>(会话状态机/SSE 流式分发/打断强杀/零保留遥测)"]
     end
 
     AndroidEdge <--> NativeCore
-    AndroidEdge <== "WebRTC + REST Signaling" ==> CloudInfra
+    AndroidEdge <== "HTTP SSE Token Stream + REST Signaling" ==> CloudInfra
 ```
 
 ### 1. 毫秒级意图短路与槽位仲裁器 (Fast-Path Intent Arbiter)

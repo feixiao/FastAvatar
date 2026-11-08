@@ -80,7 +80,7 @@ class CloudClient(
                 val tokenResp = gson.fromJson(respBody, TokenResponse::class.java)
 
                 synchronized(lock) {
-                    currentRoom = tokenResp.roomName
+                    currentRoom = tokenResp.sessionId.ifBlank { tokenResp.roomName }
                     currentToken = tokenResp.token
                     state = CloudConnectionState.CONNECTED
                     isAudioMuted = true // Gated by default

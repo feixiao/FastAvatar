@@ -161,9 +161,7 @@ func TestTaskRunner_EdgeModelRouting(t *testing.T) {
 func TestTaskRunner_CloudGatewayRouting(t *testing.T) {
 	// 1. 模拟云端网关服务 (:8088)
 	tokenSvc := server.NewTokenService(server.TokenConfig{
-		APIKey:     "gw_key",
-		APISecret:  "gw_secret_12345678901234567890",
-		LiveKitURL: "ws://localhost:7880",
+		SecretKey: "gw_secret_12345678901234567890",
 	})
 	cloudSrv := server.NewCloudServer(tokenSvc)
 	gwServer := httptest.NewServer(cloudSrv.Routes())

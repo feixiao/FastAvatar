@@ -122,9 +122,7 @@ func TestPipelineUnifiedEdgeTTSAndTimbreConsistency(t *testing.T) {
 
 	// 2. 模拟云端实时网关 (SSE 流式文本)
 	tokenSvc := server.NewTokenService(server.TokenConfig{
-		APIKey:     "testkey",
-		APISecret:  "secretsecretsecret123456789012345",
-		LiveKitURL: "ws://localhost:7880",
+		SecretKey: "secretsecretsecret123456789012345",
 	})
 	cloudSrv := server.NewCloudServer(tokenSvc)
 	cloudSrv.SetLLM(llm.NewClient(ts.URL, "key"), "test-model")

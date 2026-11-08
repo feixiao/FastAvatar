@@ -1,11 +1,13 @@
 package server
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/livekit/protocol/auth"
 )
 
 var (
@@ -13,12 +15,10 @@ var (
 	ErrInvalidIdentity   = errors.New("ERR_INVALID_IDENTITY: user_id or device_id is empty")
 )
 
-// TokenConfig holds LiveKit API key/secret and configuration.
+// TokenConfig holds session token signing configuration.
 type TokenConfig struct {
-	APIKey      string
-	APISecret   string
-	LiveKitURL  string
-	TokenTTL    time.Duration
+	SecretKey string
+	TokenTTL  time.Duration
 }
 
 // TokenRequest comes from Pixel or Mac client.
@@ -29,15 +29,15 @@ type TokenRequest struct {
 	CloudConsent bool   `json:"cloud_consent"`
 }
 
-// TokenResponse returns livekit url, assigned room, and access token.
+// TokenResponse returns session identification and access token.
 type TokenResponse struct {
-	LiveKitURL string `json:"livekit_url"`
-	RoomName   string `json:"room_name"`
-	Token      string `json:"token"`
-	ExpiresIn  int64  `json:"expires_in_seconds"`
+	SessionID string `json:"session_id"`
+	RoomName  string `json:"room_name"` // Compatibility alias for session_id
+	Token     string `json:"token"`
+	ExpiresIn int64  `json:"expires_in_seconds"`
 }
 
-// TokenService creates isolated LiveKit room tokens with strict PRD guardrails.
+// TokenService creates isolated session tokens with strict PRD guardrails.
 type TokenService struct {
 	cfg TokenConfig
 }
@@ -47,16 +47,13 @@ func NewTokenService(cfg TokenConfig) *TokenService {
 	if cfg.TokenTTL == 0 {
 		cfg.TokenTTL = 5 * time.Minute // Short-lived token per PRD
 	}
-	if cfg.APIKey == "" {
-		cfg.APIKey = "devkey"
-	}
-	if cfg.APISecret == "" {
-		cfg.APISecret = "secret_avatar_livekit_key_2026"
+	if cfg.SecretKey == "" {
+		cfg.SecretKey = "secret_avatar_gateway_key_2026"
 	}
 	return &TokenService{cfg: cfg}
 }
 
-// IssueToken validates consent & identity, creates an isolated room name, and signs JWT.
+// IssueToken validates consent & identity, creates an isolated session name, and signs bearer token.
 func (s *TokenService) IssueToken(req TokenRequest) (*TokenResponse, error) {
 	// Guardrail 1: Explicit user consent check
 	if !req.CloudConsent {
@@ -68,34 +65,21 @@ func (s *TokenService) IssueToken(req TokenRequest) (*TokenResponse, error) {
 		return nil, ErrInvalidIdentity
 	}
 
-	// Guardrail 3: Isolated Room Name per device/session
+	// Guardrail 3: Isolated Session / Room Name per device/session
 	roomName := fmt.Sprintf("room_sess_%s_%d", req.DeviceID, time.Now().UnixNano())
 
-	// Build LiveKit Grant
-	t := true
-	at := auth.NewAccessToken(s.cfg.APIKey, s.cfg.APISecret)
-	grant := &auth.VideoGrant{
-		RoomJoin:       true,
-		Room:           roomName,
-		CanPublish:     &t,
-		CanSubscribe:   &t,
-		CanPublishData: &t,
-	}
-
-	at.AddGrant(grant).
-		SetIdentity(fmt.Sprintf("%s:%s", req.ClientType, req.DeviceID)).
-		SetName(req.UserID).
-		SetValidFor(s.cfg.TokenTTL)
-
-	jwt, err := at.ToJWT()
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign token: %w", err)
-	}
+	// Sign HMAC-SHA256 Token with expiry
+	expiresAt := time.Now().Add(s.cfg.TokenTTL).Unix()
+	payload := fmt.Sprintf("%s:%s:%s:%d", roomName, req.UserID, req.DeviceID, expiresAt)
+	h := hmac.New(sha256.New, []byte(s.cfg.SecretKey))
+	h.Write([]byte(payload))
+	sig := hex.EncodeToString(h.Sum(nil))
+	token := base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + sig
 
 	return &TokenResponse{
-		LiveKitURL: s.cfg.LiveKitURL,
-		RoomName:   roomName,
-		Token:      jwt,
-		ExpiresIn:  int64(s.cfg.TokenTTL.Seconds()),
+		SessionID: roomName,
+		RoomName:  roomName,
+		Token:     token,
+		ExpiresIn: int64(s.cfg.TokenTTL.Seconds()),
 	}, nil
 }

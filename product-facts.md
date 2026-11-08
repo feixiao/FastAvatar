@@ -5,7 +5,7 @@
 - **底层架构**：
   - **端云双环架构 (Dual-Loop)**：
     - 端侧快环 (≤ 150ms)：Swift 原生 ASR (macOS) / Jetpack Compose + FastDispatcher (Android <1ms 路由判定)、离线 TTS 与本地记忆库，常驻内存仅 ~25-35MB。
-    - 云端慢环 (P50 ≤ 800ms)：Go Gateway + LiveKit SFU 实时音视频网关，大模型多模态深度推理。
+    - 云端慢环 (P50 ≤ 800ms)：Go Gateway 轻量实时网关 (SSE 流式传输) + 端侧统一发声，大模型深度推理。
   - **毫秒级全双工打断 (Barge-in ≤ 80ms)**：用户说话瞬间掐断发音并向云端发送截断。
   - **Zero-Retention 零留存隐私与硬件媒体门禁**：未经用户许可不上云；Android 媒体门禁物理闭锁（Muted=true，仅在通话回合临时开门推流），耳机拔出瞬间暂停播放防泄露。
 

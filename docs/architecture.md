@@ -519,7 +519,7 @@ stateDiagram-v2
 - **Success Response**: `200 OK`
   ```json
   {
-    "livekit_url": "ws://localhost:7880",
+    "session_id": "room_usr_001_1730000000",
     "room_name": "room_usr_001_1730000000",
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "expires_in_seconds": 300
