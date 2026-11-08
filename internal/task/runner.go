@@ -163,7 +163,9 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 				if cb != nil {
 					cb(cleanSentence)
 				}
-				_ = r.ttsEngine.Speak(ctx, cleanSentence)
+				if err := r.ttsEngine.Speak(ctx, cleanSentence); err != nil && ctx.Err() == nil {
+					fmt.Printf("[TTS 播报异常] %v\n", err)
+				}
 			}
 		}
 	}()

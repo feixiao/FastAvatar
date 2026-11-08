@@ -73,7 +73,7 @@ func TestAppVoiceIntegration(t *testing.T) {
 func TestLiveLLMConversation(t *testing.T) {
 	app := NewApp()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 
 	if !llm.ProbeEndpoint(ctx, app.cfg.LLM.BaseURL, app.cfg.LLM.APIKey) {
@@ -100,7 +100,7 @@ func TestLiveLLMConversation(t *testing.T) {
 
 func TestLiveLLMConversationWithASR(t *testing.T) {
 	app := NewApp()
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 	defer cancel()
 	if err := app.asrEngine.Start(ctx); err != nil {
 		t.Fatalf("ASR start: %v", err)
