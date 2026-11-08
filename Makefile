@@ -6,6 +6,7 @@ GRADLEW = JAVA_HOME="$(JAVA_HOME)" ANDROID_HOME="$(ANDROID_HOME)" ./gradlew
 # 配置变量
 TAGS ?= production
 LDFLAGS ?= -w -s
+DOCKER_COMPOSE ?= $(shell if docker compose version >/dev/null 2>&1; then echo "docker compose"; elif which docker-compose >/dev/null 2>&1; then echo "docker-compose"; else echo "docker-compose"; fi)
 
 # 默认目标
 help: ## 显示帮助信息
@@ -81,10 +82,15 @@ install-apk: android-install ## 安装 Android Debug APK 到设备 (android-inst
 install: android-install ## 安装应用到设备 (默认安装 Android APK)
 
 server: ## 统一通过 Docker Compose 启动全套云端后台服务 (LiveKit SFU + Go Gateway + Agent Worker)
+	@if ! docker info >/dev/null 2>&1; then \
+		echo "\033[31m[Docker 未运行]\033[0m 请先启动 Docker Desktop (或 OrbStack / Colima) 后再运行此命令。"; \
+		echo "\033[33m[提示]\033[0m 若暂不启动容器，可运行 \033[36mmake server-dev\033[0m 在宿主机直接运行 Go 网关！"; \
+		exit 1; \
+	fi
 	@if [ -f server/.env ]; then \
-		docker compose --env-file server/.env -f server/docker-compose.yaml up -d --build; \
+		$(DOCKER_COMPOSE) --env-file server/.env -f server/docker-compose.yaml up -d --build; \
 	else \
-		docker compose -f server/docker-compose.yaml up -d --build; \
+		$(DOCKER_COMPOSE) -f server/docker-compose.yaml up -d --build; \
 	fi
 	@echo "\033[32m[Cloud Server]\033[0m 后台服务集群已在 Docker Compose 中启动:"
 	@echo "  - Go 实时网关:   http://localhost:8088"
@@ -94,15 +100,19 @@ server: ## 统一通过 Docker Compose 启动全套云端后台服务 (LiveKit S
 
 server-dev: ## 本地宿主机直接运行 Go 实时网关 (开发调试用，仅容器化运行 LiveKit)
 	@if ! nc -z -w 1 localhost 7880 2>/dev/null; then \
-		docker compose -f server/docker-compose.yaml up -d livekit; \
+		if docker info >/dev/null 2>&1; then \
+			$(DOCKER_COMPOSE) -f server/docker-compose.yaml up -d livekit; \
+		else \
+			echo "\033[33m[提示]\033[0m LiveKit SFU 未在 7880 运行且 Docker 未启动，网关继续以纯 HTTP 模式运行。"; \
+		fi \
 	fi
 	go run ./server/cmd/main.go
 
 server-logs: ## 查看后台容器集群实时日志
-	docker compose -f server/docker-compose.yaml logs -f
+	$(DOCKER_COMPOSE) -f server/docker-compose.yaml logs -f
 
 server-stop: ## 停止后台容器集群
-	docker compose -f server/docker-compose.yaml down
+	$(DOCKER_COMPOSE) -f server/docker-compose.yaml down
 
 livekit-stop: server-stop ## 停止后台运行的 LiveKit SFU 与网关容器 (server-stop 别名)
 build: asr ## 编译可执行二进制文件

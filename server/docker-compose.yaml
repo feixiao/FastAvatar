@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   livekit:
     image: livekit/livekit-server:latest
