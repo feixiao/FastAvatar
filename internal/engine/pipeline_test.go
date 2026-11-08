@@ -38,8 +38,6 @@ func TestPipelineChatAndInterrupt(t *testing.T) {
 	cfg.LLM.Model = "test-model"
 	cfg.LLM.Edge.BaseURL = ts.URL
 	cfg.LLM.Edge.Model = "test-model"
-	cfg.LLM.Cloud.BaseURL = ts.URL
-	cfg.LLM.Cloud.Model = "test-model"
 	tmpDir := t.TempDir()
 	vault, _ := memory.NewVault(filepath.Join(tmpDir, "p_mem.json"))
 	personaMgr, _ := persona.NewManager(filepath.Join(tmpDir, "p_per.json"))

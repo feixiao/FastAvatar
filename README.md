@@ -102,10 +102,9 @@ Avatar/
 ## ⚙️ 配置说明
 
 桌面端首次启动会自动在用户目录下生成配置文件：`~/.avatar/config.json`：
-- **本地大模型 (Ollama)**：设置 `llm.base_url` 为 `http://127.0.0.1:11434/v1`，`model` 为 `qwen2.5:1.5b` 等；
-- **云端大模型 API**：配置兼容 OpenAI 的 `base_url`、`api_key` 与 `model`（如 DeepSeek-V3 / Qwen-Max）；
-- **云端实时网关**：配置 `cloud_server_url` 指向你的云网关实例（如 `http://127.0.0.1:8088`）。
-
+- **端侧小模型 (Local SLM)**：客户端直连本地轻量模型（Ollama / LM Studio），配置 `llm.base_url`（如 `http://127.0.0.1:11434/v1`）与 `model`（如 `qwen2.5-0.5b-instruct`），负责极速闲聊、日常问候与本地情绪安抚；
+- **云端实时网关 (`cloud_server_url`)**：配置指向自建云网关实例（默认 `http://127.0.0.1:8088`）。客户端严禁直连外部大模型及携带厂商 API Key，所有复杂认知推理统一由网关代理；
+- **联网大模型授权 (`cloud_consent`)**：客户端联网开关（默认 `false` 纯离线隐私保护）。开启时允许复杂问题上云网关，关闭时仅在端侧响应小模型与本地规则记忆。
 ---
 
 ## 📚 详细设计与技术文档

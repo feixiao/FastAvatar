@@ -148,3 +148,46 @@ func TestApp_FastPathMemoryWorksWithoutLLM(t *testing.T) {
 		t.Fatalf("expected state idle, got %s", app.pipeline.State())
 	}
 }
+
+func TestApp_CloudConsentAndEngineStatus(t *testing.T) {
+	app := NewApp()
+
+	// 默认状态：纯离线模式
+	origConsent := app.GetCloudConsent()
+
+	// 切换联网授权状态
+	newConsent := app.SetCloudConsent(!origConsent)
+	if newConsent == origConsent {
+		t.Fatalf("expected consent to change from %v to %v", origConsent, !origConsent)
+	}
+	if app.GetCloudConsent() != newConsent {
+		t.Fatalf("expected GetCloudConsent to return %v", newConsent)
+	}
+
+	// 测试 Toggle
+	toggled := app.ToggleCloudConsent()
+	if toggled != origConsent {
+		t.Fatalf("expected ToggleCloudConsent to flip back to %v, got %v", origConsent, toggled)
+	}
+
+	// 还原状态
+	_ = app.SetCloudConsent(origConsent)
+
+	// 检查网关与小模型引擎状态
+	status := app.CheckEngineStatus()
+	if _, ok := status["edge_slm"]; !ok {
+		t.Fatalf("expected status to report edge_slm")
+	}
+	if _, ok := status["cloud_gateway"]; !ok {
+		t.Fatalf("expected status to report cloud_gateway")
+	}
+	if status["cloud_consent"] != origConsent {
+		t.Fatalf("expected status cloud_consent to match %v", origConsent)
+	}
+
+	// 检查 DualModelInfo
+	info := app.GetDualModelInfo()
+	if info["cloud_gateway"] == "" {
+		t.Fatalf("expected cloud_gateway in dual model info")
+	}
+}

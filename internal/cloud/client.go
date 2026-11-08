@@ -54,6 +54,7 @@ type Client struct {
 	deviceID        string
 	clientType      string
 	httpClient      *http.Client
+	streamClient    *http.Client
 	state           ConnectionState
 	currentRoom     string
 	currentToken    string
@@ -73,6 +74,7 @@ func NewClient(serverURL, userID, deviceID, clientType string) *Client {
 		deviceID:     deviceID,
 		clientType:   clientType,
 		httpClient:   &http.Client{Timeout: 5 * time.Second},
+		streamClient: &http.Client{Timeout: 0},
 		state:        StateDisconnected,
 		isAudioMuted: true, // PRD Guardrail: Audio track is muted by default (Gating)
 	}
@@ -297,7 +299,7 @@ func (c *Client) ChatStream(ctx context.Context, turnID, message, persona string
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/event-stream")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.streamClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("do stream request: %w", err)
 	}

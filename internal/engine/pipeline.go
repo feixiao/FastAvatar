@@ -56,6 +56,7 @@ func NewPipeline(
 	taskRunner := task.NewRunner(cfg.LLM, llmClient, synthesizer, vault, personaMgr, bondMgr, coord)
 
 	fastPath := interaction.NewFastPathHandler(vault, personaMgr)
+	fastPath.SetCloudConsent(cfg.CloudConsent)
 	speechPlayer := interaction.NewSpeechPlayer(synthesizer)
 	interactionMgr := interaction.NewManager(coord, fastPath, speechPlayer, taskRunner)
 
@@ -146,4 +147,14 @@ func (p *Pipeline) FastPath() *interaction.FastPathHandler {
 // SetCloudClient configures cloud realtime client for edge-cloud synchronization.
 func (p *Pipeline) SetCloudClient(client *cloud.Client) {
 	p.interaction.SetCloudClient(client)
+	if p.taskRunner != nil {
+		p.taskRunner.SetCloudGateway(client)
+	}
+}
+
+// SetCloudConsent updates user consent for cloud network features.
+func (p *Pipeline) SetCloudConsent(consented bool) {
+	if p.fastPath != nil {
+		p.fastPath.SetCloudConsent(consented)
+	}
 }

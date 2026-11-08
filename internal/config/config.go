@@ -32,7 +32,6 @@ type LLMConfig struct {
 	MaxTokens   int     `json:"max_tokens"`   // 最大生成 Token
 
 	Edge  ModelEndpointConfig `json:"edge"`  // 本地端侧小模型 (SLM, 如 0.5B/1.5B)
-	Cloud ModelEndpointConfig `json:"cloud"` // 云端大模型 (LLM, 如 7B/14B/DeepSeek)
 }
 
 func (c *LLMConfig) GetEdgeEndpoint() ModelEndpointConfig {
@@ -56,32 +55,6 @@ func (c *LLMConfig) GetEdgeEndpoint() ModelEndpointConfig {
 	return edge
 }
 
-func (c *LLMConfig) GetCloudEndpoint() ModelEndpointConfig {
-	cloud := c.Cloud
-	if cloud.BaseURL == "" {
-		cloud.BaseURL = c.BaseURL
-	}
-	if cloud.Model == "" {
-		if c.Model != "" {
-			cloud.Model = c.Model
-		} else {
-			cloud.Model = "qwen2.5-7b-instruct"
-		}
-	}
-	if cloud.Temperature == 0 {
-		cloud.Temperature = c.Temperature
-		if cloud.Temperature == 0 {
-			cloud.Temperature = 0.7
-		}
-	}
-	if cloud.MaxTokens == 0 {
-		cloud.MaxTokens = c.MaxTokens
-		if cloud.MaxTokens == 0 {
-			cloud.MaxTokens = 1024
-		}
-	}
-	return cloud
-}
 
 type TTSConfig struct {
 	Engine   string `json:"engine"`    // "mac_say", "edge_tts"
@@ -95,30 +68,34 @@ type ASRConfig struct {
 
 
 type AppConfig struct {
-	DisplayForm  string          `json:"display_form"` // "pet" (桌面宠物) 或 "capsule" (极简胶囊)
-	PetSkin      string          `json:"pet_skin"`     // "cat", "fox", "spirit" 或自定义皮肤 ID
-	Mode         InteractionMode `json:"mode"`
-	AlwaysOnTop  bool            `json:"always_on_top"`
-	Hotkey       string          `json:"hotkey"` // 例如 "Option+Space"
-	LLM          LLMConfig       `json:"llm"`
-	TTS          TTSConfig       `json:"tts"`
-	ASR          ASRConfig       `json:"asr"`
-	LocalGGUF    string          `json:"local_gguf"`    // 本地 GGUF 模型路径
-	LlamaServer  string          `json:"llama_server"`  // llama-server 路径 (空则自动探测或下载)
-	SidecarPort  int             `json:"sidecar_port"`  // 本地伴生服务端口 (默认 50088)
+	DisplayForm    string          `json:"display_form"`     // "pet" (桌面宠物) 或 "capsule" (极简胶囊)
+	PetSkin        string          `json:"pet_skin"`         // "cat", "fox", "spirit" 或自定义皮肤 ID
+	Mode           InteractionMode `json:"mode"`
+	AlwaysOnTop    bool            `json:"always_on_top"`
+	Hotkey         string          `json:"hotkey"`           // 例如 "Option+Space"
+	CloudServerURL string          `json:"cloud_server_url"` // 云端实时网关服务地址 (默认 http://127.0.0.1:8088)
+	CloudConsent   bool            `json:"cloud_consent"`    // 联网与云端认知大模型授权开关 (true: 允许联网; false: 纯离线隐私模式)
+	LLM            LLMConfig       `json:"llm"`              // 端侧小模型 (SLM) 配置
+	TTS            TTSConfig       `json:"tts"`
+	ASR            ASRConfig       `json:"asr"`
+	LocalGGUF      string          `json:"local_gguf"`       // 本地 GGUF 模型路径
+	LlamaServer    string          `json:"llama_server"`     // llama-server 路径 (空则自动探测或下载)
+	SidecarPort    int             `json:"sidecar_port"`     // 本地伴生服务端口 (默认 50088)
 }
 
 var (
 	defaultConfig = AppConfig{
-		DisplayForm: "pet",
-		PetSkin:     "whale",
-		Mode:        ModeHandsFree,
-		AlwaysOnTop: true,
-		Hotkey:      "Option+Space",
+		DisplayForm:    "pet",
+		PetSkin:        "whale",
+		Mode:           ModeHandsFree,
+		AlwaysOnTop:    true,
+		Hotkey:         "Option+Space",
+		CloudServerURL: "http://127.0.0.1:8088",
+		CloudConsent:   false, // 默认纯离线隐私模式，不主动发网络包
 		LLM: LLMConfig{
 			Engine:      "openai_compatible",
 			BaseURL:     "http://127.0.0.1:1234/v1",
-			Model:       "qwen2.5-7b-instruct",
+			Model:       "qwen2.5-0.5b-instruct",
 			Temperature: 0.7,
 			MaxTokens:   512,
 			Edge: ModelEndpointConfig{
@@ -127,13 +104,6 @@ var (
 				Model:       "qwen2.5-0.5b-instruct",
 				Temperature: 0.7,
 				MaxTokens:   256,
-			},
-			Cloud: ModelEndpointConfig{
-				Engine:      "openai_compatible",
-				BaseURL:     "http://127.0.0.1:1234/v1",
-				Model:       "qwen2.5-7b-instruct",
-				Temperature: 0.7,
-				MaxTokens:   1024,
 			},
 		},
 		TTS: TTSConfig{
@@ -198,8 +168,8 @@ func LoadConfig() AppConfig {
 	if loaded.LLM.Edge.BaseURL == "" {
 		loaded.LLM.Edge = loaded.LLM.GetEdgeEndpoint()
 	}
-	if loaded.LLM.Cloud.BaseURL == "" {
-		loaded.LLM.Cloud = loaded.LLM.GetCloudEndpoint()
+	if loaded.CloudServerURL == "" {
+		loaded.CloudServerURL = "http://127.0.0.1:8088"
 	}
 	current = loaded
 	return current

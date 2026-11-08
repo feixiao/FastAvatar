@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
 	"avatar/internal/asr"
+	"avatar/internal/cloud"
 	"avatar/internal/config"
 	"avatar/internal/engine"
 	"avatar/internal/llm"
@@ -21,18 +23,19 @@ import (
 
 // App struct
 type App struct {
-	ctx        context.Context
-	cfg        config.AppConfig
-	pipeline   *engine.Pipeline
-	sidecar    *sidecar.LlamaManager
-	vault      *memory.Vault
-	personaMgr *persona.Manager
-	bondMgr    *persona.BondManager
-	skinMgr    *skin.Manager
-	asrEngine  asr.Engine
-	mu         sync.Mutex
-	isExpanded bool
-	lastVAD    time.Time
+	ctx         context.Context
+	cfg         config.AppConfig
+	pipeline    *engine.Pipeline
+	cloudClient *cloud.Client
+	sidecar     *sidecar.LlamaManager
+	vault       *memory.Vault
+	personaMgr  *persona.Manager
+	bondMgr     *persona.BondManager
+	skinMgr     *skin.Manager
+	asrEngine   asr.Engine
+	mu          sync.Mutex
+	isExpanded  bool
+	lastVAD     time.Time
 }
 func (a *App) emitEvent(eventName string, data ...interface{}) {
 	if a.ctx != nil {
@@ -44,29 +47,17 @@ func (a *App) emitEvent(eventName string, data ...interface{}) {
 // NewApp creates a new App application struct
 func NewApp() *App {
 	cfg := config.LoadConfig()
-	// 自动探测本地端云双模型端点 (LM Studio 跑两个模型，或 LM Studio + Ollama)
+	// 自动探测本地端侧小模型端点 (LM Studio / Ollama 运行 0.5B/1.5B 等本地小模型)
 	ctxProbe, cancelProbe := context.WithTimeout(context.Background(), 1*time.Second)
-	edgeURL, edgeM, cloudURL, cloudM, dualOk := llm.AutoDetectDualEndpoints(ctxProbe)
-	if dualOk {
-		fmt.Printf("自动检测到端云双模型运行中:\n  - 端侧 SLM: %s (%s)\n  - 云端 LLM: %s (%s)\n", edgeURL, edgeM, cloudURL, cloudM)
-		cfg.LLM.Edge.BaseURL = edgeURL
-		cfg.LLM.Edge.Model = edgeM
-		cfg.LLM.Cloud.BaseURL = cloudURL
-		cfg.LLM.Cloud.Model = cloudM
-		cfg.LLM.BaseURL = cloudURL
-		cfg.LLM.Model = cloudM
-		_ = config.SaveConfig(cfg)
-	} else if !llm.ProbeEndpoint(ctxProbe, cfg.LLM.BaseURL, cfg.LLM.APIKey) {
+	if !llm.ProbeEndpoint(ctxProbe, cfg.LLM.Edge.BaseURL, "") {
 		if detectedURL, detectedModel, ok := llm.AutoDetectEndpoint(ctxProbe); ok {
-			fmt.Printf("自动检测到本地大模型运行于 %s (模型: %s)，已自动接入\n", detectedURL, detectedModel)
+			fmt.Printf("自动检测到本地端侧小模型运行于 %s (模型: %s)，已自动接入\n", detectedURL, detectedModel)
 			cfg.LLM.BaseURL = detectedURL
+			cfg.LLM.Edge.BaseURL = detectedURL
 			if detectedModel != "" {
 				cfg.LLM.Model = detectedModel
+				cfg.LLM.Edge.Model = detectedModel
 			}
-			cfg.LLM.Edge.BaseURL = detectedURL
-			cfg.LLM.Edge.Model = detectedModel
-			cfg.LLM.Cloud.BaseURL = detectedURL
-			cfg.LLM.Cloud.Model = detectedModel
 			_ = config.SaveConfig(cfg)
 		}
 	}
@@ -118,15 +109,20 @@ func NewApp() *App {
 
 	pipe := engine.NewPipeline(cfg, synth, vault, personaMgr, bondMgr)
 
+	// 统一绑定云端网关客户端 (端侧不持有云端大模型 API Key，复杂推理收拢至网关 :8088)
+	cloudClient := cloud.NewClient(cfg.CloudServerURL, "user_mac", "mac_client_01", "mac")
+	pipe.SetCloudClient(cloudClient)
+
 	return &App{
-		cfg:        cfg,
-		pipeline:   pipe,
-		sidecar:    sidecarMgr,
-		vault:      vault,
-		personaMgr: personaMgr,
-		bondMgr:    bondMgr,
-		skinMgr:    skinMgr,
-		asrEngine:  asrEng,
+		cfg:         cfg,
+		pipeline:    pipe,
+		cloudClient: cloudClient,
+		sidecar:     sidecarMgr,
+		vault:       vault,
+		personaMgr:  personaMgr,
+		bondMgr:     bondMgr,
+		skinMgr:     skinMgr,
+		asrEngine:   asrEng,
 	}
 }
 
@@ -229,6 +225,18 @@ func (a *App) startup(ctx context.Context) {
 	if a.bondMgr != nil {
 		a.emitEvent("avatar:bond", a.bondMgr.GetData())
 	}
+	a.emitEvent("avatar:cloud_consent", a.cfg.CloudConsent)
+
+	// 若开启了联网大模型授权，异步完成云端网关握手与 Token 获取
+	if a.cfg.CloudConsent && a.cloudClient != nil {
+		go func() {
+			ctxToken, cancelToken := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancelToken()
+			if res, err := a.cloudClient.AcquireSessionToken(ctxToken, true); err == nil {
+				fmt.Printf("[云端网关] 成功建立会话 Room: %s\n", res.RoomName)
+			}
+		}()
+	}
 
 	// 初始广播形态与桌宠外观配置
 	a.emitEvent("avatar:display_form", a.cfg.DisplayForm)
@@ -239,16 +247,25 @@ func (a *App) startup(ctx context.Context) {
 		runtime.WindowSetSize(a.ctx, 320, 360)
 	}
 
-	// 异步检测 LLM 服务连通性并提示
+	// 异步检测端侧小模型与云端网关服务连通性并提示
 	go func() {
 		time.Sleep(600 * time.Millisecond)
 		ctxTest, cancelTest := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancelTest()
-		if !llm.ProbeEndpoint(ctxTest, a.cfg.LLM.BaseURL, a.cfg.LLM.APIKey) {
-			a.emitEvent("avatar:error", fmt.Sprintf("大模型未连接 (%s)。请启动 LM Studio 或 Ollama。", a.cfg.LLM.BaseURL))
+		if !llm.ProbeEndpoint(ctxTest, a.cfg.LLM.Edge.BaseURL, "") {
+			a.emitEvent("avatar:error", fmt.Sprintf("端侧小模型未连接 (%s)。请启动 LM Studio 或 Ollama 运行端侧小模型。", a.cfg.LLM.Edge.BaseURL))
+		}
+		if a.cfg.CloudConsent {
+			req, err := http.NewRequestWithContext(ctxTest, http.MethodGet, a.cfg.CloudServerURL+"/health", nil)
+			if err != nil {
+				a.emitEvent("avatar:error", fmt.Sprintf("云端网关异常: %v", err))
+			} else if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != http.StatusOK {
+				a.emitEvent("avatar:error", fmt.Sprintf("云端网关未启动 (%s)。如需使用大模型，请运行 make server 启动网关。", a.cfg.CloudServerURL))
+			} else {
+				_ = resp.Body.Close()
+			}
 		}
 	}()
-
 	// 初始伴侣醒来开场白（根据当前激活人格动态输出）
 	go func() {
 		time.Sleep(1200 * time.Millisecond)
@@ -457,14 +474,22 @@ func (a *App) CheckEngineStatus() map[string]bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	edgeOk := llm.ProbeEndpoint(ctx, a.cfg.LLM.Edge.BaseURL, a.cfg.LLM.Edge.APIKey)
-	cloudOk := llm.ProbeEndpoint(ctx, a.cfg.LLM.Cloud.BaseURL, a.cfg.LLM.Cloud.APIKey)
+	edgeOk := llm.ProbeEndpoint(ctx, a.cfg.LLM.Edge.BaseURL, "")
+	cloudGatewayOk := false
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.cfg.CloudServerURL+"/health", nil)
+	if err == nil {
+		if resp, err := http.DefaultClient.Do(req); err == nil {
+			cloudGatewayOk = (resp.StatusCode == http.StatusOK)
+			_ = resp.Body.Close()
+		}
+	}
 	ollamaOk := llm.ProbeEndpoint(ctx, "http://127.0.0.1:11434/v1", "")
 
 	return map[string]bool{
 		"local_sidecar": edgeOk,
 		"edge_slm":      edgeOk,
-		"cloud_llm":     cloudOk,
+		"cloud_gateway": cloudGatewayOk,
+		"cloud_consent": a.cfg.CloudConsent,
 		"ollama":        ollamaOk,
 	}
 }
@@ -474,11 +499,64 @@ func (a *App) GetDualModelInfo() map[string]string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return map[string]string{
-		"edge_url":    a.cfg.LLM.Edge.BaseURL,
-		"edge_model":  a.cfg.LLM.Edge.Model,
-		"cloud_url":   a.cfg.LLM.Cloud.BaseURL,
-		"cloud_model": a.cfg.LLM.Cloud.Model,
+		"edge_url":      a.cfg.LLM.Edge.BaseURL,
+		"edge_model":    a.cfg.LLM.Edge.Model,
+		"cloud_gateway": a.cfg.CloudServerURL,
+		"cloud_consent": fmt.Sprintf("%t", a.cfg.CloudConsent),
 	}
+}
+
+// SetCloudConsent 切换是否开启联网大模型授权
+func (a *App) SetCloudConsent(consented bool) bool {
+	a.mu.Lock()
+	a.cfg.CloudConsent = consented
+	_ = config.SaveConfig(a.cfg)
+	a.mu.Unlock()
+
+	a.pipeline.SetCloudConsent(consented)
+	a.emitEvent("avatar:cloud_consent", consented)
+
+	if consented && a.cloudClient != nil {
+		go func() {
+			ctxToken, cancelToken := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancelToken()
+			_, _ = a.cloudClient.AcquireSessionToken(ctxToken, true)
+		}()
+	}
+	return consented
+}
+
+// ToggleCloudConsent 切换联网大模型授权状态
+func (a *App) ToggleCloudConsent() bool {
+	a.mu.Lock()
+	newVal := !a.cfg.CloudConsent
+	a.mu.Unlock()
+	return a.SetCloudConsent(newVal)
+}
+
+// GetCloudConsent 获取当前联网大模型授权状态
+func (a *App) GetCloudConsent() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.cfg.CloudConsent
+}
+
+// GetCloudServerURL 获取当前云端网关服务地址
+func (a *App) GetCloudServerURL() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.cfg.CloudServerURL
+}
+
+// SetCloudServerURL 更新云端网关地址并重新绑定
+func (a *App) SetCloudServerURL(url string) string {
+	a.mu.Lock()
+	a.cfg.CloudServerURL = url
+	_ = config.SaveConfig(a.cfg)
+	a.cloudClient = cloud.NewClient(url, "user_mac", "mac_client_01", "mac")
+	a.pipeline.SetCloudClient(a.cloudClient)
+	a.mu.Unlock()
+	return url
 }
 
 // ==================== 桌面宠物 API ====================
