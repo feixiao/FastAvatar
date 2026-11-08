@@ -44,15 +44,29 @@ func (a *App) emitEvent(eventName string, data ...interface{}) {
 // NewApp creates a new App application struct
 func NewApp() *App {
 	cfg := config.LoadConfig()
-	// 自动探测本地大模型端点（若配置的端点离线）
+	// 自动探测本地端云双模型端点 (LM Studio 跑两个模型，或 LM Studio + Ollama)
 	ctxProbe, cancelProbe := context.WithTimeout(context.Background(), 1*time.Second)
-	if !llm.ProbeEndpoint(ctxProbe, cfg.LLM.BaseURL, cfg.LLM.APIKey) {
+	edgeURL, edgeM, cloudURL, cloudM, dualOk := llm.AutoDetectDualEndpoints(ctxProbe)
+	if dualOk {
+		fmt.Printf("自动检测到端云双模型运行中:\n  - 端侧 SLM: %s (%s)\n  - 云端 LLM: %s (%s)\n", edgeURL, edgeM, cloudURL, cloudM)
+		cfg.LLM.Edge.BaseURL = edgeURL
+		cfg.LLM.Edge.Model = edgeM
+		cfg.LLM.Cloud.BaseURL = cloudURL
+		cfg.LLM.Cloud.Model = cloudM
+		cfg.LLM.BaseURL = cloudURL
+		cfg.LLM.Model = cloudM
+		_ = config.SaveConfig(cfg)
+	} else if !llm.ProbeEndpoint(ctxProbe, cfg.LLM.BaseURL, cfg.LLM.APIKey) {
 		if detectedURL, detectedModel, ok := llm.AutoDetectEndpoint(ctxProbe); ok {
 			fmt.Printf("自动检测到本地大模型运行于 %s (模型: %s)，已自动接入\n", detectedURL, detectedModel)
 			cfg.LLM.BaseURL = detectedURL
 			if detectedModel != "" {
 				cfg.LLM.Model = detectedModel
 			}
+			cfg.LLM.Edge.BaseURL = detectedURL
+			cfg.LLM.Edge.Model = detectedModel
+			cfg.LLM.Cloud.BaseURL = detectedURL
+			cfg.LLM.Cloud.Model = detectedModel
 			_ = config.SaveConfig(cfg)
 		}
 	}
@@ -134,6 +148,15 @@ func (a *App) startup(ctx context.Context) {
 		a.emitEvent("avatar:persona", slot)
 	}, func(bond persona.BondData) {
 		a.emitEvent("avatar:bond", bond)
+	})
+
+	// 注册端云双模型意图路由遥测
+	a.pipeline.SetModelRouteCallback(func(route string, model string, isEdge bool) {
+		a.emitEvent("avatar:model_route", map[string]interface{}{
+			"route":   route,
+			"model":   model,
+			"is_edge": isEdge,
+		})
 	})
 
 	// 注册 ASR 语音识别回调并异步启动
@@ -434,12 +457,27 @@ func (a *App) CheckEngineStatus() map[string]bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	localOk := llm.ProbeEndpoint(ctx, a.cfg.LLM.BaseURL, "")
+	edgeOk := llm.ProbeEndpoint(ctx, a.cfg.LLM.Edge.BaseURL, a.cfg.LLM.Edge.APIKey)
+	cloudOk := llm.ProbeEndpoint(ctx, a.cfg.LLM.Cloud.BaseURL, a.cfg.LLM.Cloud.APIKey)
 	ollamaOk := llm.ProbeEndpoint(ctx, "http://127.0.0.1:11434/v1", "")
 
 	return map[string]bool{
-		"local_sidecar": localOk,
+		"local_sidecar": edgeOk,
+		"edge_slm":      edgeOk,
+		"cloud_llm":     cloudOk,
 		"ollama":        ollamaOk,
+	}
+}
+
+// GetDualModelInfo 获取当前生效的端侧小模型与云端大模型配置信息
+func (a *App) GetDualModelInfo() map[string]string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return map[string]string{
+		"edge_url":    a.cfg.LLM.Edge.BaseURL,
+		"edge_model":  a.cfg.LLM.Edge.Model,
+		"cloud_url":   a.cfg.LLM.Cloud.BaseURL,
+		"cloud_model": a.cfg.LLM.Cloud.Model,
 	}
 }
 

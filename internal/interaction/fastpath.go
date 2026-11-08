@@ -83,7 +83,7 @@ func (f *FastPathHandler) Evaluate(userInput string) (handled bool, confirmation
 		case dispatcher.RouteOffline:
 			return true, "当前处于离线模式，云端对话暂时不可用。但您的本地记忆仍可正常响应。", nil
 
-		case dispatcher.RouteCloudChat:
+		case dispatcher.RouteCloudChat, dispatcher.RouteEdgeChat:
 			// Let it pass to background task runner or LiveKit cloud realtime agent
 			return false, "", nil
 		}

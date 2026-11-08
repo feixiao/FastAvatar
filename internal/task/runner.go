@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"avatar/internal/config"
+	"avatar/internal/dispatcher"
 	"avatar/internal/llm"
 	"avatar/internal/memory"
 	"avatar/internal/orchestrator"
@@ -20,6 +21,10 @@ import (
 type Runner struct {
 	llmCfg        config.LLMConfig
 	llmClient     *llm.Client
+	edgeClient    *llm.Client
+	edgeCfg       config.ModelEndpointConfig
+	cloudClient   *llm.Client
+	cloudCfg      config.ModelEndpointConfig
 	ttsEngine     tts.Synthesizer
 	vault         *memory.Vault
 	personaMgr    *persona.Manager
@@ -30,6 +35,7 @@ type Runner struct {
 	mu            sync.RWMutex
 	onSpeechChunk func(string)
 	onBondSync    func(persona.BondData)
+	onModelRoute  func(route string, model string, isEdge bool)
 }
 
 // NewRunner creates a new cognitive task runner.
@@ -45,16 +51,29 @@ func NewRunner(
 	if synth == nil {
 		synth = tts.NewMockSynthesizer()
 	}
+	edgeCfg := llmCfg.GetEdgeEndpoint()
+	cloudCfg := llmCfg.GetCloudEndpoint()
+	var edgeCli, cloudCli *llm.Client
+	if edgeCfg.BaseURL != "" {
+		edgeCli = llm.NewClient(edgeCfg.BaseURL, edgeCfg.APIKey)
+	}
+	if cloudCfg.BaseURL != "" {
+		cloudCli = llm.NewClient(cloudCfg.BaseURL, cloudCfg.APIKey)
+	}
 	return &Runner{
-		llmCfg:     llmCfg,
-		llmClient:  client,
-		ttsEngine:  synth,
-		vault:      vault,
-		personaMgr: personaMgr,
-		bondMgr:    bondMgr,
-		coord:      coord,
-		splitter:   splitter.NewSentenceSplitter(),
-		history:    make([]llm.Message, 0),
+		llmCfg:      llmCfg,
+		llmClient:   client,
+		edgeClient:  edgeCli,
+		edgeCfg:     edgeCfg,
+		cloudClient: cloudCli,
+		cloudCfg:    cloudCfg,
+		ttsEngine:   synth,
+		vault:       vault,
+		personaMgr:  personaMgr,
+		bondMgr:     bondMgr,
+		coord:       coord,
+		splitter:    splitter.NewSentenceSplitter(),
+		history:     make([]llm.Message, 0),
 	}
 }
 
@@ -70,6 +89,28 @@ func (r *Runner) SetBondSyncCallback(cb func(persona.BondData)) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.onBondSync = cb
+}
+
+// SetModelRouteCallback registers callback for which model (edge vs cloud) answered this turn.
+func (r *Runner) SetModelRouteCallback(cb func(route string, model string, isEdge bool)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.onModelRoute = cb
+}
+
+// SetDualClients explicitly updates edge and cloud clients and endpoint configs.
+func (r *Runner) SetDualClients(
+	edgeCli *llm.Client,
+	edgeCfg config.ModelEndpointConfig,
+	cloudCli *llm.Client,
+	cloudCfg config.ModelEndpointConfig,
+) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.edgeClient = edgeCli
+	r.edgeCfg = edgeCfg
+	r.cloudClient = cloudCli
+	r.cloudCfg = cloudCfg
 }
 
 // History returns a copy of the conversation history.
@@ -174,14 +215,81 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 	var fullResponse string
 	r.splitter.Reset()
 
-	req := llm.ChatCompletionRequest{
-		Model:       r.llmCfg.Model,
-		Messages:    msgs,
-		Temperature: r.llmCfg.Temperature,
-		MaxTokens:   r.llmCfg.MaxTokens,
+	// 意图复杂度仲裁：决定使用端侧小模型还是云端大模型
+	isComplex := dispatcher.IsComplexQuery(task.GoalSnapshot)
+	var activeClient *llm.Client
+	var activeModel string
+	var activeTemp float64
+	var activeMaxTokens int
+	var routeLabel string
+
+	r.mu.RLock()
+	edgeCli := r.edgeClient
+	cloudCli := r.cloudClient
+	edgeCfg := r.edgeCfg
+	cloudCfg := r.cloudCfg
+	defaultCli := r.llmClient
+	defaultCfg := r.llmCfg
+	routeCb := r.onModelRoute
+	r.mu.RUnlock()
+
+	if isComplex {
+		routeLabel = "CLOUD_LLM"
+		if cloudCli != nil && cloudCfg.BaseURL != "" {
+			activeClient = cloudCli
+			activeModel = cloudCfg.Model
+			activeTemp = cloudCfg.Temperature
+			activeMaxTokens = cloudCfg.MaxTokens
+		} else if defaultCli != nil {
+			activeClient = defaultCli
+			activeModel = defaultCfg.Model
+			activeTemp = defaultCfg.Temperature
+			activeMaxTokens = defaultCfg.MaxTokens
+		}
+	} else {
+		routeLabel = "EDGE_SLM"
+		if edgeCli != nil && edgeCfg.BaseURL != "" {
+			activeClient = edgeCli
+			activeModel = edgeCfg.Model
+			activeTemp = edgeCfg.Temperature
+			activeMaxTokens = edgeCfg.MaxTokens
+		} else if defaultCli != nil {
+			activeClient = defaultCli
+			activeModel = defaultCfg.Model
+			activeTemp = defaultCfg.Temperature
+			activeMaxTokens = defaultCfg.MaxTokens
+		}
 	}
 
-	err := r.llmClient.StreamChat(ctx, req, func(token string) error {
+	if activeClient == nil {
+		activeClient = defaultCli
+		activeModel = defaultCfg.Model
+		activeTemp = defaultCfg.Temperature
+		activeMaxTokens = defaultCfg.MaxTokens
+	}
+	if activeModel == "" {
+		activeModel = r.llmCfg.Model
+	}
+	if activeTemp == 0 {
+		activeTemp = 0.7
+	}
+	if activeMaxTokens == 0 {
+		activeMaxTokens = 1024
+	}
+
+	fmt.Printf("[模型调度] 通道: %s | 模型: %s | 用户输入: %q\n", routeLabel, activeModel, task.GoalSnapshot)
+	if routeCb != nil {
+		routeCb(routeLabel, activeModel, !isComplex)
+	}
+
+	req := llm.ChatCompletionRequest{
+		Model:       activeModel,
+		Messages:    msgs,
+		Temperature: activeTemp,
+		MaxTokens:   activeMaxTokens,
+	}
+
+	err := activeClient.StreamChat(ctx, req, func(token string) error {
 		fullResponse += token
 		chunks := r.splitter.Push(token)
 		for _, chunk := range chunks {

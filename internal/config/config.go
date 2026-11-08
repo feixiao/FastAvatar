@@ -14,6 +14,15 @@ const (
 	ModePTT       InteractionMode = "ptt"        // 快捷键按住说话/切换
 )
 
+type ModelEndpointConfig struct {
+	Engine      string  `json:"engine,omitempty"`       // "openai_compatible", "ollama", "lmstudio"
+	BaseURL     string  `json:"base_url"`               // 本地或云端 Base URL
+	APIKey      string  `json:"api_key,omitempty"`      // API Key (可选)
+	Model       string  `json:"model"`                  // 模型标识符
+	Temperature float64 `json:"temperature,omitempty"`  // 温度
+	MaxTokens   int     `json:"max_tokens,omitempty"`   // 最大生成 Token
+}
+
 type LLMConfig struct {
 	Engine      string  `json:"engine"`       // "local_llama", "ollama", "openai_compatible"
 	BaseURL     string  `json:"base_url"`     // 本地或云端 Base URL
@@ -21,6 +30,57 @@ type LLMConfig struct {
 	Model       string  `json:"model"`        // 模型名称 (例如 qwen2.5-1.5b-instruct)
 	Temperature float64 `json:"temperature"`  // 温度
 	MaxTokens   int     `json:"max_tokens"`   // 最大生成 Token
+
+	Edge  ModelEndpointConfig `json:"edge"`  // 本地端侧小模型 (SLM, 如 0.5B/1.5B)
+	Cloud ModelEndpointConfig `json:"cloud"` // 云端大模型 (LLM, 如 7B/14B/DeepSeek)
+}
+
+func (c *LLMConfig) GetEdgeEndpoint() ModelEndpointConfig {
+	edge := c.Edge
+	if edge.BaseURL == "" {
+		edge.BaseURL = c.BaseURL
+	}
+	if edge.Model == "" {
+		edge.Model = "qwen2.5-0.5b-instruct"
+	}
+	if edge.Temperature == 0 {
+		edge.Temperature = 0.7
+	}
+	if edge.MaxTokens == 0 {
+		if c.MaxTokens > 0 {
+			edge.MaxTokens = c.MaxTokens
+		} else {
+			edge.MaxTokens = 1024
+		}
+	}
+	return edge
+}
+
+func (c *LLMConfig) GetCloudEndpoint() ModelEndpointConfig {
+	cloud := c.Cloud
+	if cloud.BaseURL == "" {
+		cloud.BaseURL = c.BaseURL
+	}
+	if cloud.Model == "" {
+		if c.Model != "" {
+			cloud.Model = c.Model
+		} else {
+			cloud.Model = "qwen2.5-7b-instruct"
+		}
+	}
+	if cloud.Temperature == 0 {
+		cloud.Temperature = c.Temperature
+		if cloud.Temperature == 0 {
+			cloud.Temperature = 0.7
+		}
+	}
+	if cloud.MaxTokens == 0 {
+		cloud.MaxTokens = c.MaxTokens
+		if cloud.MaxTokens == 0 {
+			cloud.MaxTokens = 1024
+		}
+	}
+	return cloud
 }
 
 type TTSConfig struct {
@@ -56,11 +116,25 @@ var (
 		AlwaysOnTop: true,
 		Hotkey:      "Option+Space",
 		LLM: LLMConfig{
-			Engine:      "local_llama",
-			BaseURL:     "http://127.0.0.1:50088/v1",
-			Model:       "qwen2.5-1.5b-instruct",
+			Engine:      "openai_compatible",
+			BaseURL:     "http://127.0.0.1:1234/v1",
+			Model:       "qwen2.5-7b-instruct",
 			Temperature: 0.7,
 			MaxTokens:   512,
+			Edge: ModelEndpointConfig{
+				Engine:      "openai_compatible",
+				BaseURL:     "http://127.0.0.1:1234/v1",
+				Model:       "qwen2.5-0.5b-instruct",
+				Temperature: 0.7,
+				MaxTokens:   256,
+			},
+			Cloud: ModelEndpointConfig{
+				Engine:      "openai_compatible",
+				BaseURL:     "http://127.0.0.1:1234/v1",
+				Model:       "qwen2.5-7b-instruct",
+				Temperature: 0.7,
+				MaxTokens:   1024,
+			},
 		},
 		TTS: TTSConfig{
 			Engine: "mac_say",
@@ -120,6 +194,12 @@ func LoadConfig() AppConfig {
 	}
 	if loaded.ASR.Locale == "" {
 		loaded.ASR.Locale = "zh-CN"
+	}
+	if loaded.LLM.Edge.BaseURL == "" {
+		loaded.LLM.Edge = loaded.LLM.GetEdgeEndpoint()
+	}
+	if loaded.LLM.Cloud.BaseURL == "" {
+		loaded.LLM.Cloud = loaded.LLM.GetCloudEndpoint()
 	}
 	current = loaded
 	return current

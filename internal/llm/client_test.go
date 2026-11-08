@@ -88,3 +88,40 @@ func TestAutoDetectEndpoint(t *testing.T) {
 		t.Fatalf("expected 'mock-qwen-model', got '%s'", model)
 	}
 }
+func TestDetectDualModels_LMStudioMultiModel(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/models" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":[
+				{"id":"text-embedding-nomic"},
+				{"id":"qwen2.5-0.5b-instruct"},
+				{"id":"qwen2.5-7b-instruct"}
+			]}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	allModels, err := FetchAllModels(ctx, ts.URL, "")
+	if err != nil {
+		t.Fatalf("FetchAllModels failed: %v", err)
+	}
+	if len(allModels) != 2 {
+		t.Fatalf("expected 2 non-embedding models, got %d: %v", len(allModels), allModels)
+	}
+
+	edge, cloud, ok := DetectDualModels(ctx, ts.URL, "")
+	if !ok {
+		t.Fatalf("expected DetectDualModels to succeed")
+	}
+	if edge != "qwen2.5-0.5b-instruct" {
+		t.Errorf("expected edge model 'qwen2.5-0.5b-instruct', got '%s'", edge)
+	}
+	if cloud != "qwen2.5-7b-instruct" {
+		t.Errorf("expected cloud model 'qwen2.5-7b-instruct', got '%s'", cloud)
+	}
+}

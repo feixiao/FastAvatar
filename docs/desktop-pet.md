@@ -113,8 +113,11 @@ make start
 
 客户端大模型和语音服务支持完全解耦，配置文件位于 `~/.avatar/config.json`：
 
-### 1. 本地大模型 (完全离线模式)
-支持直接对接本机 Ollama 或 LM Studio：
+### 1. LM Studio 端云双模型协同 (推荐模拟方案)
+在 LM Studio 中同时加载两个模型（或同时开启 Ollama 与 LM Studio），系统会自动识别双模型并完成意图复杂度分流：
+* **端侧小模型 (Edge SLM)**：如 `qwen2.5-0.5b-instruct` 或 `1.5b`，负责极速闲聊、日常问候与情绪安慰；
+* **云端大模型 (Cloud LLM)**：如 `qwen2.5-7b-instruct` / `DeepSeek`，负责深度分析与复杂任务；
+
 ```json
 {
   "display_form": "pet",
@@ -122,9 +125,16 @@ make start
   "mode": "hands_free",
   "always_on_top": true,
   "llm": {
-    "engine": "openai_compatible",
-    "base_url": "http://127.0.0.1:11434/v1",
-    "model": "qwen2.5:7b-instruct"
+    "edge": {
+      "base_url": "http://127.0.0.1:1234/v1",
+      "model": "qwen2.5-0.5b-instruct",
+      "max_tokens": 512
+    },
+    "cloud": {
+      "base_url": "http://127.0.0.1:1234/v1",
+      "model": "qwen2.5-7b-instruct",
+      "max_tokens": 1024
+    }
   },
   "tts": {
     "engine": "mac_say",
@@ -137,6 +147,7 @@ make start
   }
 }
 ```
+*(注：若未配置双模型字段，系统启动时会自动扫描 `127.0.0.1:1234` 与 `11434` 并自动绑定已加载的大小模型)*
 
 ### 2. 云端商业大模型 (自带 Key / BYOK)
 兼容任何 OpenAI 协议端点（阶跃星辰 StepFun、通义千问 Qwen、DeepSeek 等）：

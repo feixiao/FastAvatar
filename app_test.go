@@ -99,9 +99,14 @@ func TestLiveLLMConversation(t *testing.T) {
 }
 
 func TestLiveLLMConversationWithASR(t *testing.T) {
+	time.Sleep(500 * time.Millisecond)
 	app := NewApp()
-	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
+
+	if !llm.ProbeEndpoint(ctx, app.cfg.LLM.BaseURL, app.cfg.LLM.APIKey) {
+		t.Skipf("skipping live test, no active LLM endpoint found at %s", app.cfg.LLM.BaseURL)
+	}
 	if err := app.asrEngine.Start(ctx); err != nil {
 		t.Fatalf("ASR start: %v", err)
 	}

@@ -12,7 +12,8 @@ type RouteTarget string
 const (
 	RouteLocalMemory  RouteTarget = "LOCAL_MEMORY"
 	RouteLocalPersona RouteTarget = "LOCAL_PERSONA"
-	RouteCloudChat    RouteTarget = "CLOUD_CHAT"
+	RouteEdgeChat     RouteTarget = "EDGE_CHAT"  // 本地端侧小模型 (SLM: 极速闲聊/情绪安抚/日常问候)
+	RouteCloudChat    RouteTarget = "CLOUD_CHAT" // 云端大模型 (LLM: 复杂推理/长文生成/代码/任务规划)
 	RouteLocalOnly    RouteTarget = "LOCAL_ONLY_PROMPT"
 	RouteOffline      RouteTarget = "OFFLINE_PROMPT"
 )
@@ -77,7 +78,11 @@ func (d *FastDispatcher) Evaluate(text string, isCloudConsented bool, isOnline b
 		return res
 	}
 
-	res.Target = RouteCloudChat
+	if IsComplexQuery(clean) {
+		res.Target = RouteCloudChat
+	} else {
+		res.Target = RouteEdgeChat
+	}
 	res.Latency = time.Since(start)
 	return res
 }
@@ -97,4 +102,24 @@ func isMemoryCommand(text string) bool {
 		strings.HasPrefix(text, "忘掉") ||
 		strings.HasPrefix(text, "忘了") ||
 		strings.HasPrefix(text, "清除记忆")
+}
+
+// IsComplexQuery 判定输入是否属于需要云端大模型进行深度推理/长文本生成的复杂问题
+func IsComplexQuery(text string) bool {
+	clean := strings.TrimSpace(text)
+	complexKeywords := []string{
+		"为什么", "如何", "怎么做", "分析", "原因", "解释", "比较",
+		"代码", "写一段", "编写", "实现", "设计", "架构", "算法",
+		"规划", "翻译", "总结", "大纲", "撰写", "论文", "方案", "步骤",
+	}
+	for _, kw := range complexKeywords {
+		if strings.Contains(clean, kw) {
+			return true
+		}
+	}
+	// 超过 25 字符通常包含多重上下文约束或长篇表达，转入云端大模型
+	if len([]rune(clean)) > 25 {
+		return true
+	}
+	return false
 }

@@ -90,6 +90,13 @@ func (p *Pipeline) SetCallbacks(
 	}
 }
 
+// SetModelRouteCallback registers callback for telemetry on whether edge or cloud model was invoked.
+func (p *Pipeline) SetModelRouteCallback(cb func(route string, model string, isEdge bool)) {
+	if p.taskRunner != nil {
+		p.taskRunner.SetModelRouteCallback(cb)
+	}
+}
+
 // State returns current coordinator state.
 func (p *Pipeline) State() State {
 	return p.coordinator.State()

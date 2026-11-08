@@ -630,3 +630,26 @@ type ServerEvent struct {
   - `思考 (Thinking) 💭`：内部双环光点交替旋转，反馈计算中；
   - `说话 (Speaking) 🔊`：根据下发音频能量波形动态共振跳动。
 
+
+---
+
+## 10. 未来演进与架构优化路线 (Future Roadmap & Optimization)
+
+### 10.1 原生端侧轻量神经推理集成 (llama.cpp / MNN Runtime)
+
+* **当前落地状态 (Current Simulation)**：
+  * 现阶段采用 **LM Studio 双模型并发加载模拟方案**（或 LM Studio + Ollama 双端口）：
+    * **端侧小模型 (SLM)**：`qwen2.5-0.5b-instruct` 或 `1.5b`，监听同端口或本地端口，负责短句闲聊、情绪安抚、日常寒暄（TTFT < 100ms）；
+    * **云端大模型 (LLM)**：`qwen2.5-7b-instruct` / `14b` / `DeepSeek` 等，负责深度推理、代码与长文本生成；
+    * 通过 `FastDispatcher` 与 `IntentArbiter` 进行意图复杂度自动分流。
+
+* **后续深度优化方案 (Future Native Integration)**：
+  1. **原生嵌入式推理引擎替换**：
+     * 在 macOS 桌面端直接静态链接 `llama.cpp` (Metal 加速)；
+     * 在 Android / 车机端直接链接阿里 `MNN` (`libllm.so` / Vulkan / QNN 专用加速后端)，彻底摆脱对外部 LM Studio / Ollama 独立进程与 HTTP 端口的依赖。
+  2. **量化端侧小模型常驻**：
+     * 部署量化版 `Qwen2.5-0.5B-Q4_K_M` / `1.5B-Q4_K_M`，整机常驻内存控制在 350MB~800MB，断网物理离线可用。
+  3. **系统级前缀缓存预热 (System Prefix KV Cache Warmup)**：
+     * 在应用启动或空闲阶段，预先将固定的人格设定与安全 System Prompt 灌入端侧模型完成 Prefill 计算并冻结 KV Cache；
+     * 后续多轮交互仅计算用户输入的增量 Token，将端侧首 Token 延迟降至 30~50ms；
+     * 打断时执行轻量级 KV Rollback 截断，瞬时恢复待命。
