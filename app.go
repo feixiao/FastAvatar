@@ -47,19 +47,30 @@ func (a *App) emitEvent(eventName string, data ...interface{}) {
 // NewApp creates a new App application struct
 func NewApp() *App {
 	cfg := config.LoadConfig()
-	// 自动探测本地端侧小模型端点 (LM Studio / Ollama 运行 0.5B/1.5B 等本地小模型)
+	// 自动探测本地端侧小模型端点与双模型分流 (LM Studio / Ollama 等)
 	ctxProbe, cancelProbe := context.WithTimeout(context.Background(), 1*time.Second)
-	if !llm.ProbeEndpoint(ctxProbe, cfg.LLM.Edge.BaseURL, "") {
-		if detectedURL, detectedModel, ok := llm.AutoDetectEndpoint(ctxProbe); ok {
-			fmt.Printf("自动检测到本地端侧小模型运行于 %s (模型: %s)，已自动接入\n", detectedURL, detectedModel)
-			cfg.LLM.BaseURL = detectedURL
-			cfg.LLM.Edge.BaseURL = detectedURL
-			if detectedModel != "" {
-				cfg.LLM.Model = detectedModel
-				cfg.LLM.Edge.Model = detectedModel
+	if llm.ProbeEndpoint(ctxProbe, cfg.LLM.Edge.BaseURL, "") {
+		// 校验当前 Edge.Model 是否不合理（如误配置为 32B 深度思考模型，或未指定）
+		size, isThinking, _ := llm.AnalyzeModelAttributes(cfg.LLM.Edge.Model)
+		if isThinking || size >= 20.0 || cfg.LLM.Edge.Model == "" {
+			if eM, cM, ok := llm.DetectDualModels(ctxProbe, cfg.LLM.Edge.BaseURL, ""); ok && eM != "" {
+				fmt.Printf("[模型校准] 检测到当前端侧小模型配置为超大/思考模型 (%s)，自动校正为极速小模型: %s (云端/深度模型: %s)\n", cfg.LLM.Edge.Model, eM, cM)
+				cfg.LLM.Edge.Model = eM
+				if cM != "" && (cfg.LLM.Model == "" || cfg.LLM.Model == cfg.LLM.Edge.Model) {
+					cfg.LLM.Model = cM
+				}
+				_ = config.SaveConfig(cfg)
 			}
-			_ = config.SaveConfig(cfg)
 		}
+	} else if detectedURL, detectedModel, ok := llm.AutoDetectEndpoint(ctxProbe); ok {
+		fmt.Printf("自动检测到本地端侧小模型运行于 %s (模型: %s)，已自动接入\n", detectedURL, detectedModel)
+		cfg.LLM.BaseURL = detectedURL
+		cfg.LLM.Edge.BaseURL = detectedURL
+		if detectedModel != "" {
+			cfg.LLM.Model = detectedModel
+			cfg.LLM.Edge.Model = detectedModel
+		}
+		_ = config.SaveConfig(cfg)
 	}
 	cancelProbe()
 

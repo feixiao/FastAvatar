@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -71,43 +74,131 @@ func ProbeEndpoint(ctx context.Context, baseURL, apiKey string) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// FetchFirstModel 获取可用模型列表中的首个模型名称
-func FetchFirstModel(ctx context.Context, baseURL, apiKey string) (string, error) {
-	client := &http.Client{Timeout: 1500 * time.Millisecond}
-	url := fmt.Sprintf("%s/models", strings.TrimRight(baseURL, "/"))
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return "", err
+var paramSizeRegex = regexp.MustCompile(`(?i)(?:^|[^0-9.])([0-9]+(?:\.[0-9]+)?)\s*b(?:[^a-z0-9]|$)`)
+
+// AnalyzeModelAttributes 解析模型名称，分析其估算参数量（以B为单位）、是否思考模型及是否Embedding模型
+func AnalyzeModelAttributes(name string) (approxSize float64, isThinking bool, isEmbedding bool) {
+	lower := strings.ToLower(name)
+	if strings.Contains(lower, "embed") || strings.Contains(lower, "rerank") || strings.Contains(lower, "bge-") {
+		return 0, false, true
 	}
-	if apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+apiKey)
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("status: %d", resp.StatusCode)
+	if strings.Contains(lower, "thinking") || strings.Contains(lower, "reason") || strings.Contains(lower, "-r1") || strings.Contains(lower, "deepseek-r1") {
+		isThinking = true
 	}
 
-	var payload struct {
-		Data []struct {
-			ID string `json:"id"`
-		} `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return "", err
-	}
-	for _, m := range payload.Data {
-		if !strings.Contains(m.ID, "embed") {
-			return m.ID, nil
+	matches := paramSizeRegex.FindStringSubmatch(lower)
+	if len(matches) >= 2 {
+		if val, err := strconv.ParseFloat(matches[1], 64); err == nil && val > 0 {
+			return val, isThinking, false
 		}
 	}
-	if len(payload.Data) > 0 {
-		return payload.Data[0].ID, nil
+
+	switch {
+	case strings.Contains(lower, "tiny") || strings.Contains(lower, "mini"):
+		approxSize = 1.0
+	case strings.Contains(lower, "small"):
+		approxSize = 3.0
+	case strings.Contains(lower, "large") || strings.Contains(lower, "max"):
+		approxSize = 32.0
+	default:
+		approxSize = 7.0
 	}
-	return "", fmt.Errorf("no models available")
+	return approxSize, isThinking, false
+}
+
+// SelectBestEdgeModel 挑选最适合端侧实时极速对话的小模型 (严禁思考模型，优先参数量小、Instruct/Chat对齐的小模型)
+func SelectBestEdgeModel(models []string) string {
+	if len(models) == 0 {
+		return ""
+	}
+	var nonThinking []string
+	for _, m := range models {
+		_, isThinking, isEmbed := AnalyzeModelAttributes(m)
+		if isEmbed {
+			continue
+		}
+		if !isThinking {
+			nonThinking = append(nonThinking, m)
+		}
+	}
+	pool := nonThinking
+	if len(pool) == 0 {
+		for _, m := range models {
+			_, _, isEmbed := AnalyzeModelAttributes(m)
+			if !isEmbed {
+				pool = append(pool, m)
+			}
+		}
+	}
+	if len(pool) == 0 {
+		return models[0]
+	}
+
+	sort.SliceStable(pool, func(i, j int) bool {
+		sizeI, _, _ := AnalyzeModelAttributes(pool[i])
+		sizeJ, _, _ := AnalyzeModelAttributes(pool[j])
+		if sizeI != sizeJ {
+			return sizeI < sizeJ
+		}
+		lowI := strings.ToLower(pool[i])
+		lowJ := strings.ToLower(pool[j])
+		isInstI := strings.Contains(lowI, "instruct") || strings.Contains(lowI, "chat")
+		isInstJ := strings.Contains(lowJ, "instruct") || strings.Contains(lowJ, "chat")
+		if isInstI != isInstJ {
+			return isInstI
+		}
+		return len(pool[i]) < len(pool[j])
+	})
+	return pool[0]
+}
+
+// SelectBestCloudModel 挑选最适合云端/深层次复杂推理的大模型 (参数量大、深度认知模型优先)
+func SelectBestCloudModel(models []string, edgeModel string) string {
+	if len(models) == 0 {
+		return ""
+	}
+	var candidates []string
+	for _, m := range models {
+		_, _, isEmbed := AnalyzeModelAttributes(m)
+		if !isEmbed {
+			candidates = append(candidates, m)
+		}
+	}
+	if len(candidates) == 0 {
+		return edgeModel
+	}
+	if len(candidates) == 1 {
+		return candidates[0]
+	}
+
+	sort.SliceStable(candidates, func(i, j int) bool {
+		sizeI, _, _ := AnalyzeModelAttributes(candidates[i])
+		sizeJ, _, _ := AnalyzeModelAttributes(candidates[j])
+		if sizeI != sizeJ {
+			return sizeI > sizeJ // 越大越适合作为慢环大模型
+		}
+		return len(candidates[i]) > len(candidates[j])
+	})
+
+	for _, c := range candidates {
+		if c != edgeModel {
+			return c
+		}
+	}
+	return candidates[0]
+}
+
+// FetchFirstModel 获取可用模型列表中的首选轻量模型名称
+func FetchFirstModel(ctx context.Context, baseURL, apiKey string) (string, error) {
+	models, err := FetchAllModels(ctx, baseURL, apiKey)
+	if err != nil || len(models) == 0 {
+		return "", err
+	}
+	best := SelectBestEdgeModel(models)
+	if best != "" {
+		return best, nil
+	}
+	return models[0], nil
 }
 // FetchAllModels 获取可用模型列表中的所有非 embedding 模型
 func FetchAllModels(ctx context.Context, baseURL, apiKey string) ([]string, error) {
@@ -156,50 +247,9 @@ func DetectDualModels(ctx context.Context, baseURL, apiKey string) (edgeModel st
 	if len(models) == 1 {
 		return models[0], models[0], true
 	}
-
-	smallKeywords := []string{"0.5b", "1.5b", "1b", "2b", "3b", "mini", "small", "tiny"}
-	largeKeywords := []string{"7b", "8b", "14b", "32b", "70b", "deepseek", "large", "max"}
-
-	var foundSmall, foundLarge string
-	for _, m := range models {
-		lower := strings.ToLower(m)
-		if foundSmall == "" {
-			for _, kw := range smallKeywords {
-				if strings.Contains(lower, kw) {
-					foundSmall = m
-					break
-				}
-			}
-		}
-		if foundLarge == "" {
-			for _, kw := range largeKeywords {
-				if strings.Contains(lower, kw) {
-					foundLarge = m
-					break
-				}
-			}
-		}
-	}
-
-	if foundSmall != "" && foundLarge != "" && foundSmall != foundLarge {
-		return foundSmall, foundLarge, true
-	}
-	if foundSmall != "" {
-		for _, m := range models {
-			if m != foundSmall {
-				return foundSmall, m, true
-			}
-		}
-	}
-	if foundLarge != "" {
-		for _, m := range models {
-			if m != foundLarge {
-				return m, foundLarge, true
-			}
-		}
-	}
-
-	return models[0], models[1], true
+	edge := SelectBestEdgeModel(models)
+	cloud := SelectBestCloudModel(models, edge)
+	return edge, cloud, true
 }
 
 // AutoDetectDualEndpoints 自动探测并配置端云双模型 (LM Studio 双模型加载或 LM Studio+Ollama)

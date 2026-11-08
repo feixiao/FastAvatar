@@ -125,3 +125,34 @@ func TestDetectDualModels_LMStudioMultiModel(t *testing.T) {
 		t.Errorf("expected cloud model 'qwen2.5-7b-instruct', got '%s'", cloud)
 	}
 }
+
+func TestDetectDualModels_AvoidThinkingModelForEdge(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/models" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":[
+				{"id":"qwen3-vl-32b-thinking-mlx"},
+				{"id":"text-embedding-nomic-embed-text-v1.5"},
+				{"id":"qwen3.8-27b-uncensored-optiq"},
+				{"id":"qwen3-vl-8b-instruct-mlx"}
+			]}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	edge, cloud, ok := DetectDualModels(ctx, ts.URL, "")
+	if !ok {
+		t.Fatalf("expected DetectDualModels to succeed")
+	}
+	if edge != "qwen3-vl-8b-instruct-mlx" {
+		t.Errorf("expected edge model 'qwen3-vl-8b-instruct-mlx', got '%s'", edge)
+	}
+	if cloud != "qwen3-vl-32b-thinking-mlx" {
+		t.Errorf("expected cloud model 'qwen3-vl-32b-thinking-mlx', got '%s'", cloud)
+	}
+}
