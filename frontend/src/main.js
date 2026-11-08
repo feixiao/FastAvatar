@@ -456,10 +456,12 @@ btnPetTouch.addEventListener("click", (e) => {
   handlePetAction("pet");
 });
 
-btnPetFeed.addEventListener("click", (e) => {
-  e.stopPropagation();
-  handlePetAction("feed");
-});
+if (btnPetFeed) {
+  btnPetFeed.addEventListener("click", (e) => {
+    e.stopPropagation();
+    handlePetAction("feed");
+  });
+}
 if (btnPetRice) {
   btnPetRice.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -600,10 +602,12 @@ menuActionPet.addEventListener("click", () => {
   closeContextMenu();
 });
 
-menuActionFeed.addEventListener("click", () => {
-  handlePetAction("feed");
-  closeContextMenu();
-});
+if (menuActionFeed) {
+  menuActionFeed.addEventListener("click", () => {
+    handlePetAction("feed");
+    closeContextMenu();
+  });
+}
 
 menuActionChat.addEventListener("click", () => {
   petInputBar.classList.add("open");

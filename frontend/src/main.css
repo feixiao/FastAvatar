@@ -1215,7 +1215,8 @@ body {
 }
 
 /* 模式显示状态类 */
-body.mode-pet #capsule {
+body.mode-pet #capsule,
+body.mode-pet #inputDrawer {
   display: none !important;
 }
 body.mode-pet #desktopPet {
@@ -1224,6 +1225,7 @@ body.mode-pet #desktopPet {
 body.mode-capsule #capsule {
   display: flex !important;
 }
-body.mode-capsule #desktopPet {
+body.mode-capsule #desktopPet,
+body.mode-capsule #petInputBar {
   display: none !important;
 }
