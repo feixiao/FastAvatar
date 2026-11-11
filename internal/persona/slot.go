@@ -264,6 +264,7 @@ func (m *Manager) TryInterceptPersonaSwitch(query string) (intercepted bool, con
 	}
 
 	if targetID != "" {
+		m.SetAutoSchedule(false)
 		slot, err := m.SetActiveSlot(targetID)
 		if err == nil {
 			return true, fmt.Sprintf("好，已为你切换到%s模式。", slot.Name), slot

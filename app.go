@@ -50,11 +50,21 @@ func NewApp() *App {
 	// 自动探测本地端侧小模型端点与双模型分流 (LM Studio / Ollama 等)
 	ctxProbe, cancelProbe := context.WithTimeout(context.Background(), 1*time.Second)
 	if llm.ProbeEndpoint(ctxProbe, cfg.LLM.Edge.BaseURL, "") {
-		// 校验当前 Edge.Model 是否不合理（如误配置为 32B 深度思考模型，或未指定）
-		size, isThinking, _ := llm.AnalyzeModelAttributes(cfg.LLM.Edge.Model)
-		if isThinking || size >= 20.0 || cfg.LLM.Edge.Model == "" {
+		// 探测当前运行端点已加载的模型
+		loadedModels, _ := llm.FetchLoadedModels(ctxProbe, cfg.LLM.Edge.BaseURL, "")
+		modelIsLoaded := false
+		for _, m := range loadedModels {
+			if m == cfg.LLM.Edge.Model {
+				modelIsLoaded = true
+				break
+			}
+		}
+
+		_, isThinking, _ := llm.AnalyzeModelAttributes(cfg.LLM.Edge.Model)
+		// 如果当前配置的模型未加载、或者是超大深度思考模型、或者为空，则自动校准。已加载且非思考模型直接保留。
+		if !modelIsLoaded || isThinking || cfg.LLM.Edge.Model == "" {
 			if eM, cM, ok := llm.DetectDualModels(ctxProbe, cfg.LLM.Edge.BaseURL, ""); ok && eM != "" {
-				fmt.Printf("[模型校准] 检测到当前端侧小模型配置为超大/思考模型 (%s)，自动校正为极速小模型: %s (云端/深度模型: %s)\n", cfg.LLM.Edge.Model, eM, cM)
+				fmt.Printf("[模型校准] 检测到当前端侧小模型配置 (%s) 需要校正，自动适配当前可用模型: %s (云端/深度模型: %s)\n", cfg.LLM.Edge.Model, eM, cM)
 				cfg.LLM.Edge.Model = eM
 				if cM != "" && (cfg.LLM.Model == "" || cfg.LLM.Model == cfg.LLM.Edge.Model) {
 					cfg.LLM.Model = cM
@@ -225,6 +235,8 @@ func (a *App) startup(ctx context.Context) {
 			if err := a.asrEngine.Start(ctx); err != nil {
 				fmt.Printf("ASR engine start error: %v\n", err)
 				a.emitEvent("avatar:error", fmt.Sprintf("语音引擎启动失败: %v", err))
+			} else {
+				fmt.Printf("[语音引擎] 原生 ASR 进程已成功启动 (模式: %s)\n", a.cfg.Mode)
 			}
 		}()
 	}
@@ -242,6 +254,7 @@ func (a *App) startup(ctx context.Context) {
 		a.emitEvent("avatar:bond", a.bondMgr.GetData())
 	}
 	a.emitEvent("avatar:cloud_consent", a.cfg.CloudConsent)
+	a.emitEvent("avatar:mode", string(a.cfg.Mode))
 
 	// 若开启了联网大模型授权，异步完成云端网关握手与 Token 获取
 	if a.cfg.CloudConsent && a.cloudClient != nil {

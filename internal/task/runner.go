@@ -321,6 +321,28 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 			}
 			return nil
 		})
+
+		// 若端侧小模型推理失败 (如模型加载中、显存溢出、400 异常等)，且云端网关在线可用，自动无缝降级切换至云端网关
+		if err != nil && cloudGw != nil && cloudGw.IsOnline() && ctx.Err() == nil && fullResponse == "" {
+			fmt.Printf("[模型调度] 端侧小模型推理失败 (%v)，无缝自动降级切换至【云端网关】(:8088)...\n", err)
+			routeLabel = "CLOUD_GATEWAY"
+			activeModel = "cloud"
+			if routeCb != nil {
+				routeCb(routeLabel, activeModel, false)
+			}
+			err = cloudGw.ChatStream(ctx, string(task.TurnID), task.GoalSnapshot, activePersonaName, func(token string) error {
+				fullResponse += token
+				chunks := r.splitter.Push(token)
+				for _, chunk := range chunks {
+					select {
+					case <-ctx.Done():
+						return ctx.Err()
+					case sentenceChan <- chunk:
+					}
+				}
+				return nil
+			})
+		}
 	}
 
 	if err != nil && ctx.Err() == nil {

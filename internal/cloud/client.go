@@ -248,6 +248,13 @@ func (c *Client) IsAudioMuted() bool {
 	return c.isAudioMuted
 }
 
+// IsOnline returns true if cloud client is connected.
+func (c *Client) IsOnline() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.state == StateConnected
+}
+
 // GetState returns current connection state.
 func (c *Client) GetState() ConnectionState {
 	c.mu.RLock()

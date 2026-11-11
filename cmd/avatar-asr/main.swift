@@ -31,12 +31,45 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
         self.mode = mode
         speechSynthesizer.delegate = self
         setupRecognizer(localeId: localeId)
+
+        NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: audioEngine, queue: .main) { [weak self] _ in
+            self?.reconfigureAudioEngine()
+        }
     }
 
     private func setupRecognizer(localeId: String) {
         self.localeId = localeId
         let locale = Locale(identifier: localeId)
         speechRecognizer = SFSpeechRecognizer(locale: locale)
+    }
+
+    private func reconfigureAudioEngine() {
+        guard isListening else { return }
+        fputs("[avatar-asr] Audio engine route/configuration changed, reconfiguring...\n", stderr)
+        if tapInstalled {
+            audioEngine.inputNode.removeTap(onBus: 0)
+            tapInstalled = false
+        }
+        audioEngine.stop()
+
+        let inputNode = audioEngine.inputNode
+        let inputFormat = inputNode.outputFormat(forBus: 0)
+        audioConverter = AVAudioConverter(from: inputFormat, to: targetFormat)
+
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, time in
+            self?.processAudioBuffer(buffer)
+        }
+        tapInstalled = true
+
+        do {
+            try audioEngine.start()
+            fputs("[avatar-asr] Audio engine restarted with format: \(inputFormat)\n", stderr)
+            if mode == "hands_free" {
+                startRecognitionSession()
+            }
+        } catch {
+            fputs("[avatar-asr] Failed to restart audio engine: \(error.localizedDescription)\n", stderr)
+        }
     }
 
     func start() {
@@ -195,7 +228,7 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
             sum += s * s
         }
         let rms = sqrt(sum / Float(frames))
-        if rms > 0.005 {
+        if rms > 0.0015 {
             sendJSON(["event": "vad", "speaking": hasSpeech, "energy": rms])
         }
 
@@ -209,29 +242,36 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
 
         // 3. Convert input buffer to 16kHz mono buffer
         let inputFormat = buffer.format
-        let ratio = 16000.0 / inputFormat.sampleRate
-        let cap = AVAudioFrameCount(Double(buffer.frameLength) * ratio)
-        if let outBuffer = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: max(cap, 1024)),
-           let converter = audioConverter {
-            var consumed = false
-            var error: NSError?
-            let status = converter.convert(to: outBuffer, error: &error) { _, outStatus in
-                if consumed {
-                    outStatus.pointee = .noDataNow
-                    return nil
-                }
-                consumed = true
-                outStatus.pointee = .haveData
-                return buffer
-            }
-            if status != .error && outBuffer.frameLength > 0 {
-                if (mode == "hands_free" && isListening && !isFinalizing) || (mode == "ptt" && isPttActive) {
-                    recognitionRequest?.append(outBuffer)
-                }
-            }
-        } else {
+        if inputFormat.sampleRate == 16000 && inputFormat.channelCount == 1 {
+            // WH-1000XM4 / Bluetooth HFP native 16kHz mono: bypass converter directly
             if (mode == "hands_free" && isListening && !isFinalizing) || (mode == "ptt" && isPttActive) {
                 recognitionRequest?.append(buffer)
+            }
+        } else {
+            let ratio = 16000.0 / inputFormat.sampleRate
+            let cap = AVAudioFrameCount(Double(buffer.frameLength) * ratio)
+            if let outBuffer = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: max(cap, 1024)),
+               let converter = audioConverter {
+                var consumed = false
+                var error: NSError?
+                let status = converter.convert(to: outBuffer, error: &error) { _, outStatus in
+                    if consumed {
+                        outStatus.pointee = .noDataNow
+                        return nil
+                    }
+                    consumed = true
+                    outStatus.pointee = .haveData
+                    return buffer
+                }
+                if status != .error && outBuffer.frameLength > 0 {
+                    if (mode == "hands_free" && isListening && !isFinalizing) || (mode == "ptt" && isPttActive) {
+                        recognitionRequest?.append(outBuffer)
+                    }
+                }
+            } else {
+                if (mode == "hands_free" && isListening && !isFinalizing) || (mode == "ptt" && isPttActive) {
+                    recognitionRequest?.append(buffer)
+                }
             }
         }
 
@@ -243,8 +283,29 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
             if silenceDuration >= 0.90 {
                 isFinalizing = true
                 hasSpeech = false
+                let finalizingSessionID = currentSessionID
                 DispatchQueue.main.async {
                     self.recognitionRequest?.endAudio()
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                    guard let self = self,
+                          finalizingSessionID == self.currentSessionID,
+                          self.isFinalizing else {
+                        return
+                    }
+
+                    let finalText = self.lastText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !finalText.isEmpty {
+                        fputs("[avatar-asr] Finalized by silence watchdog\n", stderr)
+                        self.sendJSON(["event": "final", "text": finalText])
+                    }
+                    self.lastText = ""
+                    self.hasSpeech = false
+                    self.isFinalizing = false
+
+                    if self.mode == "hands_free" && self.isListening {
+                        self.startRecognitionSession()
+                    }
                 }
             }
         }

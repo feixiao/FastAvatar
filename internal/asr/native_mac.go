@@ -119,6 +119,7 @@ func (e *NativeMacEngine) Start(ctx context.Context) error {
 		e.mu.Unlock()
 		return fmt.Errorf("failed to open stdout pipe: %w", err)
 	}
+	cmd.Stderr = os.Stderr
 
 	if err := cmd.Start(); err != nil {
 		_ = stdin.Close()
@@ -152,6 +153,10 @@ func (e *NativeMacEngine) readLoop(stdout io.Reader) {
 
 		event, _ := payload["event"].(string)
 		switch event {
+		case "ready":
+			locale, _ := payload["locale"].(string)
+			onDevice, _ := payload["on_device"].(bool)
+			fmt.Printf("[语音引擎] ASR 原生组件就绪 (语言: %s | 离线端侧识别: %v)\n", locale, onDevice)
 		case "partial", "barge_in":
 			if text, ok := payload["text"].(string); ok && text != "" {
 				e.mu.Lock()

@@ -59,6 +59,8 @@ func TestAppVoiceIntegration(t *testing.T) {
 	if newMode == string(origMode) {
 		t.Errorf("expected mode toggle, got unchanged %s", newMode)
 	}
+	// Restore original mode to prevent test from mutating persistent user config
+	app.ToggleMode()
 
 	// Verify state and interrupts
 	app.Interrupt()

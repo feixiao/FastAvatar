@@ -188,9 +188,80 @@ func SelectBestCloudModel(models []string, edgeModel string) string {
 	return candidates[0]
 }
 
+// FetchLoadedModels 优先获取本地端点当前已加载到内存/显存中的模型
+func FetchLoadedModels(ctx context.Context, baseURL, apiKey string) ([]string, error) {
+	origin := strings.TrimSuffix(baseURL, "/v1")
+	origin = strings.TrimSuffix(origin, "/")
+
+	// 1. 尝试 LM Studio 原生接口 (/api/v0/models)
+	lmStudioURL := origin + "/api/v0/models"
+	req, err := http.NewRequestWithContext(ctx, "GET", lmStudioURL, nil)
+	if err == nil {
+		resp, err := http.DefaultClient.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				var lmRes struct {
+					Data []struct {
+						ID    string `json:"id"`
+						State string `json:"state"`
+					} `json:"data"`
+				}
+				if err := json.NewDecoder(resp.Body).Decode(&lmRes); err == nil {
+					var loaded []string
+					for _, m := range lmRes.Data {
+						if m.State == "loaded" && !strings.Contains(strings.ToLower(m.ID), "embed") {
+							loaded = append(loaded, m.ID)
+						}
+					}
+					if len(loaded) > 0 {
+						return loaded, nil
+					}
+				}
+			}
+		}
+	}
+
+	// 2. 尝试 Ollama 运行中模型接口 (/api/ps)
+	ollamaURL := origin + "/api/ps"
+	req, err = http.NewRequestWithContext(ctx, "GET", ollamaURL, nil)
+	if err == nil {
+		resp, err := http.DefaultClient.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				var olRes struct {
+					Models []struct {
+						Name  string `json:"name"`
+						Model string `json:"model"`
+					} `json:"models"`
+				}
+				if err := json.NewDecoder(resp.Body).Decode(&olRes); err == nil {
+					var loaded []string
+					for _, m := range olRes.Models {
+						n := m.Name
+						if n == "" {
+							n = m.Model
+						}
+						if n != "" && !strings.Contains(strings.ToLower(n), "embed") {
+							loaded = append(loaded, n)
+						}
+					}
+					if len(loaded) > 0 {
+						return loaded, nil
+					}
+				}
+			}
+		}
+	}
+
+	// 3. 通用标准端点 (/v1/models) 回退
+	return FetchAllModels(ctx, baseURL, apiKey)
+}
+
 // FetchFirstModel 获取可用模型列表中的首选轻量模型名称
 func FetchFirstModel(ctx context.Context, baseURL, apiKey string) (string, error) {
-	models, err := FetchAllModels(ctx, baseURL, apiKey)
+	models, err := FetchLoadedModels(ctx, baseURL, apiKey)
 	if err != nil || len(models) == 0 {
 		return "", err
 	}
@@ -240,7 +311,7 @@ func FetchAllModels(ctx context.Context, baseURL, apiKey string) ([]string, erro
 
 // DetectDualModels 从指定端点智能分析分离端侧小模型与云端大模型
 func DetectDualModels(ctx context.Context, baseURL, apiKey string) (edgeModel string, cloudModel string, ok bool) {
-	models, err := FetchAllModels(ctx, baseURL, apiKey)
+	models, err := FetchLoadedModels(ctx, baseURL, apiKey)
 	if err != nil || len(models) == 0 {
 		return "", "", false
 	}
@@ -261,7 +332,7 @@ func AutoDetectDualEndpoints(ctx context.Context) (edgeURL, edgeModel, cloudURL,
 	ollamaOk := ProbeEndpoint(ctx, ollamaURL, "")
 
 	if lmOk {
-		models, _ := FetchAllModels(ctx, lmStudioURL, "")
+		models, _ := FetchLoadedModels(ctx, lmStudioURL, "")
 		if len(models) >= 2 {
 			eM, cM, _ := DetectDualModels(ctx, lmStudioURL, "")
 			return lmStudioURL, eM, lmStudioURL, cM, true
@@ -276,7 +347,7 @@ func AutoDetectDualEndpoints(ctx context.Context) (edgeURL, edgeModel, cloudURL,
 	}
 
 	if ollamaOk {
-		models, _ := FetchAllModels(ctx, ollamaURL, "")
+		models, _ := FetchLoadedModels(ctx, ollamaURL, "")
 		if len(models) >= 2 {
 			eM, cM, _ := DetectDualModels(ctx, ollamaURL, "")
 			return ollamaURL, eM, ollamaURL, cM, true
