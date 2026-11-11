@@ -266,6 +266,11 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 			}
 			probeCancel()
 		}
+
+		// 端侧小模型使用专门定制的轻量沉浸式 System Prompt (消除代词混淆，防止元语言泄露)
+		if len(msgs) > 0 && msgs[0].Role == "system" {
+			msgs[0].Content = persona.AssembleEdgeSystemPrompt(activeSlot, r.bondMgr, r.vault)
+		}
 	}
 
 	if activeClient == nil {

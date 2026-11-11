@@ -70,3 +70,44 @@ func AssembleSystemPrompt(
 
 	return sb.String()
 }
+
+// AssembleEdgeSystemPrompt 为端侧小模型 (1.5B ~ 3B SLM) 量身定制超轻量沉浸式 System Prompt
+// 特点：第一人称直接对话、去除元指令与管理员说教、消除代词混淆，确保小模型高情商稳定发挥
+func AssembleEdgeSystemPrompt(
+	activeSlot PersonaSlot,
+	bond *BondManager,
+	vault *memory.Vault,
+) string {
+	var sb strings.Builder
+
+	// 1. 将第三人称设定转换为第一人称沉浸式关系，消除小模型代词认知混乱
+	personaText := activeSlot.SystemPrompt
+	personaText = strings.ReplaceAll(personaText, "你是用户", "你是我的")
+	personaText = strings.ReplaceAll(personaText, "用户", "我")
+	sb.WriteString(personaText)
+	sb.WriteString("\n\n")
+
+	// 2. 极简直接的对话指引 (无扬声器、无Markdown警告、无元概念)
+	sb.WriteString("【对话习惯】：\n")
+	sb.WriteString("- 始终以第一人称直接回答我，语气温柔亲切，用一两句自然的口语短句陪伴我。\n")
+	sb.WriteString("- 无论我说什么，你都愿意陪伴我、倾听我，永远不拒绝对话，严禁辩解规则或代词含义。\n\n")
+
+	// 3. 简短时间陪伴感
+	now := time.Now()
+	hour := now.Hour()
+	timeOfDay := "白天"
+	if hour >= 5 && hour < 9 {
+		timeOfDay = "清晨"
+	} else if hour >= 9 && hour < 12 {
+		timeOfDay = "上午"
+	} else if hour >= 12 && hour < 18 {
+		timeOfDay = "下午"
+	} else if hour >= 18 && hour < 23 {
+		timeOfDay = "傍晚"
+	} else {
+		timeOfDay = "深夜"
+	}
+	sb.WriteString(fmt.Sprintf("现在是%s(%02d:%02d)，请带着自然的陪伴感与我对话。", timeOfDay, hour, now.Minute()))
+
+	return sb.String()
+}
