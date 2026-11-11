@@ -241,6 +241,31 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 			activeTemp = defaultCfg.Temperature
 			activeMaxTokens = defaultCfg.MaxTokens
 		}
+
+		// 动态检测本地端点实际加载的模型 (支持 LM Studio 热切换，无需重启应用)
+		if activeClient != nil && activeClient.BaseURL != "" {
+			probeCtx, probeCancel := context.WithTimeout(ctx, 150*time.Millisecond)
+			if loaded, err := llm.FetchLoadedModels(probeCtx, activeClient.BaseURL, activeClient.APIKey); err == nil && len(loaded) > 0 {
+				isLoaded := false
+				for _, lm := range loaded {
+					if lm == activeModel {
+						isLoaded = true
+						break
+					}
+				}
+				if !isLoaded {
+					bestEdge := llm.SelectBestEdgeModel(loaded)
+					if bestEdge != "" {
+						fmt.Printf("[模型热更] 动态检测到端侧模型切换: %s -> %s (无需重启生效)\n", activeModel, bestEdge)
+						activeModel = bestEdge
+						r.mu.Lock()
+						r.edgeCfg.Model = bestEdge
+						r.mu.Unlock()
+					}
+				}
+			}
+			probeCancel()
+		}
 	}
 
 	if activeClient == nil {
