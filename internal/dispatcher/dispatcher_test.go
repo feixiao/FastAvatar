@@ -64,6 +64,14 @@ func TestDispatcher_EvaluationRoutes(t *testing.T) {
 			wantTarget: RouteEdgeChat,
 			wantIntent: "dialog.open_ended",
 		},
+		{
+			name:       "open-ended meta inquiry to cloud",
+			text:       "什么意思不能跟我聊天吗",
+			consented:  true,
+			online:     true,
+			wantTarget: RouteCloudChat,
+			wantIntent: "dialog.open_ended",
+		},
 	}
 
 	for _, tc := range cases {

@@ -119,6 +119,7 @@ func CheckComplexity(text string) (bool, string) {
 		"为什么", "如何", "怎么做", "分析", "原因", "解释", "比较",
 		"代码", "写一段", "编写", "实现", "设计", "架构", "算法",
 		"规划", "翻译", "总结", "大纲", "撰写", "论文", "方案", "步骤",
+		"什么意思", "怎么回事", "凭什么", "到底", "评价", "建议", "看法",
 	}
 	for _, kw := range complexKeywords {
 		if strings.Contains(clean, kw) {

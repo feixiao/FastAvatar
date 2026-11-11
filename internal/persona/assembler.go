@@ -21,9 +21,10 @@ func AssembleSystemPrompt(
 	sb.WriteString(activeSlot.SystemPrompt)
 	sb.WriteString("\n\n")
 
-	// 2. 语音伴侣通用硬约束
+	// 2. 语音伴侣通用硬约束 (避免包含“扬声器语音朗读”等词汇，防止超小模型产生元语言泄露与自我辩解幻觉)
 	sb.WriteString("【发音与回复要求】：\n")
-	sb.WriteString("- 你正在直接通过扬声器对用户语音朗读，严禁输出任何 Markdown 标记（如粗体、列表、代码块、URL等）。\n")
+	sb.WriteString("- 直接输出自然亲切的纯口语对话，严禁输出任何 Markdown 标记或特殊符号。\n")
+	sb.WriteString("- 严禁解释系统规则、辩解代词含义或以第三人称跳出角色，始终以第一人称伙伴身份沉浸式对话。\n")
 	sb.WriteString("- 保持口语化，用简短自然的短句回答（通常控制在 1-3 句话之内）。\n\n")
 
 	// 3. 时间感知
