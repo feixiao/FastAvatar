@@ -19,8 +19,10 @@ clang++ -std=c++17 -O2 -Wall -Wextra \
     "${CORE_DIR}/src/AudioAgentPipeline.cpp" \
     "${CORE_DIR}/src/MnnLlmEngine.cpp" \
     "${CORE_DIR}/src/SherpaOnnxPerceptionEngine.cpp" \
+    "${CORE_DIR}/src/CompanionPersona.cpp" \
     "${CORE_DIR}/src/audio_agent_c_api.cpp" \
     "${CORE_DIR}/src/test_main.cpp" \
+    -framework CoreFoundation -framework CoreAudio -framework AudioToolbox \
     -o "${CORE_DIR}/audio_agent_test"
 
 "${CORE_DIR}/audio_agent_test" >/dev/null 2>&1
@@ -41,8 +43,10 @@ clang++ -std=c++17 -O3 \
     "${CORE_DIR}/src/AudioAgentPipeline.cpp" \
     "${CORE_DIR}/src/MnnLlmEngine.cpp" \
     "${CORE_DIR}/src/SherpaOnnxPerceptionEngine.cpp" \
+    "${CORE_DIR}/src/CompanionPersona.cpp" \
     "${CORE_DIR}/src/audio_agent_c_api.cpp" \
     "${CORE_DIR}/src/bench_main.cpp" \
+    -framework CoreFoundation -framework CoreAudio -framework AudioToolbox \
     -o "${CORE_DIR}/audio_agent_bench"
 
 BENCH_OUTPUT="$("${CORE_DIR}/audio_agent_bench")"

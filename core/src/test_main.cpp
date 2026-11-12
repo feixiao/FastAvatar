@@ -8,6 +8,8 @@
 #include "MnnLlmEngine.hpp"
 #include "MockCloudLlmEngine.hpp"
 #include "IntentArbiter.hpp"
+#include "CompanionPersona.hpp"
+#include "audio_agent.h"
 #include <iostream>
 #include <sstream>
 #include <cassert>
@@ -1045,6 +1047,198 @@ static void TestIntentArbiterSuite() {
     LogPass("Intent Arbiter and Small-Model Tool Call Compensation passed all tests.");
 }
 
+// -------------------------------------------------------------
+// Test 15: Voice Companion Persona Engine (Butler / Companion / Roaster)
+// -------------------------------------------------------------
+static void TestCompanionPersonaSuite() {
+    LogTest("Companion Persona Engine & Time-of-Day Context");
+
+    CompanionPersonaManager mgr;
+    // 1. Default persona should be companion
+    auto slot = mgr.GetActiveSlot();
+    assert(slot.id == "companion");
+    assert(slot.name == "知心伴侣");
+    assert(slot.speech_rate == 1.0f);
+
+    // 2. Explicit switch
+    assert(mgr.SetActiveSlot("butler"));
+    assert(mgr.GetActiveSlot().id == "butler");
+    assert(mgr.GetActiveSlot().name == "工作幕僚");
+    assert(!mgr.SetActiveSlot("unknown_slot_id"));
+
+    // 3. Oral switch interception (<0.1ms)
+    std::string confirm;
+    PersonaSlot new_slot;
+    assert(mgr.TryInterceptPersonaSwitch("帮我切换到伴侣模式吧", confirm, new_slot));
+    assert(new_slot.id == "companion");
+    assert(confirm.find("知心伴侣") != std::string::npos);
+    assert(mgr.GetActiveSlot().id == "companion");
+
+    assert(mgr.TryInterceptPersonaSwitch("换成损友模式", confirm, new_slot));
+    assert(new_slot.id == "roaster");
+    assert(confirm.find("损友") != std::string::npos);
+
+    assert(mgr.TryInterceptPersonaSwitch("切换工作模式", confirm, new_slot));
+    assert(new_slot.id == "butler");
+
+    assert(!mgr.TryInterceptPersonaSwitch("今天天气怎么样", confirm, new_slot));
+
+    // 4. Time of day
+    std::string time_ctx = CompanionPersonaManager::GetTimeOfDayContext();
+    assert(!time_ctx.empty());
+
+    // 5. System prompt assembly
+    std::string prompt = mgr.AssembleSystemPrompt("用户喜欢喝美式咖啡");
+    assert(prompt.find("身份设定") != std::string::npos);
+    assert(prompt.find("纯口语硬约束") != std::string::npos);
+    assert(prompt.find("美式咖啡") != std::string::npos);
+
+    LogPass("Companion Persona Engine & Time-of-Day Context passed.");
+}
+
+// -------------------------------------------------------------
+// Test 16: Cross-Platform Audio IO Mode A (Push/Pull) & Mode B (Hardware)
+// -------------------------------------------------------------
+static void TestCrossPlatformAudioIoSuite() {
+    LogTest("Cross-Platform Audio IO: Push/Pull PCM & Mode Toggle");
+
+    auto mic_rb = std::make_shared<LockFreeSPSCRingBuffer<float>>(16000 * 2);
+    auto spk_rb = std::make_shared<LockFreeSPSCRingBuffer<float>>(24000 * 2);
+    FullDuplexAudioIO audio_io(mic_rb, spk_rb, 16000, 24000);
+
+    // Default: Mode A (Push/Pull software mode)
+    assert(!audio_io.IsHardwareStreamsEnabled());
+    assert(audio_io.StartStreams());
+    assert(audio_io.IsRunning());
+
+    // Test mic push
+    std::vector<float> mic_chunk(320, 0.77f);
+    audio_io.ProcessMockInputFrames(mic_chunk.data(), 320);
+    assert(mic_rb->available_read() == 320);
+
+    // Test speaker pull with zero-fill
+    std::vector<float> spk_sample(100, 0.55f);
+    spk_rb->write(spk_sample.data(), 100);
+    std::vector<float> pulled(200, 99.0f);
+    audio_io.ProcessMockOutputFrames(pulled.data(), 200);
+    assert(std::abs(pulled[0] - 0.55f) < 1e-5f);
+    assert(std::abs(pulled[150] - 0.0f) < 1e-5f);
+
+    // Test hardware toggle (Mode B)
+    audio_io.EnableHardwareStreams(true);
+    assert(audio_io.IsHardwareStreamsEnabled());
+    audio_io.EnableHardwareStreams(false);
+    assert(!audio_io.IsHardwareStreamsEnabled());
+
+    audio_io.StopStreams();
+    LogPass("Cross-Platform Audio IO Push/Pull & Hardware toggle passed.");
+}
+
+// -------------------------------------------------------------
+// Test 17: Cloud Cognitive Stream Slow Loop B in Harness
+// -------------------------------------------------------------
+static void TestCloudCognitiveStreamSuite() {
+    LogTest("Cloud Cognitive Stream (Slow Loop B) with Micro-Chunking & Tool Stripping");
+
+    auto perception = std::make_shared<SimulatedPerceptionEngine>();
+    auto llm = std::make_shared<SimulatedLlmEngine>();
+    auto tts = std::make_shared<SimulatedTtsEngine>();
+
+    std::vector<std::string> tts_sentences;
+    std::vector<std::string> tools;
+
+    PipelineObserver observer;
+    observer.on_tts_sentence_start = [&](const std::string& sentence) {
+        tts_sentences.push_back(sentence);
+    };
+    observer.on_tool_call = [&](const std::string& tool_json) {
+        tools.push_back(tool_json);
+    };
+
+    AudioAgentPipeline pipeline(perception, llm, tts, observer);
+    pipeline.Start();
+
+    // 1. Start cloud turn
+    pipeline.StartCloudTurn("请帮我查一下北京明天的天气");
+    assert(pipeline.GetState() == AgentState::THINKING);
+
+    // 2. Stream tokens into pipeline
+    std::vector<std::string> tokens = {"好", "的", "，", "正", "在", "为", "您", "查", "询", "。"};
+    for (const auto& tok : tokens) {
+        pipeline.PushCloudToken(tok);
+    }
+
+    // Stream tool call inside token stream
+    pipeline.PushCloudToken("<|tool_call|>{\"action\":\"query_weather\",\"city\":\"北京\"}<|/tool_call|>");
+    pipeline.PushCloudToken("已获取到最新气温为22度。");
+    pipeline.FinishCloudTurn();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    assert(!tts_sentences.empty());
+    assert(!tools.empty());
+    assert(tools[0].find("query_weather") != std::string::npos);
+    assert(tools[0].find("北京") != std::string::npos);
+
+    // Verify memory contains full turn
+    assert(!pipeline.GetMemory().GetActiveTurns().empty());
+    assert(pipeline.GetMemory().GetActiveTurns().back().user_query.find("北京") != std::string::npos);
+
+    pipeline.Stop();
+    LogPass("Cloud Cognitive Stream Slow Loop B passed all verifications.");
+}
+
+// -------------------------------------------------------------
+// Test 18: Pure C-API Cross-Platform Harness
+// -------------------------------------------------------------
+static void TestCapiCrossPlatformHarnessSuite() {
+    LogTest("Pure C-API (audio_agent.h) Full Lifecycle & Cross-Platform Verification");
+
+    audio_agent_callbacks_t cbs{};
+    audio_agent_pipeline_t* handle = audio_agent_pipeline_create("你是跨平台语音助手", &cbs);
+    assert(handle != nullptr);
+
+    assert(audio_agent_pipeline_start(handle));
+    assert(audio_agent_pipeline_get_state(handle) == AUDIO_AGENT_STATE_IDLE);
+
+    // 1. Test persona C-API
+    char* p1 = audio_agent_pipeline_get_persona(handle);
+    assert(p1 != nullptr);
+    audio_agent_free_string(p1);
+
+    assert(audio_agent_pipeline_set_persona(handle, "roaster"));
+    char* p2 = audio_agent_pipeline_get_persona(handle);
+    assert(p2 != nullptr && std::string(p2) == "roaster");
+    audio_agent_free_string(p2);
+
+    char* greeting = audio_agent_pipeline_get_time_greeting();
+    assert(greeting != nullptr && strlen(greeting) > 0);
+    audio_agent_free_string(greeting);
+
+    // 2. Test PCM push/pull C-API
+    std::vector<float> mic_data(512, 0.1f);
+    size_t pushed = audio_agent_pipeline_push_mic_pcm(handle, mic_data.data(), 512);
+    assert(pushed == 512);
+
+    std::vector<float> spk_dest(480, 0.0f);
+    size_t pulled = audio_agent_pipeline_pull_speaker_pcm(handle, spk_dest.data(), 480);
+    (void)pulled;
+
+    // 3. Test Cloud Turn C-API
+    audio_agent_pipeline_start_cloud_turn(handle, "测试云端长文本");
+    assert(audio_agent_pipeline_get_state(handle) == AUDIO_AGENT_STATE_THINKING);
+
+    const char* tok = "好的。";
+    audio_agent_pipeline_push_cloud_token(handle, tok, strlen(tok));
+    audio_agent_pipeline_finish_cloud_turn(handle);
+
+    // 4. Test Destroy
+    audio_agent_pipeline_stop(handle);
+    audio_agent_pipeline_destroy(handle);
+
+    LogPass("Pure C-API (audio_agent.h) Full Lifecycle passed.");
+}
+
+
 int main() {
     std::cout << "\n=======================================================\n";
     std::cout << "  Android AI Audio Agent C++17 Unit Test Suite\n";
@@ -1088,7 +1282,14 @@ int main() {
     TestMnnLlmEngineAndCloudComparison();
     TestIntentArbiterSuite();
     std::cout << std::endl;
+    TestCompanionPersonaSuite();
+    std::cout << std::endl;
+    TestCrossPlatformAudioIoSuite();
+    std::cout << std::endl;
+    TestCloudCognitiveStreamSuite();
+    std::cout << std::endl;
+    TestCapiCrossPlatformHarnessSuite();
     std::cout << std::endl;
 
-    std::cout << COLOR_GREEN << "ALL 14 TEST SUITES PASSED SUCCESSFULLY!" << COLOR_RESET << "\n\n";
+    std::cout << COLOR_GREEN << "ALL 18 TEST SUITES PASSED SUCCESSFULLY!" << COLOR_RESET << "\n\n";
 }

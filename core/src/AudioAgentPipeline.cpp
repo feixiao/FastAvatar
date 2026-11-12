@@ -31,7 +31,12 @@ AudioAgentPipeline::AudioAgentPipeline(
     tts_engine_(std::move(tts_engine)),
     observer_(std::move(observer)) {
     if (!system_prompt.empty()) {
+        PersonaSlot custom_slot{"custom", "自定义", system_prompt, "zh-CN-XiaoxiaoNeural", 1.0f, "好的，已加载自定义设定。"};
+        persona_mgr_.RegisterSlot(custom_slot);
+        persona_mgr_.SetActiveSlot("custom");
         memory_.SetSystemPrompt(system_prompt);
+    } else {
+        memory_.SetSystemPrompt(persona_mgr_.AssembleSystemPrompt());
     }
     // 为录音与放音分配 10 秒深度的无锁环形缓冲区
     mic_ring_buffer_ = std::make_shared<LockFreeSPSCRingBuffer<float>>(DEFAULT_MIC_SAMPLE_RATE * 10);
@@ -225,11 +230,133 @@ void AudioAgentPipeline::TriggerBargeIn() {
 void AudioAgentPipeline::SubmitUserQuery(std::string user_query) {
     if (user_query.empty()) return;
 
+    // 1. 口语伴侣人格切换即时拦截 (<0.1ms)
+    std::string confirmation;
+    PersonaSlot new_slot;
+    if (persona_mgr_.TryInterceptPersonaSwitch(user_query, confirmation, new_slot)) {
+        memory_.SetSystemPrompt(persona_mgr_.AssembleSystemPrompt());
+        memory_.AddTurn(user_query, confirmation);
+        EnqueueTtsSentence(confirmation);
+        if (observer_.on_persona_switched) {
+            observer_.on_persona_switched(new_slot.id, new_slot.name);
+        }
+        return;
+    }
+
+    // 2. 槽位缺失严谨追问 (Zero Hallucination)
+    auto arb = IntentArbiter::Arbitrate(user_query);
+    if (arb.status == ArbiterStatus::SLOT_MISSING) {
+        std::string clarification = "好的，请问具体是什么时间呢？";
+        if (arb.missing_slot == "phone_number") {
+            clarification = "请问您要拨打给哪位联系人或哪个电话号码呢？";
+        }
+        memory_.AddTurn(user_query, clarification);
+        EnqueueTtsSentence(clarification);
+        return;
+    }
+
     {
         std::lock_guard<std::mutex> lock(query_mtx_);
         query_queue_.push(std::move(user_query));
     }
     query_cv_.notify_one();
+}
+
+size_t AudioAgentPipeline::GetSpeakerAvailableSamples() const {
+    if (!spk_ring_buffer_) return 0;
+    return spk_ring_buffer_->available_read();
+}
+
+void AudioAgentPipeline::StartCloudTurn(const std::string& user_query) {
+    std::lock_guard<std::mutex> lock(cloud_turn_mtx_);
+    abort_flag_.store(false, std::memory_order_release);
+    SetState(AgentState::THINKING);
+
+    {
+        std::lock_guard<std::mutex> lk(spoken_mtx_);
+        spoken_text_accumulator_.clear();
+        current_user_query_ = user_query;
+    }
+    cloud_assistant_response_.clear();
+
+    SentenceChunkerCallbacks callbacks;
+    callbacks.on_sentence_ready = [this](const std::string& sentence) {
+        watchdog_.Feed(); // 首句生成成功，喂狗！
+        cloud_assistant_response_ += sentence;
+        EnqueueTtsSentence(sentence);
+    };
+    callbacks.on_tool_call = [this](const std::string& tool_json) {
+        DispatchAsyncToolCall(tool_json);
+    };
+    callbacks.is_aborted = [this]() {
+        return IsBargeInAborted();
+    };
+    callbacks.on_repetition_detected = [this]() {
+        abort_flag_.store(true, std::memory_order_release);
+        if (observer_.on_watchdog_fallback) {
+            observer_.on_watchdog_fallback("N-gram Repetition Loop");
+        }
+        EnqueueTtsSentence(TTFTWatchdog::GetFallbackResponsePrompt());
+    };
+
+    cloud_chunker_ = std::make_unique<StreamingSentenceChunker>(std::move(callbacks));
+
+    watchdog_.Start(3000, [this]() {
+        abort_flag_.store(true, std::memory_order_release);
+        if (observer_.on_watchdog_fallback) {
+            observer_.on_watchdog_fallback("TTFT 3s Timeout");
+        }
+        EnqueueTtsSentence(TTFTWatchdog::GetFallbackResponsePrompt());
+    });
+}
+
+void AudioAgentPipeline::PushCloudToken(const std::string& token) {
+    std::lock_guard<std::mutex> lock(cloud_turn_mtx_);
+    if (IsBargeInAborted() || !cloud_chunker_) return;
+    cloud_chunker_->Push(token);
+}
+
+void AudioAgentPipeline::FinishCloudTurn() {
+    std::lock_guard<std::mutex> lock(cloud_turn_mtx_);
+    if (!cloud_chunker_) return;
+    cloud_chunker_->Flush();
+    watchdog_.Stop();
+
+    if (!cloud_assistant_response_.empty() && !current_user_query_.empty()) {
+        memory_.AddTurn(current_user_query_, cloud_assistant_response_);
+    }
+    cloud_chunker_.reset();
+}
+
+void AudioAgentPipeline::AbortCloudTurn() {
+    TriggerBargeIn();
+    std::lock_guard<std::mutex> lock(cloud_turn_mtx_);
+    if (cloud_chunker_) {
+        cloud_chunker_->Reset();
+        cloud_chunker_.reset();
+    }
+    watchdog_.Stop();
+}
+
+bool AudioAgentPipeline::SetPersona(const std::string& persona_id) {
+    if (persona_mgr_.SetActiveSlot(persona_id)) {
+        memory_.SetSystemPrompt(persona_mgr_.AssembleSystemPrompt());
+        PersonaSlot slot = persona_mgr_.GetActiveSlot();
+        EnqueueTtsSentence(slot.confirmation_msg);
+        if (observer_.on_persona_switched) {
+            observer_.on_persona_switched(slot.id, slot.name);
+        }
+        return true;
+    }
+    return false;
+}
+
+std::string AudioAgentPipeline::GetCurrentPersonaId() const {
+    return persona_mgr_.GetActiveSlot().id;
+}
+
+std::string AudioAgentPipeline::GetCurrentPersonaName() const {
+    return persona_mgr_.GetActiveSlot().name;
 }
 
 size_t AudioAgentPipeline::PushMicAudio(const float* data, size_t count) {

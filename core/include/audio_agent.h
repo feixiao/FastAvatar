@@ -38,12 +38,14 @@ typedef void (*audio_agent_state_cb)(audio_agent_state_t new_state, audio_agent_
 typedef void (*audio_agent_sentence_cb)(const char* sentence, void* user_data);
 typedef void (*audio_agent_tool_cb)(const char* tool_json, void* user_data);
 typedef void (*audio_agent_barge_in_cb)(const char* spoken_so_far, void* user_data);
+typedef void (*audio_agent_persona_cb)(const char* persona_id, const char* persona_name, void* user_data);
 
 typedef struct {
     audio_agent_state_cb on_state_changed;
     audio_agent_sentence_cb on_tts_sentence;
     audio_agent_tool_cb on_tool_call;
     audio_agent_barge_in_cb on_barge_in;
+    audio_agent_persona_cb on_persona_switched;
     void* user_data;
 } audio_agent_callbacks_t;
 
@@ -63,6 +65,33 @@ AUDIO_AGENT_API void audio_agent_pipeline_destroy(audio_agent_pipeline_t* handle
 AUDIO_AGENT_API void audio_agent_pipeline_submit_query(audio_agent_pipeline_t* handle, const char* query);
 AUDIO_AGENT_API void audio_agent_pipeline_trigger_barge_in(audio_agent_pipeline_t* handle);
 AUDIO_AGENT_API audio_agent_state_t audio_agent_pipeline_get_state(const audio_agent_pipeline_t* handle);
+
+// -------------------------------------------------------------
+// Mode A: Platform Audio PCM Push / Pull (16kHz Mic In, 24kHz Spk Out)
+// -------------------------------------------------------------
+
+AUDIO_AGENT_API size_t audio_agent_pipeline_push_mic_pcm(audio_agent_pipeline_t* handle, const float* data, size_t count);
+AUDIO_AGENT_API size_t audio_agent_pipeline_pull_speaker_pcm(audio_agent_pipeline_t* handle, float* dest, size_t count);
+AUDIO_AGENT_API size_t audio_agent_pipeline_speaker_available(const audio_agent_pipeline_t* handle);
+AUDIO_AGENT_API void audio_agent_pipeline_enable_hardware_audio(audio_agent_pipeline_t* handle, bool enable);
+
+// -------------------------------------------------------------
+// Cloud Cognitive Stream Turn (Dual-Loop Slow Loop B)
+// -------------------------------------------------------------
+
+AUDIO_AGENT_API void audio_agent_pipeline_start_cloud_turn(audio_agent_pipeline_t* handle, const char* query);
+AUDIO_AGENT_API void audio_agent_pipeline_push_cloud_token(audio_agent_pipeline_t* handle, const char* token, size_t len);
+AUDIO_AGENT_API void audio_agent_pipeline_finish_cloud_turn(audio_agent_pipeline_t* handle);
+AUDIO_AGENT_API void audio_agent_pipeline_abort_cloud_turn(audio_agent_pipeline_t* handle);
+
+// -------------------------------------------------------------
+// Voice Companion Persona Management (Butler, Companion, Roaster)
+// -------------------------------------------------------------
+
+AUDIO_AGENT_API bool audio_agent_pipeline_set_persona(audio_agent_pipeline_t* handle, const char* persona_id);
+AUDIO_AGENT_API char* audio_agent_pipeline_get_persona(const audio_agent_pipeline_t* handle);
+AUDIO_AGENT_API char* audio_agent_pipeline_get_persona_name(const audio_agent_pipeline_t* handle);
+AUDIO_AGENT_API char* audio_agent_pipeline_get_time_greeting(void);
 
 // -------------------------------------------------------------
 // Fast-Path Intent Arbiter (Zero-Hallucination Deterministic Router)

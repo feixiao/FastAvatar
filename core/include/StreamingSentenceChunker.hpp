@@ -38,6 +38,11 @@ public:
 
     // Flush any pending non-empty content at end of LLM generation
     void Flush();
+    // Push an incremental token chunk directly
+    void Push(const std::string& token) {
+        sputn(token.data(), static_cast<std::streamsize>(token.size()));
+    }
+
 
     // Extract tool JSON payload from <|tool_call|>...<|/tool_call|>
     static std::string ExtractToolJson(const std::string& raw);

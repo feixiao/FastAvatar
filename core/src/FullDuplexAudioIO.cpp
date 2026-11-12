@@ -35,10 +35,53 @@ FullDuplexAudioIO::~FullDuplexAudioIO() {
  *    - Usage: VoiceCommunication（必须与 InputPreset 配合使用，让音频驱动将播音音频精准回路输入给硬件 AEC 模块作为参考信号 Ref-signal）；
  *    - SharingMode: Exclusive（独占模式，直通音频硬件降低抖动）。
  */
+#if defined(__APPLE__)
+static void MacAudioInputCallback(
+    void* inUserData,
+    AudioQueueRef inAQ,
+    AudioQueueBufferRef inBuffer,
+    const AudioTimeStamp* /*inStartTime*/,
+    UInt32 /*inNumPackets*/,
+    const AudioStreamPacketDescription* /*inPacketDesc*/
+) {
+    auto* self = static_cast<FullDuplexAudioIO*>(inUserData);
+    if (!self) return;
+    const float* samples = static_cast<const float*>(inBuffer->mAudioData);
+    uint32_t count = inBuffer->mAudioDataByteSize / sizeof(float);
+    if (count > 0) {
+        self->ProcessMockInputFrames(samples, count);
+    }
+    if (self->IsRunning()) {
+        AudioQueueEnqueueBuffer(inAQ, inBuffer, 0, nullptr);
+    }
+}
+
+static void MacAudioOutputCallback(
+    void* inUserData,
+    AudioQueueRef inAQ,
+    AudioQueueBufferRef inBuffer
+) {
+    auto* self = static_cast<FullDuplexAudioIO*>(inUserData);
+    if (!self) return;
+    float* samples = static_cast<float*>(inBuffer->mAudioData);
+    uint32_t capacity_samples = inBuffer->mAudioDataBytesCapacity / sizeof(float);
+    self->ProcessMockOutputFrames(samples, capacity_samples);
+    inBuffer->mAudioDataByteSize = capacity_samples * sizeof(float);
+    if (self->IsRunning()) {
+        AudioQueueEnqueueBuffer(inAQ, inBuffer, 0, nullptr);
+    }
+}
+#endif
+
 bool FullDuplexAudioIO::StartStreams() {
     if (is_running_.load(std::memory_order_acquire)) {
         return true;
     }
+    if (!enable_hardware_streams_) {
+        is_running_.store(true, std::memory_order_release);
+        return true;
+    }
+
 
 #if defined(AUDIO_AGENT_USE_OBOE)
     // 1. 配置录音流（16kHz Mono，语音通信专属预设）
@@ -105,6 +148,43 @@ bool FullDuplexAudioIO::StartStreams() {
         }
         return false;
     }
+#elif defined(__APPLE__)
+    AudioStreamBasicDescription inFmt{};
+    inFmt.mSampleRate = mic_sample_rate_;
+    inFmt.mFormatID = kAudioFormatLinearPCM;
+    inFmt.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
+    inFmt.mFramesPerPacket = 1;
+    inFmt.mChannelsPerFrame = 1;
+    inFmt.mBitsPerChannel = 32;
+    inFmt.mBytesPerPacket = sizeof(float);
+    inFmt.mBytesPerFrame = sizeof(float);
+
+    OSStatus stIn = AudioQueueNewInput(&inFmt, MacAudioInputCallback, this, nullptr, kCFRunLoopCommonModes, 0, &input_queue_);
+    if (stIn == noErr && input_queue_) {
+        UInt32 bufBytes = 512 * sizeof(float);
+        for (int i = 0; i < 3; ++i) {
+            if (AudioQueueAllocateBuffer(input_queue_, bufBytes, &in_buffers_[i]) == noErr) {
+                AudioQueueEnqueueBuffer(input_queue_, in_buffers_[i], 0, nullptr);
+            }
+        }
+        AudioQueueStart(input_queue_, nullptr);
+    }
+
+    AudioStreamBasicDescription outFmt = inFmt;
+    outFmt.mSampleRate = spk_sample_rate_;
+
+    OSStatus stOut = AudioQueueNewOutput(&outFmt, MacAudioOutputCallback, this, nullptr, kCFRunLoopCommonModes, 0, &output_queue_);
+    if (stOut == noErr && output_queue_) {
+        UInt32 bufBytes = 480 * sizeof(float);
+        for (int i = 0; i < 3; ++i) {
+            if (AudioQueueAllocateBuffer(output_queue_, bufBytes, &out_buffers_[i]) == noErr) {
+                std::fill_n(static_cast<float*>(out_buffers_[i]->mAudioData), 480, 0.0f);
+                out_buffers_[i]->mAudioDataByteSize = bufBytes;
+                AudioQueueEnqueueBuffer(output_queue_, out_buffers_[i], 0, nullptr);
+            }
+        }
+        AudioQueueStart(output_queue_, nullptr);
+    }
 #endif
 
     is_running_.store(true, std::memory_order_release);
@@ -129,6 +209,17 @@ void FullDuplexAudioIO::StopStreams() {
         output_stream_->stop();
         output_stream_->close();
         output_stream_.reset();
+    }
+#elif defined(__APPLE__)
+    if (input_queue_) {
+        AudioQueueStop(input_queue_, true);
+        AudioQueueDispose(input_queue_, true);
+        input_queue_ = nullptr;
+    }
+    if (output_queue_) {
+        AudioQueueStop(output_queue_, true);
+        AudioQueueDispose(output_queue_, true);
+        output_queue_ = nullptr;
     }
 #endif
 

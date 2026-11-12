@@ -37,6 +37,7 @@ set(AUDIO_AGENT_SOURCES
     ${CORE_DIR}/src/AudioAgentPipeline.cpp
     ${CORE_DIR}/src/MnnLlmEngine.cpp
     ${CORE_DIR}/src/SherpaOnnxPerceptionEngine.cpp
+    ${CORE_DIR}/src/CompanionPersona.cpp
     ${CORE_DIR}/src/audio_agent_c_api.cpp
     src/NativeJniBridge.cpp
 )

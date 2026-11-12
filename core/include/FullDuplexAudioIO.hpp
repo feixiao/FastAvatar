@@ -8,6 +8,8 @@
 
 #if defined(AUDIO_AGENT_USE_OBOE)
 #include <oboe/Oboe.h>
+#elif defined(__APPLE__)
+#include <AudioToolbox/AudioQueue.h>
 #endif
 
 namespace audio_agent {
@@ -43,6 +45,14 @@ public:
 
     // Restart streams (used when audio route changes or headset disconnected)
     bool RestartStreams();
+    // Enable or disable native hardware device streams (AudioQueue on Apple, Oboe on Android)
+    void EnableHardwareStreams(bool enable = true) {
+        enable_hardware_streams_ = enable;
+    }
+    bool IsHardwareStreamsEnabled() const {
+        return enable_hardware_streams_;
+    }
+
 
     bool IsRunning() const { return is_running_.load(std::memory_order_acquire); }
 
@@ -68,8 +78,9 @@ public:
         oboe::AudioStream *stream,
         oboe::Result error
     ) override;
-#else
-    // Host mock callbacks with identical semantics
+#endif
+#if !defined(AUDIO_AGENT_USE_OBOE)
+    // Host mock / native AudioQueue callbacks with identical semantics
     void ProcessMockInputFrames(const float* data, int32_t numFrames);
     void ProcessMockOutputFrames(float* data, int32_t numFrames);
 #endif
@@ -81,10 +92,16 @@ private:
     const int32_t spk_sample_rate_;
     std::atomic<bool> is_running_{false};
     std::atomic<bool> is_restarting_{false};
+    bool enable_hardware_streams_{false};
 
 #if defined(AUDIO_AGENT_USE_OBOE)
     std::shared_ptr<oboe::AudioStream> input_stream_;
     std::shared_ptr<oboe::AudioStream> output_stream_;
+#elif defined(__APPLE__)
+    AudioQueueRef input_queue_{nullptr};
+    AudioQueueRef output_queue_{nullptr};
+    AudioQueueBufferRef in_buffers_[3]{nullptr, nullptr, nullptr};
+    AudioQueueBufferRef out_buffers_[3]{nullptr, nullptr, nullptr};
 #endif
 };
 

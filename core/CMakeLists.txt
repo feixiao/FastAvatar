@@ -36,6 +36,7 @@ set(AUDIO_AGENT_CORE_SOURCES
     src/AudioAgentPipeline.cpp
     src/MnnLlmEngine.cpp
     src/SherpaOnnxPerceptionEngine.cpp
+    src/CompanionPersona.cpp
     src/audio_agent_c_api.cpp
 )
 
@@ -55,16 +56,6 @@ set_target_properties(audio_agent_static PROPERTIES OUTPUT_NAME "audio_agent")
 # 2. Shared library (.dylib / .so)
 add_library(audio_agent SHARED ${AUDIO_AGENT_CORE_SOURCES})
 
-if(ANDROID)
-    target_link_libraries(audio_agent android log OpenSLES)
-    if(oboe_FOUND)
-        target_link_libraries(audio_agent oboe::oboe)
-    endif()
-elseif(APPLE)
-    # macOS CoreAudio / AudioToolbox support
-    target_link_libraries(audio_agent "-framework CoreAudio" "-framework AudioToolbox")
-endif()
-
 # 3. Unit test executable
 add_executable(audio_agent_test
     ${AUDIO_AGENT_CORE_SOURCES}
@@ -76,3 +67,15 @@ add_executable(audio_agent_bench
     ${AUDIO_AGENT_CORE_SOURCES}
     src/bench_main.cpp
 )
+
+if(ANDROID)
+    target_link_libraries(audio_agent android log OpenSLES)
+    if(oboe_FOUND)
+        target_link_libraries(audio_agent oboe::oboe)
+    endif()
+elseif(APPLE)
+    # macOS CoreAudio / AudioToolbox support
+    target_link_libraries(audio_agent "-framework CoreFoundation" "-framework CoreAudio" "-framework AudioToolbox")
+    target_link_libraries(audio_agent_test "-framework CoreFoundation" "-framework CoreAudio" "-framework AudioToolbox")
+    target_link_libraries(audio_agent_bench "-framework CoreFoundation" "-framework CoreAudio" "-framework AudioToolbox")
+endif()

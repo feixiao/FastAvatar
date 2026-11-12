@@ -84,6 +84,11 @@ audio_agent_pipeline_t* audio_agent_pipeline_create(
             handle->callbacks.on_barge_in(spoken.c_str(), handle->callbacks.user_data);
         };
     }
+    if (handle->callbacks.on_persona_switched) {
+        observer.on_persona_switched = [handle](const std::string& id, const std::string& name) {
+            handle->callbacks.on_persona_switched(id.c_str(), name.c_str(), handle->callbacks.user_data);
+        };
+    }
 
     std::string prompt_str = system_prompt ? system_prompt : "";
     handle->pipeline = std::make_shared<AudioAgentPipeline>(
@@ -128,6 +133,93 @@ void audio_agent_pipeline_trigger_barge_in(audio_agent_pipeline_t* handle) {
 audio_agent_state_t audio_agent_pipeline_get_state(const audio_agent_pipeline_t* handle) {
     if (!handle || !handle->pipeline) return AUDIO_AGENT_STATE_IDLE;
     return static_cast<audio_agent_state_t>(handle->pipeline->GetState());
+}
+
+// -------------------------------------------------------------
+// Mode A: Platform Audio PCM Push / Pull
+// -------------------------------------------------------------
+
+size_t audio_agent_pipeline_push_mic_pcm(audio_agent_pipeline_t* handle, const float* data, size_t count) {
+    if (!handle || !handle->pipeline || !data) return 0;
+    return handle->pipeline->PushMicAudio(data, count);
+}
+
+size_t audio_agent_pipeline_pull_speaker_pcm(audio_agent_pipeline_t* handle, float* dest, size_t count) {
+    if (!handle || !handle->pipeline || !dest) return 0;
+    return handle->pipeline->PullSpeakerAudio(dest, count);
+}
+
+size_t audio_agent_pipeline_speaker_available(const audio_agent_pipeline_t* handle) {
+    if (!handle || !handle->pipeline) return 0;
+    return handle->pipeline->GetSpeakerAvailableSamples();
+}
+
+void audio_agent_pipeline_enable_hardware_audio(audio_agent_pipeline_t* handle, bool enable) {
+    if (!handle || !handle->pipeline) return;
+    handle->pipeline->EnableHardwareAudio(enable);
+}
+
+// -------------------------------------------------------------
+// Cloud Cognitive Stream Turn (Dual-Loop Slow Loop B)
+// -------------------------------------------------------------
+
+void audio_agent_pipeline_start_cloud_turn(audio_agent_pipeline_t* handle, const char* query) {
+    if (!handle || !handle->pipeline || !query) return;
+    handle->pipeline->StartCloudTurn(query);
+}
+
+void audio_agent_pipeline_push_cloud_token(audio_agent_pipeline_t* handle, const char* token, size_t len) {
+    if (!handle || !handle->pipeline || !token) return;
+    std::string tok_str(token, len);
+    handle->pipeline->PushCloudToken(tok_str);
+}
+
+void audio_agent_pipeline_finish_cloud_turn(audio_agent_pipeline_t* handle) {
+    if (!handle || !handle->pipeline) return;
+    handle->pipeline->FinishCloudTurn();
+}
+
+void audio_agent_pipeline_abort_cloud_turn(audio_agent_pipeline_t* handle) {
+    if (!handle || !handle->pipeline) return;
+    handle->pipeline->AbortCloudTurn();
+}
+
+// -------------------------------------------------------------
+// Voice Companion Persona Management
+// -------------------------------------------------------------
+
+bool audio_agent_pipeline_set_persona(audio_agent_pipeline_t* handle, const char* persona_id) {
+    if (!handle || !handle->pipeline || !persona_id) return false;
+    return handle->pipeline->SetPersona(persona_id);
+}
+
+char* audio_agent_pipeline_get_persona(const audio_agent_pipeline_t* handle) {
+    if (!handle || !handle->pipeline) return nullptr;
+    std::string pid = handle->pipeline->GetCurrentPersonaId();
+    char* res = static_cast<char*>(malloc(pid.size() + 1));
+    if (res) {
+        memcpy(res, pid.c_str(), pid.size() + 1);
+    }
+    return res;
+}
+
+char* audio_agent_pipeline_get_persona_name(const audio_agent_pipeline_t* handle) {
+    if (!handle || !handle->pipeline) return nullptr;
+    std::string name = handle->pipeline->GetCurrentPersonaName();
+    char* res = static_cast<char*>(malloc(name.size() + 1));
+    if (res) {
+        memcpy(res, name.c_str(), name.size() + 1);
+    }
+    return res;
+}
+
+char* audio_agent_pipeline_get_time_greeting(void) {
+    std::string greeting = CompanionPersonaManager::GetTimeOfDayContext();
+    char* res = static_cast<char*>(malloc(greeting.size() + 1));
+    if (res) {
+        memcpy(res, greeting.c_str(), greeting.size() + 1);
+    }
+    return res;
 }
 
 // -------------------------------------------------------------

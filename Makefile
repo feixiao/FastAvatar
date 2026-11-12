@@ -46,8 +46,10 @@ native-test: ## 编译并在宿主机运行 C++ 核心单元测试套件
 		src/AudioAgentPipeline.cpp \
 		src/MnnLlmEngine.cpp \
 		src/SherpaOnnxPerceptionEngine.cpp \
+		src/CompanionPersona.cpp \
 		src/audio_agent_c_api.cpp \
 		src/test_main.cpp \
+		-framework CoreFoundation -framework CoreAudio -framework AudioToolbox \
 		-o audio_agent_test && ./audio_agent_test && rm -f audio_agent_test
 
 native-bench: ## 运行 C++17 全双工性能基准测试
@@ -63,8 +65,10 @@ native-bench: ## 运行 C++17 全双工性能基准测试
 		src/AudioAgentPipeline.cpp \
 		src/MnnLlmEngine.cpp \
 		src/SherpaOnnxPerceptionEngine.cpp \
+		src/CompanionPersona.cpp \
 		src/audio_agent_c_api.cpp \
 		src/bench_main.cpp \
+		-framework CoreFoundation -framework CoreAudio -framework AudioToolbox \
 		-o audio_agent_bench && ./audio_agent_bench && rm -f audio_agent_bench
 android-test: ## 运行 Android 客户端单元测试
 	cd android && $(GRADLEW) test

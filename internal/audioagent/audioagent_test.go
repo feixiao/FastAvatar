@@ -3,6 +3,7 @@ package audioagent
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestArbitrateIntent_VehicleAndSystemCommands(t *testing.T) {
@@ -82,3 +83,132 @@ func TestSentenceChunker_StreamingAndToolStripping(t *testing.T) {
 		t.Errorf("expected set_alarm in tool call, got %s", tools[0])
 	}
 }
+
+func TestPipeline_LifecycleAndState(t *testing.T) {
+	var stateChanges []State
+	pipeline := NewPipeline("你是跨平台语音助手", PipelineCallbacks{
+		OnStateChanged: func(newState, oldState State) {
+			stateChanges = append(stateChanges, newState)
+		},
+	})
+	defer pipeline.Close()
+
+	if !pipeline.Start() {
+		t.Fatal("failed to start pipeline")
+	}
+
+	if pipeline.GetState() != StateIdle {
+		t.Errorf("expected IDLE initial state, got %v", pipeline.GetState())
+	}
+
+	pipeline.Stop()
+}
+
+func TestPipeline_PersonaManagementAndTime(t *testing.T) {
+	pipeline := NewPipeline("", PipelineCallbacks{})
+	defer pipeline.Close()
+
+	// Initial persona
+	p := pipeline.GetPersona()
+	if p == "" {
+		t.Fatal("expected non-empty persona ID")
+	}
+
+	// Switch to roaster
+	if !pipeline.SetPersona("roaster") {
+		t.Fatal("failed to switch to roaster persona")
+	}
+	if pipeline.GetPersona() != "roaster" {
+		t.Errorf("expected roaster, got %s", pipeline.GetPersona())
+	}
+
+	// Switch to butler
+	if !pipeline.SetPersona("butler") {
+		t.Fatal("failed to switch to butler persona")
+	}
+	if pipeline.GetPersona() != "butler" {
+		t.Errorf("expected butler, got %s", pipeline.GetPersona())
+	}
+
+	// Time greeting
+	greeting := pipeline.GetTimeGreeting()
+	if greeting == "" {
+		t.Error("expected non-empty time greeting")
+	}
+	t.Logf("Time greeting: %s", greeting)
+}
+
+func TestPipeline_AudioPushPullModeA(t *testing.T) {
+	pipeline := NewPipeline("", PipelineCallbacks{})
+	defer pipeline.Close()
+	pipeline.Start()
+	defer pipeline.Stop()
+
+	// Push 512 frames of 16kHz float mic PCM
+	micData := make([]float32, 512)
+	for i := range micData {
+		micData[i] = 0.42
+	}
+	written := pipeline.PushMicPCM(micData)
+	if written != 512 {
+		t.Errorf("expected 512 frames written, got %d", written)
+	}
+
+	// Pull speaker PCM
+	spkDest := make([]float32, 480)
+	_ = pipeline.PullSpeakerPCM(spkDest)
+
+	// Toggle hardware audio
+	pipeline.EnableHardwareAudio(false)
+}
+
+func TestPipeline_CloudStreamingTurn(t *testing.T) {
+	var sentences []string
+	var tools []string
+
+	pipeline := NewPipeline("", PipelineCallbacks{
+		OnTTSSentence: func(s string) {
+			sentences = append(sentences, s)
+		},
+		OnToolCall: func(toolJSON string) {
+			tools = append(tools, toolJSON)
+		},
+	})
+	defer pipeline.Close()
+	pipeline.Start()
+	defer pipeline.Stop()
+
+	// Start cloud turn
+	pipeline.StartCloudTurn("请帮我查一下杭州天气")
+	if pipeline.GetState() != StateThinking {
+		t.Errorf("expected THINKING, got %v", pipeline.GetState())
+	}
+
+	// Push streaming tokens
+	tokens := []string{"好", "的", "，", "正", "在", "为", "您", "查", "询", "。"}
+	for _, tok := range tokens {
+		pipeline.PushCloudToken(tok)
+	}
+	pipeline.PushCloudToken("<|tool_call|>{\"action\":\"query_weather\",\"city\":\"杭州\"}<|/tool_call|>")
+	pipeline.PushCloudToken("已完成查询。")
+	pipeline.FinishCloudTurn()
+
+	// Allow worker thread to process
+	for range 20 {
+		if len(sentences) > 0 && len(tools) > 0 {
+			break
+		}
+		time.Sleep(15 * time.Millisecond)
+	}
+
+	if len(sentences) == 0 {
+		t.Fatal("expected sentences emitted from cloud turn")
+	}
+	if len(tools) == 0 {
+		t.Fatal("expected tool call dispatched from cloud turn")
+	}
+	if !strings.Contains(tools[0], "query_weather") {
+		t.Errorf("expected query_weather in tool call, got %s", tools[0])
+	}
+}
+

@@ -8,6 +8,7 @@
 #include "FullDuplexAudioIO.hpp"
 #include "CpuAffinity.hpp"
 #include "IntentArbiter.hpp"
+#include "CompanionPersona.hpp"
 
 #include <atomic>
 #include <string>
@@ -33,6 +34,7 @@ struct PipelineObserver {
     std::function<void(const std::string& spoken_interrupted)> on_barge_in;
     std::function<void(const std::string& fallback_reason)> on_watchdog_fallback;
     std::function<void(const LlmStats& stats)> on_llm_stats;
+    std::function<void(const std::string& persona_id, const std::string& persona_name)> on_persona_switched;
 };
 
 /**
@@ -82,6 +84,27 @@ public:
 
     // Read speaker audio data
     size_t PullSpeakerAudio(float* dest, size_t count);
+    // Get count of speaker samples currently ready for playback
+    size_t GetSpeakerAvailableSamples() const;
+    // Enable or disable native hardware device audio (AudioQueue/Oboe)
+    void EnableHardwareAudio(bool enable = true) {
+        if (audio_io_) {
+            audio_io_->EnableHardwareStreams(enable);
+        }
+    }
+
+
+    // Cloud Cognitive Stream Turn (Slow Loop B)
+    void StartCloudTurn(const std::string& user_query);
+    void PushCloudToken(const std::string& token);
+    void FinishCloudTurn();
+    void AbortCloudTurn();
+
+    // Voice Companion Persona Management
+    CompanionPersonaManager& GetPersonaManager() { return persona_mgr_; }
+    bool SetPersona(const std::string& persona_id);
+    std::string GetCurrentPersonaId() const;
+    std::string GetCurrentPersonaName() const;
 
     // Check if pipeline is in aborted state
     bool IsBargeInAborted() const {
@@ -184,6 +207,11 @@ private:
     std::thread cognition_thread_;
     std::thread expression_thread_;
     std::thread idle_monitor_thread_;
+    // Companion Persona & Cloud Turn State
+    CompanionPersonaManager persona_mgr_;
+    std::mutex cloud_turn_mtx_;
+    std::unique_ptr<StreamingSentenceChunker> cloud_chunker_;
+    std::string cloud_assistant_response_;
 };
 
 } // namespace audio_agent
