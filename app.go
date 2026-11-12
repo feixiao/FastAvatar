@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"sync"
 	"time"
-
 	"avatar/internal/asr"
 	"avatar/internal/cloud"
 	"avatar/internal/config"
@@ -111,18 +111,36 @@ func NewApp() *App {
 
 	// 初始化 TTS 引擎
 	var synth tts.Synthesizer
-	if cfg.TTS.Engine == "mac_say" {
-		activeVoice := cfg.TTS.Voice
-		activeRate := cfg.TTS.Rate
-		if personaMgr != nil {
-			slot := personaMgr.GetActiveSlot()
-			if slot.VoiceOverride != "" {
-				activeVoice = slot.VoiceOverride
-			}
-			if slot.RateOverride > 0 {
-				activeRate = slot.RateOverride
-			}
+	activeVoice := cfg.TTS.Voice
+	activeRate := cfg.TTS.Rate
+	if personaMgr != nil {
+		slot := personaMgr.GetActiveSlot()
+		if slot.VoiceOverride != "" {
+			activeVoice = slot.VoiceOverride
 		}
+		if slot.RateOverride > 0 {
+			activeRate = slot.RateOverride
+		}
+	}
+
+	if cfg.TTS.Engine == "sherpa_onnx" {
+		binPath := cfg.TTS.BinPath
+		if binPath == "" {
+			binPath = "bin/sherpa-onnx-offline-tts-play"
+		}
+		modelDir := cfg.TTS.ModelDir
+		if modelDir == "" {
+			modelDir = "models/vits-zh-aishell3"
+		}
+		if _, err := os.Stat(binPath); err == nil {
+			sherpaSynth := tts.NewSherpaOnnxSynthesizer(binPath, modelDir, 66, activeRate)
+			sherpaSynth.SetVoice(activeVoice)
+			synth = sherpaSynth
+		} else {
+			fmt.Printf("[TTS 警告] sherpa_onnx 可执行文件未就绪 (%s)，降级为 mac_say\n", binPath)
+			synth = tts.NewMacSaySynthesizer(activeVoice, activeRate)
+		}
+	} else if cfg.TTS.Engine == "mac_say" {
 		synth = tts.NewMacSaySynthesizer(activeVoice, activeRate)
 	} else {
 		synth = tts.NewMockSynthesizer()

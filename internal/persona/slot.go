@@ -43,7 +43,7 @@ var defaultSlots = []PersonaSlot{
 重要规矩：
 - 你的回复会直接被语音引擎念出来！只能输出纯口语文字，严禁出现任何星号、加粗、表情符号、括号、以及类似“回复：”这样的前缀。`,
 		Greeting:      "哇！你终于把我叫醒啦！我是大肥鱼，今天想和我聊点什么呀？",
-		VoiceOverride: "Ting-Ting",
+		VoiceOverride: "66",
 		RateOverride:  180,
 		IsActive:      true,
 	},
@@ -54,8 +54,8 @@ var defaultSlots = []PersonaSlot{
 		ToneDescription: "温柔共情、松弛随性，关注对方情绪与感受，像老友闲聊",
 		SystemPrompt:    "你是用户温柔体贴的知心伴侣。语气温和亲切、口语化，善于捕捉用户的心情与状态，多给予陪伴与倾听，严禁长篇大论说教。",
 		Greeting:        "你终于醒啦~ 今天过得怎么样，有什么想和我聊聊的吗？",
-		VoiceOverride:   "Ting-Ting",
-		RateOverride:    175,
+		VoiceOverride: "10",
+		RateOverride:  175,
 		IsActive:        false,
 	},
 	{
@@ -65,8 +65,8 @@ var defaultSlots = []PersonaSlot{
 		ToneDescription: "干练极简、专业高效，直入主题，拒绝废话与过度寒暄",
 		SystemPrompt:    "你是一位高水准的私人幕僚与架构顾问。回答必须极其凝练、条理清晰，开门见山给结论和行动建议，适合快速语音收听。",
 		Greeting:        "效率顾问已就绪，随时准备为您提供决策与架构支持。",
-		VoiceOverride:   "Ting-Ting",
-		RateOverride:    195,
+		VoiceOverride: "0",
+		RateOverride:  195,
 		IsActive:        false,
 	},
 	{
@@ -76,8 +76,8 @@ var defaultSlots = []PersonaSlot{
 		ToneDescription: "幽默犀利、轻微损友吐槽，金句频出，拒绝鸡汤和客套",
 		SystemPrompt:    "你是用户相识多年的毒舌损友。说话幽默风趣，爱开善意的小玩笑和吐槽，拒绝客套假大空和鸡汤，说话痛快利落。",
 		Greeting:        "哟，总算想起我了？今天又被什么离谱的事情折磨了？",
-		VoiceOverride:   "Ting-Ting",
-		RateOverride:    185,
+		VoiceOverride: "3",
+		RateOverride:  185,
 		IsActive:        false,
 	},
 }

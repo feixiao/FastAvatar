@@ -57,9 +57,11 @@ func (c *LLMConfig) GetEdgeEndpoint() ModelEndpointConfig {
 
 
 type TTSConfig struct {
-	Engine   string `json:"engine"`    // "mac_say", "edge_tts"
-	Voice    string `json:"voice"`     // 例如 "Ting-Ting" 或 "zh-CN-XiaoxiaoNeural"
-	Rate     int    `json:"rate"`      // 语速百分比调节
+	Engine   string `json:"engine"`              // "sherpa_onnx", "mac_say"
+	Voice    string `json:"voice"`               // 发音人 ID (如 "66" 或别名 "whale")
+	Rate     int    `json:"rate"`                // 语速百分比调节
+	BinPath  string `json:"bin_path,omitempty"`  // sherpa-onnx-offline-tts-play 路径
+	ModelDir string `json:"model_dir,omitempty"` // VITS 模型目录
 }
 type ASRConfig struct {
 	Engine string `json:"engine"` // "native_mac", "mock"
@@ -107,9 +109,11 @@ var (
 			},
 		},
 		TTS: TTSConfig{
-			Engine: "mac_say",
-			Voice:  "Ting-Ting",
-			Rate:   180,
+			Engine:   "sherpa_onnx",
+			Voice:    "66",
+			Rate:     180,
+			BinPath:  "bin/sherpa-onnx-offline-tts-play",
+			ModelDir: "models/vits-zh-aishell3",
 		},
 		LocalGGUF:   "models/qwen2.5-1.5b-instruct-q4.gguf",
 		ASR: ASRConfig{

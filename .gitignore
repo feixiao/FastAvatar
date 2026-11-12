@@ -2,6 +2,7 @@
 build/bin/
 core/build/
 bin/
+lib/
 *.exe
 *.exe~
 *.dll
