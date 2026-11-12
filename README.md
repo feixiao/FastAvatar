@@ -33,30 +33,34 @@ Avatar 是一套**端云协同、双环驱动（Dual-Loop）、全链路文本�
 
 ## 🚀 快速开始
 
-### 1. 统一启动云端后台服务 (Docker Compose)
+### 1. 启动云端实时网关 (Go Gateway :8088)
+
+云端实时网关负责大模型接入与 HTTP SSE 流式文本推送。支持宿主机秒级裸跑或 Docker 容器化编排：
 
 ```bash
-# 复制环境变量配置文件（可选，默认自动接入本地 Ollama，或配置云端商业大模型）
+# 方式 A: 本地宿主机秒级启动 (零 Docker 依赖，开发调试强烈推荐)
+# 自动嗅探本地 LM Studio (http://127.0.0.1:1234/v1) 或 Ollama
+make server-dev
+
+# 方式 B: 通过 Docker Compose 启动容器集群
 cp server/.env.example server/.env
-
-# 一键启动后台网关容器 (Go 实时网关 :8088)
 make server
-
-# 查看后台服务运行日志
-make server-logs
-
-# 停止后台服务集群
-make server-stop
+make server-logs # 查看运行日志
 ```
 
 ### 2. 启动桌面端应用 (macOS)
 
-```bash
-# 本地调试运行（自动编译 Swift 原生 ASR 并在本地启动）
-make run
+桌面端包含 Wails 透明胶囊/桌宠界面、Swift 原生连续语音识别（AVAudioEngine）与 Sherpa-ONNX 离线统一发声引擎：
 
-# 或直接打包为 macOS 原生 .app 并启动
+```bash
+# 方式 A: 打包并前台启动 App (终端直接查看端云遥测与识别实时日志，推荐)
+make start-log
+
+# 方式 B: 打包为 macOS 原生 .app 并在后台运行
 make start
+
+# 方式 C: 源码调试直接运行
+make run
 ```
 
 ### 3. 运行端云协同端到端集成测试

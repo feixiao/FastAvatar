@@ -11,6 +11,7 @@ lib/
 *.dylib
 *.app
 
+*.wav
 # Models & User Data
 models/
 *.gguf

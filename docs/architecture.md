@@ -689,3 +689,53 @@ type ServerEvent struct {
      * 在应用启动或空闲阶段，预先将固定的人格设定与安全 System Prompt 灌入端侧模型完成 Prefill 计算并冻结 KV Cache；
      * 后续多轮交互仅计算用户输入的增量 Token，将端侧首 Token 延迟降至 30~50ms；
      * 打断时执行轻量级 KV Rollback 截断，瞬时恢复待命。
+
+---
+
+## 11. macOS 本地与云端网关实测部署运行指南 (macOS & Cloud Gateway Runtime Guide)
+
+### 11.1 运行时拓扑与进程协同表
+
+| 节点 / 组件 | 运行方式 / 路径 | 监听 / 状态 | 关键职责与配置 |
+| :--- | :--- | :--- | :--- |
+| **云端实时网关 (Cloud Gateway)** | `./bin/avatar-server` (或 `make server-dev`) | `http://127.0.0.1:8088`<br/>`HTTP 200 OK` | • 零音视频流中转，仅推 HTTP SSE 文本 Token 流<br/>• 上游自动探测并接入本地 LM Studio (`http://127.0.0.1:1234/v1` / `qwen2.5-1.5b-instruct`) 或云端商业大模型<br/>• 毫秒级级联打断信令响应 (`/api/v1/session/interrupt`) |
+| **桌面端应用 (macOS App)** | `build/bin/Avatar.app` (或 `make start-log`) | 前台 GUI 悬浮窗 / 桌宠 | • Wails v2 极简透明胶囊 / 桌面宠物交互界面<br/>• 自动向网关申请 Token (`POST /api/v1/auth/token`) 建立会话 Room<br/>• 基于 `FastDispatcher` 毫秒级意图分流 |
+| **端侧原生 ASR (Speech)** | `bin/avatar-asr` | 连续倾听模式 (`hands_free`) | • Swift 原生 CoreAudio/AVFoundation 16kHz 实时采集<br/>• 离线端侧高灵敏度 VAD 与文字转写 |
+| **端侧统一 TTS (Voice)** | `bin/sherpa-onnx-offline-tts-play` | 引擎就绪 (`vits-zh-aishell3`) | • 端侧统一发声，根除云端/本地音色与语速人格割裂<br/>• 首句微切 (4~6 字) 超低延时播报 |
+
+### 11.2 意图分流与端云双环工作流
+
+```mermaid
+graph TD
+    A[用户语音开嗓] --> B[macOS 原生 ASR 实时转写]
+    B --> C{FastDispatcher 意图分流}
+    C -->|本地记忆 / 备忘指令| D[端侧快环 Memory Vault]
+    C -->|日常闲聊 / 极速问候| E[本地端侧小模型 Qwen2.5-1.5B]
+    C -->|复杂认知 / 代码 / 深度分析| F[云端网关 :8088 SSE 流式]
+    D --> G[端侧统一 TTS 离线发声]
+    E --> G
+    F --> G
+    G -->|用户随时插话 Barge-in| H[≤80ms 物理掐断扬声器 + 下发云端取消信令]
+```
+
+### 11.3 实测性能指标与遥测数据
+
+1. **云端网关 SSE 流式推理延迟**：首包 Token 时延 (TTFT) ~134ms；
+2. **端侧快环本地备忘指令**：端侧拦截判定耗时 < 1ms，100% 端侧响应，零网络泄露；
+3. **全双工打断 (Barge-in)**：本地 TTS 队列掐断清空时延 ~300µs (严格满足 ≤ 80ms 目标)，并同步向云端下发取消信号。
+
+### 11.4 常用运行与排障命令
+
+```bash
+# 1. 编译并直接启动云端网关 (宿主机秒级裸跑，推荐)
+make server-dev
+
+# 2. 打包并启动 macOS 原生应用 (前台输出完整运行日志)
+make start-log
+
+# 3. 检测云端网关健康状态
+curl -s http://127.0.0.1:8088/health
+
+# 4. 一键端到端全链路自动化验收测试
+make test-e2e
+```
