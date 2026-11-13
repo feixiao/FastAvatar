@@ -888,12 +888,6 @@ menuActionPet.addEventListener("click", () => {
   closeContextMenu();
 });
 
-if (menuActionFeed) {
-  menuActionFeed.addEventListener("click", () => {
-    handlePetAction("feed");
-    closeContextMenu();
-  });
-}
 
 menuActionChat.addEventListener("click", () => {
   petInputBar.classList.add("open");
@@ -1614,7 +1608,7 @@ if (window.runtime) {
 
 // ==================== 13. DOM 就绪自启 ====================
 
-window.addEventListener("DOMContentLoaded", () => {
+function initApp() {
   // 获取后端保存的形态、皮肤与自主漫游配置
   if (window.go && window.go.main && window.go.main.App) {
     window.go.main.App.GetDisplayForm().then((form) => applyDisplayForm(form));
@@ -1660,4 +1654,10 @@ window.addEventListener("DOMContentLoaded", () => {
     refreshBond();
     refreshModelConfig();
   }, 300);
-});
+}
+
+if (document.readyState === "loading") {
+  window.addEventListener("DOMContentLoaded", initApp);
+} else {
+  initApp();
+}

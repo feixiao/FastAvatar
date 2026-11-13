@@ -2088,12 +2088,6 @@
     handlePetAction("pet");
     closeContextMenu();
   });
-  if (menuActionFeed) {
-    menuActionFeed.addEventListener("click", () => {
-      handlePetAction("feed");
-      closeContextMenu();
-    });
-  }
   menuActionChat.addEventListener("click", () => {
     petInputBar.classList.add("open");
     petTextInput.focus();
@@ -2728,7 +2722,7 @@
       refreshMemory();
     });
   }
-  window.addEventListener("DOMContentLoaded", () => {
+  function initApp() {
     if (window.go && window.go.main && window.go.main.App) {
       window.go.main.App.GetDisplayForm().then((form) => applyDisplayForm(form));
       window.go.main.App.GetPetSkin().then((skin) => applySkin(skin, false));
@@ -2771,5 +2765,10 @@
       refreshBond();
       refreshModelConfig();
     }, 300);
-  });
+  }
+  if (document.readyState === "loading") {
+    window.addEventListener("DOMContentLoaded", initApp);
+  } else {
+    initApp();
+  }
 })();

@@ -11,6 +11,11 @@ MACOS_DIR="${CONTENTS_DIR}/MacOS"
 RESOURCES_DIR="${CONTENTS_DIR}/Resources"
 
 mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}"
+if command -v npx >/dev/null 2>&1; then
+  echo "0. Bundling frontend assets..."
+  npx esbuild frontend/src/main.js --bundle --format=iife --outfile=frontend/src/main.bundle.js
+fi
+
 
 echo "1. Compiling Go binary..."
 go build -tags production -ldflags="-w -s" -o "${MACOS_DIR}/${APP_NAME}" .
