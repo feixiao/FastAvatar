@@ -57,6 +57,14 @@ func TestDispatcher_EvaluationRoutes(t *testing.T) {
 			wantIntent: "pet.action",
 		},
 		{
+			name:       "pet action sit squat",
+			text:       "蹲下",
+			consented:  true,
+			online:     true,
+			wantTarget: RoutePetAction,
+			wantIntent: "pet.action",
+		},
+		{
 			name:       "open-ended not consented",
 			text:       "今天有什么新鲜事",
 			consented:  false,

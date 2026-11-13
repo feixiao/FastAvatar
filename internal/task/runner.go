@@ -170,6 +170,27 @@ func resolveActionTag(tag string) interaction.PetActionPayload {
 			Message: "收起小爪子趴下打盹~",
 			XP:      2,
 		}
+	case "sit", "squat":
+		return interaction.PetActionPayload{
+			Action:  "sit",
+			Cue:     "idle",
+			Message: "乖巧地蹲坐下来~",
+			XP:      3,
+		}
+	case "wake":
+		return interaction.PetActionPayload{
+			Action:  "wake",
+			Cue:     "jumping",
+			Message: "精神抖擞地站起身来！",
+			XP:      3,
+		}
+	case "meow":
+		return interaction.PetActionPayload{
+			Action:  "meow",
+			Cue:     "waving",
+			Message: "软软地叫了一声：喵呜~",
+			XP:      3,
+		}
 	default:
 		return interaction.PetActionPayload{
 			Action:  norm,
@@ -180,6 +201,38 @@ func resolveActionTag(tag string) interaction.PetActionPayload {
 	}
 }
 
+
+func inferActionFromText(query, reply string) string {
+	combined := query + " " + reply
+	if strings.Contains(combined, "蹲下") || strings.Contains(combined, "坐下") || strings.Contains(combined, "趴下") || strings.Contains(combined, "躺下") {
+		return "sit"
+	}
+	if strings.Contains(combined, "跳一下") || strings.Contains(combined, "跳一个") || strings.Contains(combined, "翻跟头") || strings.Contains(combined, "跳舞") {
+		return "jump"
+	}
+	if strings.Contains(combined, "小鱼干") || strings.Contains(combined, "干饭") || strings.Contains(combined, "吃鱼") {
+		return "feed"
+	}
+	if strings.Contains(combined, "挥手") || strings.Contains(combined, "打招呼") || strings.Contains(combined, "挥挥爪") || strings.Contains(combined, "握手") {
+		return "wave"
+	}
+	if strings.Contains(combined, "巡视") || strings.Contains(combined, "巡逻") || strings.Contains(combined, "向右") {
+		return "roam_right"
+	}
+	if strings.Contains(combined, "向左") {
+		return "roam_left"
+	}
+	if strings.Contains(combined, "装死") || strings.Contains(combined, "晕倒") {
+		return "failed"
+	}
+	if strings.Contains(combined, "思考") || strings.Contains(combined, "歪头") {
+		return "review"
+	}
+	if strings.Contains(combined, "睡觉") || strings.Contains(combined, "打盹") || strings.Contains(combined, "休息吧") {
+		return "sleep"
+	}
+	return ""
+}
 // SetCloudGateway sets the cloud gateway client to route complex LLM queries through backend server (:8088).
 func (r *Runner) SetCloudGateway(client *cloud.Client) {
 	r.mu.Lock()
@@ -310,6 +363,19 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 				r.mu.RUnlock()
 				if cb != nil {
 					cb(actPayload)
+				}
+			} else {
+				// 兜底小模型 (如 0.5B / 1.5B) 遗漏标签：从用户指令与回复内容自动推断动作
+				inferred := inferActionFromText(task.GoalSnapshot, text)
+				if inferred != "" {
+					actionTriggered = true
+					actPayload := resolveActionTag(inferred)
+					r.mu.RLock()
+					cb := r.onPetAction
+					r.mu.RUnlock()
+					if cb != nil {
+						cb(actPayload)
+					}
 				}
 			}
 		}

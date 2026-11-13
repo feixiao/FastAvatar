@@ -183,12 +183,13 @@ core (C++17 High-Reliability Native Harness)
 │   ├── LockFreeRingBuffer: 单生产者单消费者 (SPSC) 无锁环形缓冲，音频流零锁阻塞
 │   └── Barge-in 打断: 原子标记瞬间截断播放队列与 KV 状态回滚 (< 5ms)
 │
-├── Intent Short-Circuiting Engine (IntentArbiter.cpp / .hpp)
-│   ├── CleanPunctuationAndParticles: 毫秒级文本首尾语气助词与标点清洗
-│   ├── ParseChineseNumber: 鲁棒中文口语数字/时间解析 (如 "七点半" -> "07:30")
-│   ├── 系统动作抽槽与短路: 音乐播控 (暂停/继续/切歌/点歌)、闹钟设置、天气查询
-│   └── 冲突前置阻断: 严格过滤 "为什么"、"笑话" 等开放式问答，穿透放行至云端 LLM
-│
+├── Intent & Action Engine (IntentArbiter.cpp / .hpp · 高内聚·低耦合统一分流)
+│   ├── 纯动作元语分流 (ActionCommand): 姿态 (SIT/STAND/JUMP/REST)、位移 (MOVE_LEFT/RIGHT/STOP)、表达 (GREET/CELEBRATE/CONFUSED/PONDER/VOCALIZE/CONSUME)
+│   ├── 硬件与系统工具 (ToolCall): 音乐播控 (暂停/继续/切歌/点歌)、闹钟设置、天气查询、电话拨号
+│   ├── 伴侣记忆与人设 (Memory & Persona): 记忆增删改前缀拦截、人设流转意图分流
+│   ├── 冲突前置阻断: 严格过滤 "为什么"、"如何" 等开放式问答，零延迟穿透放行至 LLM 认知环
+│   ├── 零角色业务解耦: 核心库无任何角色名称、皮肤资产包、XP 数值概念，仅输出标准 ActionCommand
+│   └── 跨语言统一 C-ABI: 导出 audio_agent_dispatch_intent，macOS (CGO) 与 Android (JNI) 共享单一事实源
 ├── Safety Watchdog & Loop Breaker (WatchdogAndRepetition.cpp / .hpp)
 │   ├── TTFT Watchdog: 3 秒首 Token 超时看门狗，超时强制触发降级口语安抚
 │   └── N-gram Repetition Breaker: 12 字节滑动窗口检测，瞬时打断大模型死循环吐字

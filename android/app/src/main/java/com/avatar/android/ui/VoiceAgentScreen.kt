@@ -597,7 +597,7 @@ fun MessageBubble(msg: MessageItem) {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             val badgeColor = when (msg.routeTarget) {
-                                RouteTarget.LOCAL_MEMORY, RouteTarget.LOCAL_PERSONA -> AccentGreen
+                                RouteTarget.LOCAL_MEMORY, RouteTarget.LOCAL_PERSONA, RouteTarget.LOCAL_PET_ACTION -> AccentGreen
                                 RouteTarget.CLOUD_CHAT -> AccentPurple
                                 else -> TextMuted
                             }
@@ -605,6 +605,7 @@ fun MessageBubble(msg: MessageItem) {
                             val routeLabel = when (msg.routeTarget) {
                                 RouteTarget.LOCAL_MEMORY -> "本地记忆快环"
                                 RouteTarget.LOCAL_PERSONA -> "人设快环"
+                                RouteTarget.LOCAL_PET_ACTION -> "桌宠动作快环"
                                 RouteTarget.CLOUD_CHAT -> "智能对话"
                                 RouteTarget.LOCAL_ONLY_PROMPT -> "未授权降级"
                                 RouteTarget.OFFLINE_PROMPT -> "离线降级"

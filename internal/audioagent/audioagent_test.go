@@ -35,6 +35,44 @@ func TestArbitrateIntent_VehicleAndSystemCommands(t *testing.T) {
 	}
 }
 
+func TestDispatchIntent_MultiDomainCPlusPlus(t *testing.T) {
+	// 1. Action: 蹲下
+	sitJson := DispatchIntent("蹲下")
+	if !strings.Contains(sitJson, `"action":"sit"`) {
+		t.Fatalf("expected sit action in JSON, got %s", sitJson)
+	}
+
+	// 2. Action: 跳一下
+	jumpJson := DispatchIntent("跳一下")
+	if !strings.Contains(jumpJson, `"action":"jump"`) {
+		t.Fatalf("expected jump action in JSON, got %s", jumpJson)
+	}
+
+	// 3. Action: 向右跑 (带位移)
+	moveJson := DispatchIntent("向右跑两步")
+	if !strings.Contains(moveJson, `"action":"move_right"`) || !strings.Contains(moveJson, `"direction":"right"`) {
+		t.Fatalf("expected move_right with right direction, got %s", moveJson)
+	}
+
+	// 4. Memory: 记住
+	memJson := DispatchIntent("记住我明天要开会")
+	if !strings.Contains(memJson, `"domain":"MEMORY_COMMAND"`) {
+		t.Fatalf("expected MEMORY_COMMAND in JSON, got %s", memJson)
+	}
+
+	// 5. Persona: 切换成伴侣
+	personaJson := DispatchIntent("切换成伴侣人设")
+	if !strings.Contains(personaJson, `"domain":"PERSONA_SWITCH"`) {
+		t.Fatalf("expected PERSONA_SWITCH in JSON, got %s", personaJson)
+	}
+
+	// 6. Open-ended question (Anti-conflict)
+	queryJson := DispatchIntent("为什么蹲下会觉得累")
+	if !strings.Contains(queryJson, `"domain":"OPEN_ENDED"`) {
+		t.Fatalf("expected OPEN_ENDED in JSON, got %s", queryJson)
+	}
+}
+
 func TestStateString(t *testing.T) {
 	if StateIdle.String() != "IDLE" {
 		t.Errorf("expected IDLE, got %s", StateIdle.String())

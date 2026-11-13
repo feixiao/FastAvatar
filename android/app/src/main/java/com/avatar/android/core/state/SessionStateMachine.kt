@@ -171,6 +171,28 @@ class SessionStateMachine(
                     )
                 }
 
+                RouteTarget.LOCAL_PET_ACTION -> {
+                    _state.value = SessionState.LOCAL_PROCESSING
+                    val action = dispatchResult.slots["action"] as? String ?: "action"
+                    val cue = dispatchResult.slots["cue"] as? String ?: "jumping"
+                    val response = dispatchResult.slots["response"] as? String ?: "好嘞，收到指令啦！喵呜~"
+                    val elapsed = System.currentTimeMillis() - startTime
+
+                    diagnosticLogger.logEvent("local_pet_action", mapOf(
+                        "action" to action,
+                        "cue" to cue,
+                        "latency_ms" to elapsed
+                    ))
+
+                    playAndEmitResult(
+                        turnId = turnId,
+                        userText = text,
+                        target = dispatchResult.target,
+                        response = response,
+                        latencyMs = elapsed
+                    )
+                }
+
 
                 RouteTarget.LOCAL_PERSONA -> {
                     _state.value = SessionState.LOCAL_PROCESSING

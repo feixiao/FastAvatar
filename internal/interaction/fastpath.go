@@ -189,6 +189,18 @@ func buildPetActionResponse(act, cue, move string) (PetActionPayload, string) {
 		confirm = "哈欠~ 困啦困啦，趴下打个盹，晚安喵~"
 		msg = "罗小黑收起小爪子趴下打盹，进入香甜梦乡~"
 		xp = 2
+	case "sit":
+		confirm = "好嘞，乖乖蹲坐好啦~ 喵呜！"
+		msg = "罗小黑乖巧蹲坐下来，大眼睛安静地望着你~"
+		xp = 3
+	case "wake":
+		confirm = "伸个大大的懒腰，我精神满满起来啦！喵~"
+		msg = "罗小黑敏捷纵跳起身，精神抖擞！"
+		xp = 3
+	case "meow":
+		confirm = "喵呜~~ 喵~~"
+		msg = "罗小黑仰起小脑袋软软地叫了一声：喵呜~"
+		xp = 3
 	}
 	return PetActionPayload{
 		Action:  act,

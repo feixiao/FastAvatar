@@ -233,6 +233,22 @@ char* audio_agent_arbitrate_intent(const char* query) {
     return strdup(result.c_str());
 }
 
+char* audio_agent_dispatch_intent(const char* query) {
+    if (!query) return nullptr;
+    std::string result = IntentArbiter::ResolveDispatchJson(query);
+    if (result.empty()) return nullptr;
+    return strdup(result.c_str());
+}
+
+char* audio_agent_dispatch_intent_context(const char* query, const char* last_route, const char* last_domain) {
+    if (!query) return nullptr;
+    std::string route = last_route ? last_route : "";
+    std::string domain = last_domain ? last_domain : "";
+    std::string result = IntentArbiter::ResolveDispatchJson(query, route, domain);
+    if (result.empty()) return nullptr;
+    return strdup(result.c_str());
+}
+
 void audio_agent_free_string(char* str) {
     if (str) {
         free(str);

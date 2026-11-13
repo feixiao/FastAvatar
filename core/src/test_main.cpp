@@ -1014,6 +1014,112 @@ static void TestIntentArbiterSuite() {
         assert(phone_tool.find("王经理") != std::string::npos);
     }
 
+    // 7.4 Universal ActionCommand & Decoupled Intent Dispatching (Zero Role Coupling)
+    {
+        // 1. 蹲下
+        auto sit_cmd = IntentArbiter::ArbitrateAction("蹲下");
+        assert(sit_cmd.type == ActionType::SIT);
+        assert(std::string(sit_cmd.action_name) == "sit");
+
+        auto sit_res = IntentArbiter::Arbitrate("蹲下");
+        assert(sit_res.status == ArbiterStatus::MATCHED);
+        assert(sit_res.domain == ArbiterDomain::ACTION_COMMAND);
+        assert(sit_res.action == "sit");
+        assert(sit_res.action_cmd.type == ActionType::SIT);
+
+        // 2. 跳一下 / 翻跟头
+        auto jump_res = IntentArbiter::Arbitrate("跳一下");
+        assert(jump_res.status == ArbiterStatus::MATCHED);
+        assert(jump_res.domain == ArbiterDomain::ACTION_COMMAND);
+        assert(jump_res.action == "jump");
+        assert(jump_res.action_cmd.type == ActionType::JUMP);
+
+        // 3. 向右跑 (带空间位移参数)
+        auto move_res = IntentArbiter::Arbitrate("向右跑两步");
+        assert(move_res.status == ArbiterStatus::MATCHED);
+        assert(move_res.domain == ArbiterDomain::ACTION_COMMAND);
+        assert(move_res.action == "move_right");
+        assert(move_res.action_cmd.type == ActionType::MOVE_RIGHT);
+        assert(std::string(move_res.action_cmd.motion.direction) == "right");
+        assert(move_res.action_cmd.motion.distance > 0.0f);
+
+        // 4. 别动 / 停下
+        auto stop_res = IntentArbiter::Arbitrate("别动");
+        assert(stop_res.status == ArbiterStatus::MATCHED);
+        assert(stop_res.domain == ArbiterDomain::ACTION_COMMAND);
+        assert(stop_res.action == "stop");
+        assert(stop_res.action_cmd.type == ActionType::STOP);
+
+        // 5. 记忆指令
+        auto mem_res = IntentArbiter::Arbitrate("记住我喜欢喝黑咖啡");
+        assert(mem_res.status == ArbiterStatus::MATCHED);
+        assert(mem_res.domain == ArbiterDomain::MEMORY_COMMAND);
+
+        // 6. 人设切换
+        auto persona_res = IntentArbiter::Arbitrate("切换成伴侣人设");
+        assert(persona_res.status == ArbiterStatus::MATCHED);
+        assert(persona_res.domain == ArbiterDomain::PERSONA_SWITCH);
+
+        // 7. 开放疑问词严禁触发动作 (防冲突)
+        auto conflict_res = IntentArbiter::Arbitrate("为什么蹲下来会觉得累啊");
+        assert(conflict_res.status == ArbiterStatus::UNMATCHED);
+        assert(conflict_res.domain == ArbiterDomain::OPEN_ENDED);
+
+        // 8. 统一 JSON 结构导出
+        std::string json = IntentArbiter::ResolveDispatchJson("蹲下");
+        assert(json.find("\"domain\":\"ACTION_COMMAND\"") != std::string::npos);
+        assert(json.find("\"action\":\"sit\"") != std::string::npos);
+
+        // 9. C-ABI 统一导出验证
+        char* c_json = audio_agent_dispatch_intent("蹲下");
+        assert(c_json != nullptr);
+        std::string c_str(c_json);
+        audio_agent_free_string(c_json);
+        assert(c_str.find("\"action\":\"sit\"") != std::string::npos);
+
+        // 10. TinyIntentClassifier: 方案 A 微型端侧认知分类器验证
+        // 10.1 短句数理推演 (6~8字，无代码/为什么，精准判定需要云端)
+        auto math_eval = TinyIntentClassifier::Classify("求导 x^3·lnx");
+        assert(math_eval.need_deep_reasoning == true);
+        assert(math_eval.cloud_probability >= 0.8f);
+        assert(math_eval.domain == ReasoningDomain::MATH_ALGORITHM);
+
+        // 10.2 编程代码实现与并发调试
+        auto code_eval = TinyIntentClassifier::Classify("帮我用 Rust 写一个无锁环形队列");
+        assert(code_eval.need_deep_reasoning == true);
+        assert(code_eval.domain == ReasoningDomain::CODE_DEV);
+
+        // 10.3 生活长故事柔化 (38字情感分享，杜绝字数误判上云，留在端侧小模型)
+        auto casual_story = TinyIntentClassifier::Classify("今天我和朋友去公园散步看到一只流浪小猫，喂了它一点猫粮好开心");
+        assert(casual_story.need_deep_reasoning == false);
+        assert(casual_story.cloud_probability < 0.2f);
+        assert(casual_story.domain == ReasoningDomain::CHAT_CASUAL);
+
+        // 10.4 儿童级简单常识问询 (带'为什么'但属于口语常识，留在端侧小模型)
+        auto fish_eval = TinyIntentClassifier::Classify("为什么吃鱼");
+        assert(fish_eval.need_deep_reasoning == false);
+        assert(fish_eval.cloud_probability < 0.5f);
+        assert(fish_eval.domain == ReasoningDomain::CHAT_CASUAL);
+
+        // 10.5 多轮会话状态跟踪 (DST: Dialogue State Tracking 消除精神分裂)
+        // 短指代 "第三行是什么意思" 单看无关键词，但上一轮是云端写代码，强制继承云端深度推理
+        auto followup_eval = TinyIntentClassifier::Classify("第三行是什么意思", "CLOUD_CHAT", "code");
+        assert(followup_eval.need_deep_reasoning == true);
+        assert(followup_eval.domain == ReasoningDomain::CONTEXT_FOLLOWUP);
+
+        // 10.6 结构化 JSON 与 C-API 上下文透传验证
+        std::string cloud_json = IntentArbiter::ResolveDispatchJson("求导 x^3·lnx");
+        assert(cloud_json.find("\"need_cloud\":true") != std::string::npos);
+        assert(cloud_json.find("\"primary_domain\":\"math\"") != std::string::npos);
+
+        char* c_ctx_json = audio_agent_dispatch_intent_context("第三行是什么意思", "CLOUD_CHAT", "code");
+        assert(c_ctx_json != nullptr);
+        std::string c_ctx_str(c_ctx_json);
+        audio_agent_free_string(c_ctx_json);
+        assert(c_ctx_str.find("\"need_cloud\":true") != std::string::npos);
+        assert(c_ctx_str.find("\"primary_domain\":\"context_followup\"") != std::string::npos);
+    }
+
     // 8. Pipeline Tool Compensation Simulation:
     // If LLM generates purely conversational text without <|tool_call|>, IntentArbiter compensates and dispatches it!
     class ConversationalOnlyLlm : public ILlmEngine {

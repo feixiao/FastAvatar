@@ -181,33 +181,51 @@ func matchPetActionCommand(text string) (action, cue, move string, ok bool) {
 		return "grass", "jumping", "", true
 	}
 
-	// 4. 跳跃与动作
-	if strings.Contains(cmd, "跳一下") || strings.Contains(cmd, "跳一个") || strings.Contains(cmd, "跳跳") || strings.Contains(cmd, "翻个跟头") || strings.Contains(cmd, "翻跟头") || strings.Contains(cmd, "蹦一下") || strings.Contains(cmd, "蹦一个") || strings.Contains(cmd, "空翻") || strings.Contains(cmd, "跳起来") || cmd == "跳" || cmd == "蹦" {
+	// 4. 跳跃与翻转
+	if strings.Contains(cmd, "跳一下") || strings.Contains(cmd, "跳一个") || strings.Contains(cmd, "跳跳") || strings.Contains(cmd, "翻个跟头") || strings.Contains(cmd, "翻跟头") || strings.Contains(cmd, "蹦一下") || strings.Contains(cmd, "蹦一个") || strings.Contains(cmd, "空翻") || strings.Contains(cmd, "跳起来") || strings.Contains(cmd, "转圈") || strings.Contains(cmd, "跳舞") || cmd == "跳" || cmd == "蹦" {
 		return "jump", "jumping", "", true
 	}
 
-	// 5. 抚摸与蹭蹭
+	// 5. 蹲下、坐下、趴下、躺下
+	if strings.Contains(cmd, "蹲下") || strings.Contains(cmd, "蹲着") || strings.Contains(cmd, "蹲一个") || cmd == "蹲" ||
+		strings.Contains(cmd, "坐下") || strings.Contains(cmd, "坐着") || strings.Contains(cmd, "坐好") || cmd == "坐" ||
+		strings.Contains(cmd, "趴下") || strings.Contains(cmd, "趴着") || strings.Contains(cmd, "趴好") || cmd == "趴" ||
+		strings.Contains(cmd, "躺下") || strings.Contains(cmd, "躺平") || strings.Contains(cmd, "躺着") {
+		return "sit", "idle", "", true
+	}
+
+	// 6. 起立、醒醒、起床
+	if strings.Contains(cmd, "站起来") || strings.Contains(cmd, "起来") || strings.Contains(cmd, "醒醒") || strings.Contains(cmd, "起床") {
+		return "wake", "jumping", "", true
+	}
+
+	// 7. 叫一声 / 喵一声
+	if strings.Contains(cmd, "叫一声") || strings.Contains(cmd, "喵一声") || strings.Contains(cmd, "叫一个") || strings.Contains(cmd, "学猫叫") || strings.Contains(cmd, "喵喵叫") || cmd == "叫" || cmd == "喵" {
+		return "meow", "waving", "", true
+	}
+
+	// 8. 抚摸与蹭蹭
 	if strings.Contains(cmd, "摸摸头") || strings.Contains(cmd, "摸摸你") || strings.Contains(cmd, "摸摸") || strings.Contains(cmd, "摸一下") || strings.Contains(cmd, "揉揉头") || strings.Contains(cmd, "蹭蹭") || strings.Contains(cmd, "顺毛") || strings.Contains(cmd, "挠挠") {
 		return "pet", "jumping", "", true
 	}
 
-	// 6. 打招呼
-	if strings.Contains(cmd, "打个招呼") || strings.Contains(cmd, "挥手") || strings.Contains(cmd, "打招呼") || strings.Contains(cmd, "挥挥爪") || strings.Contains(cmd, "挥爪") || strings.Contains(cmd, "招招手") {
+	// 9. 打招呼与握手
+	if strings.Contains(cmd, "打个招呼") || strings.Contains(cmd, "挥手") || strings.Contains(cmd, "打招呼") || strings.Contains(cmd, "挥挥爪") || strings.Contains(cmd, "挥爪") || strings.Contains(cmd, "招招手") || strings.Contains(cmd, "握手") || strings.Contains(cmd, "握个手") || strings.Contains(cmd, "伸爪") {
 		return "wave", "waving", "", true
 	}
 
-	// 7. 困惑 / 装死
+	// 10. 困惑 / 装死 / 别动
 	if strings.Contains(cmd, "装死") || strings.Contains(cmd, "别动") || strings.Contains(cmd, "倒下") || strings.Contains(cmd, "晕一个") || strings.Contains(cmd, "犯错") {
 		return "failed", "failed", "", true
 	}
 
-	// 8. 歪头沉思
+	// 11. 歪头沉思
 	if strings.Contains(cmd, "歪头") || strings.Contains(cmd, "想一想") || strings.Contains(cmd, "思考一下") || strings.Contains(cmd, "琢磨琢磨") {
 		return "review", "review", "", true
 	}
 
-	// 9. 睡觉与休眠
-	if strings.Contains(cmd, "去睡觉") || strings.Contains(cmd, "睡觉吧") || strings.Contains(cmd, "休息吧") || strings.Contains(cmd, "打个盹") || strings.Contains(cmd, "趴下") || strings.Contains(cmd, "闭嘴睡觉") || strings.Contains(cmd, "安静睡觉") {
+	// 12. 睡觉与休眠
+	if strings.Contains(cmd, "去睡觉") || strings.Contains(cmd, "睡觉吧") || strings.Contains(cmd, "休息吧") || strings.Contains(cmd, "打个盹") || strings.Contains(cmd, "闭嘴睡觉") || strings.Contains(cmd, "安静睡觉") {
 		return "sleep", "idle", "", true
 	}
 

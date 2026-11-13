@@ -39,6 +39,7 @@ typedef void (*audio_agent_sentence_cb)(const char* sentence, void* user_data);
 typedef void (*audio_agent_tool_cb)(const char* tool_json, void* user_data);
 typedef void (*audio_agent_barge_in_cb)(const char* spoken_so_far, void* user_data);
 typedef void (*audio_agent_persona_cb)(const char* persona_id, const char* persona_name, void* user_data);
+typedef void (*audio_agent_action_cb)(const char* action_name, const char* direction, float distance, void* user_data);
 
 typedef struct {
     audio_agent_state_cb on_state_changed;
@@ -46,6 +47,7 @@ typedef struct {
     audio_agent_tool_cb on_tool_call;
     audio_agent_barge_in_cb on_barge_in;
     audio_agent_persona_cb on_persona_switched;
+    audio_agent_action_cb on_action_command;
     void* user_data;
 } audio_agent_callbacks_t;
 
@@ -98,6 +100,8 @@ AUDIO_AGENT_API char* audio_agent_pipeline_get_time_greeting(void);
 // -------------------------------------------------------------
 
 AUDIO_AGENT_API char* audio_agent_arbitrate_intent(const char* query);
+AUDIO_AGENT_API char* audio_agent_dispatch_intent(const char* query);
+AUDIO_AGENT_API char* audio_agent_dispatch_intent_context(const char* query, const char* last_route, const char* last_domain);
 AUDIO_AGENT_API void audio_agent_free_string(char* str);
 
 // -------------------------------------------------------------

@@ -26,6 +26,39 @@ func ArbitrateIntent(query string) string {
 	return C.GoString(cResult)
 }
 
+// DispatchIntent parses user query with C++ IntentArbiter for multi-domain dispatching.
+// Returns structured JSON string or empty string.
+func DispatchIntent(query string) string {
+	cQuery := C.CString(query)
+	defer C.free(unsafe.Pointer(cQuery))
+
+	cResult := C.audio_agent_dispatch_intent(cQuery)
+	if cResult == nil {
+		return ""
+	}
+	defer C.audio_agent_free_string(cResult)
+
+	return C.GoString(cResult)
+}
+
+// DispatchIntentContext parses user query with C++ IntentArbiter & TinyIntentClassifier using multi-turn DST context.
+func DispatchIntentContext(query, lastRoute, lastDomain string) string {
+	cQuery := C.CString(query)
+	cRoute := C.CString(lastRoute)
+	cDomain := C.CString(lastDomain)
+	defer C.free(unsafe.Pointer(cQuery))
+	defer C.free(unsafe.Pointer(cRoute))
+	defer C.free(unsafe.Pointer(cDomain))
+
+	cResult := C.audio_agent_dispatch_intent_context(cQuery, cRoute, cDomain)
+	if cResult == nil {
+		return ""
+	}
+	defer C.audio_agent_free_string(cResult)
+
+	return C.GoString(cResult)
+}
+
 // State represents the 4-state audio agent FSM.
 type State int
 

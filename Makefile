@@ -39,6 +39,7 @@ native-test: ## 编译并在宿主机运行 C++ 核心单元测试套件
 		-I include \
 		src/CpuAffinity.cpp \
 		src/IntentArbiter.cpp \
+		src/TinyIntentClassifier.cpp \
 		src/StreamingSentenceChunker.cpp \
 		src/WatchdogAndRepetition.cpp \
 		src/ThreeTierMemory.cpp \

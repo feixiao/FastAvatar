@@ -29,6 +29,7 @@ include_directories(
 set(AUDIO_AGENT_CORE_SOURCES
     src/CpuAffinity.cpp
     src/IntentArbiter.cpp
+    src/TinyIntentClassifier.cpp
     src/StreamingSentenceChunker.cpp
     src/WatchdogAndRepetition.cpp
     src/ThreeTierMemory.cpp
