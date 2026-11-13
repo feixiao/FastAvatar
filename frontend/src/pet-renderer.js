@@ -169,15 +169,15 @@ export class PetRenderer {
 
     if (!frame) {
       // 动作单次播放完成，切入 fallback 轨道
-      const fallbackName = this.track.fallback || "idle";
+      const defaultFallback = this.state === "speaking" ? "waving" : "idle";
+      const fallbackName = this.track.fallback || defaultFallback;
       const fallback =
         this.assets.animations[fallbackName] || this.assets.animations.idle;
       this.track = {
         ...fallback,
         loopStart: 0,
-        fallback: "idle",
+        fallback: defaultFallback,
       };
-      this.cue = null;
       this.startedAt = performance.now();
       frame = frameAtElapsed(this.track, 0);
     }

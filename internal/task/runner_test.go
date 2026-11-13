@@ -11,6 +11,7 @@ import (
 
 	"avatar/internal/cloud"
 	"avatar/internal/config"
+	"avatar/internal/interaction"
 	"avatar/internal/llm"
 	"avatar/internal/memory"
 	"avatar/internal/orchestrator"
@@ -232,5 +233,62 @@ func TestTaskRunner_CloudGatewayRouting(t *testing.T) {
 	_ = runner.Run(context.Background(), complexTask, emit)
 	if capturedRoute != "CLOUD_GATEWAY" || capturedModel != "cloud" {
 		t.Fatalf("expected complex task to invoke CLOUD_GATEWAY, got %s / %s", capturedRoute, capturedModel)
+	}
+}
+
+func TestTaskRunner_ActionTagParsing(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher, _ := w.(http.Flusher)
+
+		tokens := []string{"[ACTION:jumping]", " 好", "嘞", "！看我", "跳一个", "！"}
+		for _, tok := range tokens {
+			chunk := fmt.Sprintf("data: {\"choices\":[{\"delta\":{\"content\":\"%s\"}}]}\n\n", tok)
+			_, _ = fmt.Fprint(w, chunk)
+			flusher.Flush()
+		}
+		_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
+		flusher.Flush()
+	}))
+	defer ts.Close()
+
+	tmpDir := t.TempDir()
+	vault, _ := memory.NewVault(filepath.Join(tmpDir, "mem.json"))
+	personaMgr, _ := persona.NewManager(filepath.Join(tmpDir, "per.json"))
+	bondMgr, _ := persona.NewBondManager(filepath.Join(tmpDir, "bnd.json"))
+
+	mockTTS := tts.NewMockSynthesizer()
+	coord := orchestrator.NewCoordinator("test-sess")
+	llmClient := llm.NewClient(ts.URL, "key")
+	llmCfg := config.LLMConfig{
+		Model: "test-model",
+	}
+
+	runner := NewRunner(llmCfg, llmClient, mockTTS, vault, personaMgr, bondMgr, coord)
+
+	var capturedAction interaction.PetActionPayload
+	actionTriggered := false
+	runner.SetPetActionCallback(func(act interaction.PetActionPayload) {
+		actionTriggered = true
+		capturedAction = act
+	})
+
+	task := orchestrator.Task{
+		TaskID:       "task-action",
+		TurnID:       "turn-action",
+		SessionID:    "test-sess",
+		GoalSnapshot: "跳个舞来看看",
+	}
+
+	err := runner.Run(context.Background(), task, func(e orchestrator.TaskEvent) {})
+	if err != nil {
+		t.Fatalf("Run error: %v", err)
+	}
+	if !actionTriggered {
+		t.Fatal("expected pet action to be triggered from [ACTION:jumping] tag")
+	}
+	if capturedAction.Action != "jump" || capturedAction.Cue != "jumping" {
+		t.Fatalf("unexpected captured action: %+v", capturedAction)
 	}
 }

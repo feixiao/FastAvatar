@@ -46,7 +46,7 @@
     sleep: { name: "idle", mode: "loop" },
     listening: { name: "waiting", mode: "loop", blocksCues: true },
     thinking: { name: "review", mode: "loop", blocksCues: true },
-    speaking: { name: "waving", mode: "loop", blocksCues: true },
+    speaking: { name: "waving", mode: "loop", blocksCues: false },
     error: { name: "failed", mode: "once", blocksCues: true }
   });
   var PET_EVENT_ANIMATION_POLICY = Object.freeze({
@@ -66,7 +66,7 @@
     dragDirection = "",
     cue = null
   } = {}) {
-    const fallback = baseWorking || state === "working" ? "running" : "idle";
+    const fallback = state === "speaking" ? "waving" : baseWorking || state === "working" ? "running" : "idle";
     const statePolicy = PET_STATE_ANIMATION_POLICY[state] || { name: fallback, mode: "loop" };
     if (dragDirection === "left" || dragDirection === "right") {
       return {
@@ -1263,14 +1263,14 @@
       const elapsed = performance.now() - this.startedAt;
       let frame = frameAtElapsed(this.track, elapsed);
       if (!frame) {
-        const fallbackName = this.track.fallback || "idle";
+        const defaultFallback = this.state === "speaking" ? "waving" : "idle";
+        const fallbackName = this.track.fallback || defaultFallback;
         const fallback = this.assets.animations[fallbackName] || this.assets.animations.idle;
         this.track = {
           ...fallback,
           loopStart: 0,
-          fallback: "idle"
+          fallback: defaultFallback
         };
-        this.cue = null;
         this.startedAt = performance.now();
         frame = frameAtElapsed(this.track, 0);
       }
@@ -1779,6 +1779,22 @@
     isRoamingMoving = false;
     if (roamAnimId) cancelAnimationFrame(roamAnimId);
     petRenderer.setDragDirection("");
+  }
+  function triggerDirectedRoam(offsetDelta) {
+    if (isDragging || isDrawerOpen) return;
+    roamTargetOffset = Math.max(-45, Math.min(45, roamCurrentOffset + offsetDelta));
+    const diff = roamTargetOffset - roamCurrentOffset;
+    if (Math.abs(diff) < 4) {
+      roamTargetOffset = offsetDelta > 0 ? 35 : -35;
+    }
+    const dir = roamTargetOffset - roamCurrentOffset > 0 ? "right" : "left";
+    isRoamingMoving = true;
+    patrolStepsTotal += Math.round(Math.abs(roamTargetOffset - roamCurrentOffset));
+    if (roamPatrolCount) roamPatrolCount.textContent = `${patrolStepsTotal} \u6B65`;
+    petRenderer.setDragDirection(dir);
+    showRoamBubble(dir === "right" ? "\u{1F43E} \u6536\u5230\u6307\u4EE4\uFF0C\u5411\u53F3\u5DE1\u89C6..." : "\u{1F43E} \u6536\u5230\u6307\u4EE4\uFF0C\u5411\u5DE6\u5DE1\u89C6...", 2500);
+    updateAuditTrack(dir === "right" ? "Row 1 (running-right)" : "Row 2 (running-left)");
+    animateRoamStep();
   }
   function toggleAutoRoaming() {
     isAutoRoamingEnabled = !isAutoRoamingEnabled;
@@ -2720,6 +2736,43 @@
     });
     window.runtime.EventsOn("avatar:memory_updated", () => {
       refreshMemory();
+    });
+    window.runtime.EventsOn("avatar:pet_action", (act) => {
+      if (!act) return;
+      resetSleepTimer();
+      const cue = act.cue || "jumping";
+      petRenderer.triggerCue(cue, 1400);
+      const xpText = act.xp > 0 ? `+${act.xp} XP` : "";
+      if (act.action === "feed" || act.action === "rice" || act.action === "turbo") {
+        fishFedTotal += 1;
+        if (fishFeedCount) fishFeedCount.textContent = `${fishFedTotal} \u6B21`;
+        petRenderer.spawnHearts(100, 70, `\u{1F41F} ${xpText}`);
+      } else if (act.action === "wave") {
+        petRenderer.spawnHearts(100, 70, `\u{1F43E} ${xpText}`);
+      } else if (act.action === "jump") {
+        petRenderer.spawnHearts(100, 70, `\u2728 ${xpText}`);
+      } else if (act.action === "grass") {
+        petRenderer.spawnHearts(100, 70, `\u{1F33E} ${xpText}`);
+      } else if (act.action === "sleep") {
+        stopRoamingMove();
+        applyState("sleep");
+      } else {
+        petRenderer.spawnHearts(100, 70, `\u2764\uFE0F ${xpText}`);
+      }
+      if (act.message) {
+        showBubble(act.message, 3e3);
+      }
+      if (act.move === "right") {
+        triggerDirectedRoam(35);
+      } else if (act.move === "left") {
+        triggerDirectedRoam(-35);
+      } else if (act.action === "roam") {
+        triggerDirectedRoam(roamCurrentOffset > 0 ? -30 : 30);
+      }
+      if (act.bond) {
+        updateBondUI(act.bond);
+      }
+      updateAuditTrack(`Voice Action: ${act.action} -> ${cue}`);
     });
   }
   function initApp() {

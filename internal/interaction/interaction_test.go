@@ -199,6 +199,48 @@ func TestFastPathMemoryCommand(t *testing.T) {
 	}
 }
 
+func TestFastPathPetAction(t *testing.T) {
+	mockTTS := &testTrackingSynth{}
+	coord := orchestrator.NewCoordinator("test-sess")
+	fp := NewFastPathHandler(nil, nil)
+	player := NewSpeechPlayer(mockTTS)
+	runner := &mockTaskRunner{}
+	manager := NewManager(coord, fp, player, runner)
+
+	var capturedAction PetActionPayload
+	actionCalled := false
+	manager.SetPetActionCallback(func(act PetActionPayload) {
+		actionCalled = true
+		capturedAction = act
+	})
+
+	input := orchestrator.UserInput{
+		InputType: orchestrator.InputTypeText,
+		Text:      "小黑，翻个跟头跳一下",
+		Stability: orchestrator.StabilityFinal,
+	}
+
+	turnID, err := manager.Submit(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Submit error: %v", err)
+	}
+	if turnID == "" {
+		t.Fatal("expected valid turn ID")
+	}
+	if runner.called {
+		t.Fatal("expected pet action to be handled by fast-path without invoking task runner")
+	}
+	if !actionCalled {
+		t.Fatal("expected onPetAction callback to be invoked")
+	}
+	if capturedAction.Action != "jump" || capturedAction.Cue != "jumping" {
+		t.Fatalf("unexpected action payload: %+v", capturedAction)
+	}
+	if len(mockTTS.spoken) == 0 {
+		t.Fatal("expected confirmation voice to be spoken")
+	}
+}
+
 func TestFastPathLocalOnlyAndOfflineHandling(t *testing.T) {
 	mockTTS := &testTrackingSynth{}
 	coord := orchestrator.NewCoordinator("test-sess")

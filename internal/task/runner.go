@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"avatar/internal/cloud"
 	"avatar/internal/config"
 	"avatar/internal/dispatcher"
+	"avatar/internal/interaction"
 	"avatar/internal/llm"
 	"avatar/internal/memory"
 	"avatar/internal/orchestrator"
@@ -36,6 +38,7 @@ type Runner struct {
 	onSpeechChunk func(string)
 	onBondSync    func(persona.BondData)
 	onModelRoute  func(route string, model string, isEdge bool)
+	onPetAction   func(interaction.PetActionPayload)
 }
 
 // NewRunner creates a new cognitive task runner.
@@ -90,6 +93,91 @@ func (r *Runner) SetModelRouteCallback(cb func(route string, model string, isEdg
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.onModelRoute = cb
+}
+
+// SetPetActionCallback registers callback for pet actions extracted from LLM responses.
+func (r *Runner) SetPetActionCallback(cb func(interaction.PetActionPayload)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.onPetAction = cb
+}
+
+func resolveActionTag(tag string) interaction.PetActionPayload {
+	norm := strings.ToLower(strings.TrimSpace(tag))
+	switch norm {
+	case "jump", "jumping":
+		return interaction.PetActionPayload{
+			Action:  "jump",
+			Cue:     "jumping",
+			Message: "欢快地纵身一跃，在空中翻了个跟头！",
+			XP:      3,
+		}
+	case "feed", "eat", "running":
+		return interaction.PetActionPayload{
+			Action:  "feed",
+			Cue:     "running",
+			Message: "开心地大口吃着美味食物~",
+			XP:      3,
+		}
+	case "wave", "waving":
+		return interaction.PetActionPayload{
+			Action:  "wave",
+			Cue:     "waving",
+			Message: "开心地挥了挥小爪子打招呼~",
+			XP:      3,
+		}
+	case "failed", "dizzy":
+		return interaction.PetActionPayload{
+			Action:  "failed",
+			Cue:     "failed",
+			Message: "困惑地歪了歪身子装死~",
+			XP:      2,
+		}
+	case "review", "think", "thinking":
+		return interaction.PetActionPayload{
+			Action:  "review",
+			Cue:     "review",
+			Message: "若有所思地歪头审视观察~",
+			XP:      2,
+		}
+	case "roam_right":
+		return interaction.PetActionPayload{
+			Action:  "roam_right",
+			Cue:     "running-right",
+			Move:    "right",
+			Message: "迈着轻快猫步向右边巡视小跑~",
+			XP:      2,
+		}
+	case "roam_left":
+		return interaction.PetActionPayload{
+			Action:  "roam_left",
+			Cue:     "running-left",
+			Move:    "left",
+			Message: "迈着轻快猫步向左边巡视小跑~",
+			XP:      2,
+		}
+	case "roam":
+		return interaction.PetActionPayload{
+			Action:  "roam",
+			Cue:     "running",
+			Message: "轻快地在桌面上漫游巡视~",
+			XP:      2,
+		}
+	case "sleep", "idle":
+		return interaction.PetActionPayload{
+			Action:  "sleep",
+			Cue:     "idle",
+			Message: "收起小爪子趴下打盹~",
+			XP:      2,
+		}
+	default:
+		return interaction.PetActionPayload{
+			Action:  norm,
+			Cue:     norm,
+			Message: "高兴地做出了互动动作！",
+			XP:      2,
+		}
+	}
 }
 
 // SetCloudGateway sets the cloud gateway client to route complex LLM queries through backend server (:8088).
@@ -210,6 +298,22 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 
 	// 意图复杂度仲裁：决定使用端侧小模型还是云端大模型
 	isComplex, complexReason := dispatcher.CheckComplexity(task.GoalSnapshot)
+	var actionTriggered bool
+	actionRegex := regexp.MustCompile(`\[ACTION:([a-zA-Z0-9_-]+)\]`)
+	handleActionStream := func(text string) {
+		if !actionTriggered {
+			if m := actionRegex.FindStringSubmatch(text); len(m) > 1 {
+				actionTriggered = true
+				actPayload := resolveActionTag(m[1])
+				r.mu.RLock()
+				cb := r.onPetAction
+				r.mu.RUnlock()
+				if cb != nil {
+					cb(actPayload)
+				}
+			}
+		}
+	}
 	var activeClient *llm.Client
 	var activeModel string
 	var activeTemp float64
@@ -313,6 +417,7 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 
 		err = cloudGw.ChatStream(ctx, string(task.TurnID), task.GoalSnapshot, activePersonaName, func(token string) error {
 			fullResponse += token
+			handleActionStream(fullResponse)
 			chunks := r.splitter.Push(token)
 			for _, chunk := range chunks {
 				select {
@@ -341,6 +446,7 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 
 		err = activeClient.StreamChat(ctx, req, func(token string) error {
 			fullResponse += token
+			handleActionStream(fullResponse)
 			chunks := r.splitter.Push(token)
 			for _, chunk := range chunks {
 				select {
@@ -362,6 +468,7 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 			}
 			err = cloudGw.ChatStream(ctx, string(task.TurnID), task.GoalSnapshot, activePersonaName, func(token string) error {
 				fullResponse += token
+				handleActionStream(fullResponse)
 				chunks := r.splitter.Push(token)
 				for _, chunk := range chunks {
 					select {

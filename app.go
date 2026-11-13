@@ -11,6 +11,7 @@ import (
 	"avatar/internal/cloud"
 	"avatar/internal/config"
 	"avatar/internal/engine"
+	"avatar/internal/interaction"
 	"avatar/internal/llm"
 	"avatar/internal/memory"
 	"avatar/internal/persona"
@@ -196,6 +197,25 @@ func (a *App) startup(ctx context.Context) {
 			"route":   route,
 			"model":   model,
 			"is_edge": isEdge,
+		})
+	})
+
+	// 注册桌宠动作与动画回调 (支持语音指令/大模型触发肢体互动)
+	a.pipeline.SetPetActionCallback(func(payload interaction.PetActionPayload) {
+		fmt.Printf("[桌宠动作] 执行动作: %s | 动画轨: %s | 位移: %s | 描述: %s\n", payload.Action, payload.Cue, payload.Move, payload.Message)
+		var bondData persona.BondData
+		if a.bondMgr != nil && payload.XP > 0 {
+			a.bondMgr.AddInteraction()
+			bondData = a.bondMgr.GetData()
+			a.emitEvent("avatar:bond", bondData)
+		}
+		a.emitEvent("avatar:pet_action", map[string]interface{}{
+			"action":  payload.Action,
+			"cue":     payload.Cue,
+			"move":    payload.Move,
+			"message": payload.Message,
+			"xp":      payload.XP,
+			"bond":    bondData,
 		})
 	})
 

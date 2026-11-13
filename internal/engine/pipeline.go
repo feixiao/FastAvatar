@@ -121,6 +121,16 @@ func (p *Pipeline) SetModelRouteCallback(cb func(route string, model string, isE
 	}
 }
 
+// SetPetActionCallback registers callback for pet action animations triggered via fast-path or LLM.
+func (p *Pipeline) SetPetActionCallback(cb func(interaction.PetActionPayload)) {
+	if p.interaction != nil {
+		p.interaction.SetPetActionCallback(cb)
+	}
+	if p.taskRunner != nil {
+		p.taskRunner.SetPetActionCallback(cb)
+	}
+}
+
 // State returns current coordinator state.
 func (p *Pipeline) State() State {
 	return p.coordinator.State()

@@ -534,6 +534,24 @@ function stopRoamingMove() {
   petRenderer.setDragDirection("");
 }
 
+function triggerDirectedRoam(offsetDelta) {
+  if (isDragging || isDrawerOpen) return;
+  roamTargetOffset = Math.max(-45, Math.min(45, roamCurrentOffset + offsetDelta));
+  const diff = roamTargetOffset - roamCurrentOffset;
+  if (Math.abs(diff) < 4) {
+    roamTargetOffset = offsetDelta > 0 ? 35 : -35;
+  }
+  const dir = (roamTargetOffset - roamCurrentOffset) > 0 ? "right" : "left";
+  isRoamingMoving = true;
+  patrolStepsTotal += Math.round(Math.abs(roamTargetOffset - roamCurrentOffset));
+  if (roamPatrolCount) roamPatrolCount.textContent = `${patrolStepsTotal} 步`;
+
+  petRenderer.setDragDirection(dir);
+  showRoamBubble(dir === "right" ? "🐾 收到指令，向右巡视..." : "🐾 收到指令，向左巡视...", 2500);
+  updateAuditTrack(dir === "right" ? "Row 1 (running-right)" : "Row 2 (running-left)");
+  animateRoamStep();
+}
+
 function toggleAutoRoaming() {
   isAutoRoamingEnabled = !isAutoRoamingEnabled;
   if (window.go && window.go.main && window.go.main.App) {
@@ -1603,6 +1621,52 @@ if (window.runtime) {
   });
   window.runtime.EventsOn("avatar:memory_updated", () => {
     refreshMemory();
+  });
+  window.runtime.EventsOn("avatar:pet_action", (act) => {
+    if (!act) return;
+    resetSleepTimer();
+
+    // 1. 触发对应的动画轨道
+    const cue = act.cue || "jumping";
+    petRenderer.triggerCue(cue, 1400);
+
+    // 2. 特效与气泡
+    const xpText = act.xp > 0 ? `+${act.xp} XP` : "";
+    if (act.action === "feed" || act.action === "rice" || act.action === "turbo") {
+      fishFedTotal += 1;
+      if (fishFeedCount) fishFeedCount.textContent = `${fishFedTotal} 次`;
+      petRenderer.spawnHearts(100, 70, `🐟 ${xpText}`);
+    } else if (act.action === "wave") {
+      petRenderer.spawnHearts(100, 70, `🐾 ${xpText}`);
+    } else if (act.action === "jump") {
+      petRenderer.spawnHearts(100, 70, `✨ ${xpText}`);
+    } else if (act.action === "grass") {
+      petRenderer.spawnHearts(100, 70, `🌾 ${xpText}`);
+    } else if (act.action === "sleep") {
+      stopRoamingMove();
+      applyState("sleep");
+    } else {
+      petRenderer.spawnHearts(100, 70, `❤️ ${xpText}`);
+    }
+
+    if (act.message) {
+      showBubble(act.message, 3000);
+    }
+
+    // 3. 漫游与空间位移联动
+    if (act.move === "right") {
+      triggerDirectedRoam(35);
+    } else if (act.move === "left") {
+      triggerDirectedRoam(-35);
+    } else if (act.action === "roam") {
+      triggerDirectedRoam(roamCurrentOffset > 0 ? -30 : 30);
+    }
+
+    // 4. 羁绊数值同步
+    if (act.bond) {
+      updateBondUI(act.bond);
+    }
+    updateAuditTrack(`Voice Action: ${act.action} -> ${cue}`);
   });
 }
 

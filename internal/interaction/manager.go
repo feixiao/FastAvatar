@@ -20,6 +20,7 @@ type Manager struct {
 	mu            sync.RWMutex
 	onSpeechChunk func(string)
 	onPersonaSync func(persona.PersonaSlot)
+	onPetAction   func(PetActionPayload)
 }
 
 // NewManager creates a new interaction manager.
@@ -58,6 +59,13 @@ func (m *Manager) SetPersonaSyncCallback(cb func(persona.PersonaSlot)) {
 	m.onPersonaSync = cb
 }
 
+// SetPetActionCallback registers callback for pet action animations.
+func (m *Manager) SetPetActionCallback(cb func(PetActionPayload)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.onPetAction = cb
+}
+
 // Submit handles user input: checks fast-path first, then falls back to background task runner.
 func (m *Manager) Submit(ctx context.Context, input orchestrator.UserInput) (orchestrator.TurnID, error) {
 	// 1. 打断任何正在进行中的活动
@@ -80,7 +88,7 @@ func (m *Manager) Submit(ctx context.Context, input orchestrator.UserInput) (orc
 
 	// 4. 0.1ms 极速快路径处理
 	if m.fastPath != nil {
-		handled, confirm, newSlot := m.fastPath.Evaluate(input.Text)
+		handled, confirm, newSlot, petAction := m.fastPath.Evaluate(input.Text)
 		if handled {
 			if newSlot != nil {
 				m.mu.RLock()
@@ -91,6 +99,14 @@ func (m *Manager) Submit(ctx context.Context, input orchestrator.UserInput) (orc
 				}
 			}
 
+			if petAction != nil {
+				m.mu.RLock()
+				actCb := m.onPetAction
+				m.mu.RUnlock()
+				if actCb != nil {
+					actCb(*petAction)
+				}
+			}
 			m.coord.SetState(orchestrator.StateSpeaking)
 			m.mu.RLock()
 			speechCb := m.onSpeechChunk

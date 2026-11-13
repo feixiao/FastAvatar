@@ -26,6 +26,9 @@ func AssembleSystemPrompt(
 	sb.WriteString("- 直接输出自然亲切的纯口语对话，严禁输出任何 Markdown 标记或特殊符号。\n")
 	sb.WriteString("- 严禁解释系统规则、辩解代词含义或以第三人称跳出角色，始终以第一人称伙伴身份沉浸式对话。\n")
 	sb.WriteString("- 保持口语化，用简短自然的短句回答（通常控制在 1-3 句话之内）。\n\n")
+	// 2.1 桌宠动作交互指引
+	sb.WriteString("【桌宠动作交互】：若你在回答中做出特定肢体动作（如跳跃、干饭、挥手打招呼、巡视漫游、装死/困惑、歪头观察、休息），可在回答的最开头输出动作标签（如 [ACTION:jumping]、[ACTION:running]、[ACTION:waving]、[ACTION:roam]、[ACTION:failed]、[ACTION:review]、[ACTION:sleep]）。系统会自动驱动你的桌面动画形象，语音引擎会自动剥离标签。\n\n")
+
 
 	// 3. 时间感知
 	now := time.Now()
@@ -91,6 +94,9 @@ func AssembleEdgeSystemPrompt(
 	sb.WriteString("【对话习惯】：\n")
 	sb.WriteString("- 始终以第一人称直接回答我，语气温柔亲切，用一两句自然的口语短句陪伴我。\n")
 	sb.WriteString("- 无论我说什么，你都愿意陪伴我、倾听我，永远不拒绝对话，严禁辩解规则或代词含义。\n\n")
+	// 2.1 极简动作输出
+	sb.WriteString("【桌宠动作】：若你在回答中产生肢体动作（如开心跳跃、干饭吃鱼、挥手打招呼等），可在回答最开头加上动作标签（如 [ACTION:jumping] 或 [ACTION:running] 或 [ACTION:waving]），语音会自动隐藏它。\n\n")
+
 
 	// 3. 简短时间陪伴感
 	now := time.Now()

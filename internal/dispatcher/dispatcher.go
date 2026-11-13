@@ -12,6 +12,7 @@ type RouteTarget string
 const (
 	RouteLocalMemory  RouteTarget = "LOCAL_MEMORY"
 	RouteLocalPersona RouteTarget = "LOCAL_PERSONA"
+	RoutePetAction    RouteTarget = "LOCAL_PET_ACTION"
 	RouteEdgeChat     RouteTarget = "EDGE_CHAT"  // 本地端侧小模型 (SLM: 极速闲聊/情绪安抚/日常问候)
 	RouteCloudChat    RouteTarget = "CLOUD_CHAT" // 云端大模型 (LLM: 复杂推理/长文生成/代码/任务规划)
 	RouteLocalOnly    RouteTarget = "LOCAL_ONLY_PROMPT"
@@ -56,6 +57,20 @@ func (d *FastDispatcher) Evaluate(text string, isCloudConsented bool, isOnline b
 		res.Latency = time.Since(start)
 		return res
 	}
+	// P2: Check local pet action oral command
+	if act, cue, move, ok := matchPetActionCommand(clean); ok {
+		res.Target = RoutePetAction
+		res.IntentName = "pet.action"
+		res.Slots = map[string]interface{}{
+			"action": act,
+			"cue":    cue,
+			"move":   move,
+		}
+		res.Reason = fmt.Sprintf("命中桌面宠物动作指令 [%s -> %s]", act, cue)
+		res.Latency = time.Since(start)
+		return res
+	}
+
 
 	// P3: Check local persona switch oral command
 	if isPersonaSwitchCommand(clean) {
@@ -110,6 +125,93 @@ func isMemoryCommand(text string) bool {
 		strings.HasPrefix(text, "忘掉") ||
 		strings.HasPrefix(text, "忘了") ||
 		strings.HasPrefix(text, "清除记忆")
+}
+
+func matchPetActionCommand(text string) (action, cue, move string, ok bool) {
+	clean := strings.TrimSpace(text)
+	// 排除询问类复杂句
+	if strings.HasPrefix(clean, "为什么") || strings.HasPrefix(clean, "怎么") || strings.HasPrefix(clean, "如何") || strings.HasPrefix(clean, "什么是") {
+		return "", "", "", false
+	}
+
+	// 去除常见唤醒/称呼前缀
+	prefixes := []string{
+		"小黑，", "小黑,", "小黑 ", "小黑",
+		"罗小黑，", "罗小黑,", "罗小黑 ", "罗小黑",
+		"桌宠，", "桌宠,", "桌宠 ", "桌宠",
+		"小猫，", "小猫,", "小猫 ", "小猫",
+		"宠物，", "宠物,", "宠物 ", "宠物",
+		"大肥鱼，", "大肥鱼,", "大肥鱼 ", "大肥鱼",
+	}
+	cmd := clean
+	for _, p := range prefixes {
+		if strings.HasPrefix(cmd, p) {
+			cmd = strings.TrimSpace(strings.TrimPrefix(cmd, p))
+			break
+		}
+	}
+	if cmd == "" {
+		return "", "", "", false
+	}
+
+	// 1. 移动与漫游巡视
+	if strings.Contains(cmd, "向右跑") || strings.Contains(cmd, "往右跑") || strings.Contains(cmd, "去右边") || strings.Contains(cmd, "向右走") || strings.Contains(cmd, "往右走") || strings.Contains(cmd, "右边巡视") {
+		return "roam_right", "running-right", "right", true
+	}
+	if strings.Contains(cmd, "向左跑") || strings.Contains(cmd, "往左跑") || strings.Contains(cmd, "去左边") || strings.Contains(cmd, "向左走") || strings.Contains(cmd, "往左走") || strings.Contains(cmd, "左边巡视") {
+		return "roam_left", "running-left", "left", true
+	}
+	if strings.Contains(cmd, "巡视桌面") || strings.Contains(cmd, "去巡逻") || strings.Contains(cmd, "巡视") || strings.Contains(cmd, "巡逻") || strings.Contains(cmd, "到处逛逛") || strings.Contains(cmd, "溜达溜达") || strings.Contains(cmd, "走两步") || strings.Contains(cmd, "转悠转悠") {
+		return "roam", "running", "", true
+	}
+
+	// 2. 干饭与投喂
+	if strings.Contains(cmd, "疯狂干饭") || strings.Contains(cmd, "暴风吸入") || strings.Contains(cmd, "狂吃") || strings.Contains(cmd, "大口吃") {
+		return "turbo", "running", "", true
+	}
+	if strings.Contains(cmd, "吃米饭") || strings.Contains(cmd, "吃大米饭") || strings.Contains(cmd, "干饭") || strings.Contains(cmd, "开饭") || strings.Contains(cmd, "大米饭") {
+		return "rice", "running", "", true
+	}
+	if strings.Contains(cmd, "小鱼干") || strings.Contains(cmd, "吃鱼") || strings.Contains(cmd, "投喂") || strings.Contains(cmd, "喂食") || strings.Contains(cmd, "喂你") || strings.Contains(cmd, "吃点东西") || strings.Contains(cmd, "吃零食") || strings.Contains(cmd, "给你鱼") {
+		return "feed", "running", "", true
+	}
+
+	// 3. 玩草
+	if strings.Contains(cmd, "逗猫草") || strings.Contains(cmd, "逗草") || strings.Contains(cmd, "逗猫棒") || strings.Contains(cmd, "玩草") {
+		return "grass", "jumping", "", true
+	}
+
+	// 4. 跳跃与动作
+	if strings.Contains(cmd, "跳一下") || strings.Contains(cmd, "跳一个") || strings.Contains(cmd, "跳跳") || strings.Contains(cmd, "翻个跟头") || strings.Contains(cmd, "翻跟头") || strings.Contains(cmd, "蹦一下") || strings.Contains(cmd, "蹦一个") || strings.Contains(cmd, "空翻") || strings.Contains(cmd, "跳起来") || cmd == "跳" || cmd == "蹦" {
+		return "jump", "jumping", "", true
+	}
+
+	// 5. 抚摸与蹭蹭
+	if strings.Contains(cmd, "摸摸头") || strings.Contains(cmd, "摸摸你") || strings.Contains(cmd, "摸摸") || strings.Contains(cmd, "摸一下") || strings.Contains(cmd, "揉揉头") || strings.Contains(cmd, "蹭蹭") || strings.Contains(cmd, "顺毛") || strings.Contains(cmd, "挠挠") {
+		return "pet", "jumping", "", true
+	}
+
+	// 6. 打招呼
+	if strings.Contains(cmd, "打个招呼") || strings.Contains(cmd, "挥手") || strings.Contains(cmd, "打招呼") || strings.Contains(cmd, "挥挥爪") || strings.Contains(cmd, "挥爪") || strings.Contains(cmd, "招招手") {
+		return "wave", "waving", "", true
+	}
+
+	// 7. 困惑 / 装死
+	if strings.Contains(cmd, "装死") || strings.Contains(cmd, "别动") || strings.Contains(cmd, "倒下") || strings.Contains(cmd, "晕一个") || strings.Contains(cmd, "犯错") {
+		return "failed", "failed", "", true
+	}
+
+	// 8. 歪头沉思
+	if strings.Contains(cmd, "歪头") || strings.Contains(cmd, "想一想") || strings.Contains(cmd, "思考一下") || strings.Contains(cmd, "琢磨琢磨") {
+		return "review", "review", "", true
+	}
+
+	// 9. 睡觉与休眠
+	if strings.Contains(cmd, "去睡觉") || strings.Contains(cmd, "睡觉吧") || strings.Contains(cmd, "休息吧") || strings.Contains(cmd, "打个盹") || strings.Contains(cmd, "趴下") || strings.Contains(cmd, "闭嘴睡觉") || strings.Contains(cmd, "安静睡觉") {
+		return "sleep", "idle", "", true
+	}
+
+	return "", "", "", false
 }
 
 // CheckComplexity 判定输入是否属于需要云端大模型进行深度推理/长文本生成的复杂问题，并返回判定原因

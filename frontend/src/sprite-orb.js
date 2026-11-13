@@ -58,7 +58,7 @@ export const PET_STATE_ANIMATION_POLICY = Object.freeze({
   sleep: { name: "idle", mode: "loop" },
   listening: { name: "waiting", mode: "loop", blocksCues: true },
   thinking: { name: "review", mode: "loop", blocksCues: true },
-  speaking: { name: "waving", mode: "loop", blocksCues: true },
+  speaking: { name: "waving", mode: "loop", blocksCues: false },
   error: { name: "failed", mode: "once", blocksCues: true },
 });
 
@@ -83,10 +83,14 @@ export function spritePlaybackSelection({
   dragDirection = "",
   cue = null,
 } = {}) {
-  const fallback = baseWorking || state === "working" ? "running" : "idle";
+  const fallback =
+    state === "speaking"
+      ? "waving"
+      : baseWorking || state === "working"
+      ? "running"
+      : "idle";
   const statePolicy =
     PET_STATE_ANIMATION_POLICY[state] || { name: fallback, mode: "loop" };
-
   if (dragDirection === "left" || dragDirection === "right") {
     return {
       name: `running-${dragDirection}`,
