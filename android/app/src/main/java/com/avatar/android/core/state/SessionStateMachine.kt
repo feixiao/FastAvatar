@@ -249,8 +249,10 @@ class SessionStateMachine(
                 }
 
                 RouteTarget.CLOUD_CHAT -> {
+                    val needCloud = dispatchResult.slots["need_cloud"] as? Boolean ?: true
+                    val domain = dispatchResult.slots["primary_domain"] as? String ?: "chat"
+                    dispatcher.updateContext(if (needCloud) "CLOUD_CHAT" else "EDGE_CHAT", domain)
                     _state.value = SessionState.CLOUD_CONNECTING
-
                     if (simulateCloudResponse != null) {
                         _state.value = SessionState.CLOUD_TURN
                         cloudClient.startTurn(turnId)

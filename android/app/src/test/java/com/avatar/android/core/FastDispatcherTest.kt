@@ -64,6 +64,40 @@ class FastDispatcherTest {
         assertEquals(RouteTarget.OFFLINE_PROMPT, res.target)
     }
 
+
+    @Test
+    fun testPetActionCommands_RoutedToLocalPetAction() {
+        val resSit = dispatcher.evaluate("蹲下", isCloudConsented = true, isOnline = true)
+        assertEquals(RouteTarget.LOCAL_PET_ACTION, resSit.target)
+        assertEquals("sit", resSit.slots["action"])
+
+        val resJump = dispatcher.evaluate("跳一下", isCloudConsented = true, isOnline = true)
+        assertEquals(RouteTarget.LOCAL_PET_ACTION, resJump.target)
+        assertEquals("jump", resJump.slots["action"])
+    }
+
+    @Test
+    fun testTinyClassifierAndDSTContextInheritance() {
+        // 1. 短句数理公式 -> need_cloud = true
+        val mathRes = dispatcher.evaluate("求导 x^3·lnx", isCloudConsented = true, isOnline = true)
+        assertEquals(true, mathRes.slots["need_cloud"])
+        assertEquals("math", mathRes.slots["primary_domain"])
+
+        // 2. 长句生活闲聊 -> need_cloud = false (杜绝字数一刀切)
+        val storyRes = dispatcher.evaluate(
+            "今天我和朋友去公园散步看到一只流浪小猫好开心",
+            isCloudConsented = true,
+            isOnline = true
+        )
+        assertEquals(false, storyRes.slots["need_cloud"])
+        assertEquals("chat", storyRes.slots["primary_domain"])
+
+        // 3. 多轮 DST 上下文继承: 上一轮云端写代码 -> 本轮短代词追问 "第三行是什么意思" 继承云端
+        dispatcher.updateContext("CLOUD_CHAT", "code")
+        val followupRes = dispatcher.evaluate("第三行是什么意思", isCloudConsented = true, isOnline = true)
+        assertEquals(true, followupRes.slots["need_cloud"])
+        assertEquals("context_followup", followupRes.slots["primary_domain"])
+    }
     @Test
     fun testDispatcherEvaluationLatency_Under5ms() {
         val query = "把空调调到22.5度"

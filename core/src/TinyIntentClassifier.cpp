@@ -38,6 +38,11 @@ static constexpr std::string_view s_architecture_features[] = {
     "论文综述", "学术推导", "深入分析", "对比分析", "原理解释", "技术方案"
 };
 
+// 3.1 泛化百科推理与语义追问特征
+static constexpr std::string_view s_inquiry_features[] = {
+    "为什么", "什么意思", "怎么回事", "原理", "机制", "区别",
+    "分析", "总结", "翻译", "大纲", "规划", "建议", "评价", "如何"
+};
 // 4. 多轮对话短指代与追问特征 (用于 DST 继承)
 static constexpr std::string_view s_followup_features[] = {
     "第", "行", "为什么", "怎么回事", "改一下", "换个写法", "再优化",
@@ -96,6 +101,13 @@ ClassificationResult TinyIntentClassifier::Classify(
         }
     }
 
+    int inquiry_matches = 0;
+    for (const auto& feat : s_inquiry_features) {
+        if (q.find(feat) != std::string_view::npos) {
+            inquiry_matches++;
+        }
+    }
+
     int casual_matches = 0;
     for (const auto& feat : s_casual_features) {
         if (q.find(feat) != std::string_view::npos) {
@@ -118,7 +130,10 @@ ClassificationResult TinyIntentClassifier::Classify(
         logit += arch_matches * 2.8f;
     }
 
-    // 4. 多轮对话状态跟踪 (DST: Dialogue State Tracking)
+    // 3.1 泛化推理与百科探究特征
+    if (inquiry_matches > 0) {
+        logit += inquiry_matches * 1.8f;
+    }
     // 若上一轮经由云端大模型深度处理 (如代码/数理/架构)，当前短指代追问强制继承
     bool is_context_followup = false;
     if (last_route == "CLOUD_CHAT" || last_domain == "code" || last_domain == "math" || last_domain == "architecture") {
@@ -139,9 +154,9 @@ ClassificationResult TinyIntentClassifier::Classify(
     }
 
     // 6. 常见儿童级短问答修正 (如短句 "为什么吃鱼"、"为什么天黑")
-    // 文本短且无专业术语时，抑制 "为什么" 的云端倾向
-    if (q.find("为什么") != std::string_view::npos && q.size() <= 24 && math_matches == 0 && code_matches == 0 && arch_matches == 0) {
-        logit -= 2.0f;
+    // 文本极短 (<= 18 字节，约6个汉字以内) 且无专业术语时，抑制 "为什么" 的云端倾向
+    if (q.find("为什么") != std::string_view::npos && q.size() <= 18 && math_matches == 0 && code_matches == 0 && arch_matches == 0) {
+        logit -= 2.2f;
     }
 
     float prob = Sigmoid(logit);

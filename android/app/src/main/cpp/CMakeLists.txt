@@ -30,6 +30,7 @@ include_directories(
 set(AUDIO_AGENT_SOURCES
     ${CORE_DIR}/src/CpuAffinity.cpp
     ${CORE_DIR}/src/IntentArbiter.cpp
+    ${CORE_DIR}/src/TinyIntentClassifier.cpp
     ${CORE_DIR}/src/StreamingSentenceChunker.cpp
     ${CORE_DIR}/src/WatchdogAndRepetition.cpp
     ${CORE_DIR}/src/ThreeTierMemory.cpp

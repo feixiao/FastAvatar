@@ -97,11 +97,27 @@ func TestDispatcher_EvaluationRoutes(t *testing.T) {
 			wantIntent: "dialog.open_ended",
 		},
 		{
-			name:       "open-ended meta inquiry to cloud",
-			text:       "什么意思不能跟我聊天吗",
+			name:       "short math derivation to cloud",
+			text:       "求导 x^3·lnx",
 			consented:  true,
 			online:     true,
 			wantTarget: RouteCloudChat,
+			wantIntent: "dialog.open_ended",
+		},
+		{
+			name:       "long casual story stays on edge",
+			text:       "今天我和朋友去公园散步看到一只流浪小猫，喂了它一点猫粮好开心",
+			consented:  true,
+			online:     true,
+			wantTarget: RouteEdgeChat,
+			wantIntent: "dialog.open_ended",
+		},
+		{
+			name:       "short casual why stays on edge",
+			text:       "为什么吃鱼",
+			consented:  true,
+			online:     true,
+			wantTarget: RouteEdgeChat,
 			wantIntent: "dialog.open_ended",
 		},
 	}
@@ -119,6 +135,22 @@ func TestDispatcher_EvaluationRoutes(t *testing.T) {
 				t.Errorf("latency too high: %v", res.Latency)
 			}
 		})
+	}
+}
+
+func TestDispatcher_MultiTurnDSTContextInheritance(t *testing.T) {
+	d := NewFastDispatcher()
+
+	// 第1轮：代码提问 -> 云端
+	res1 := d.EvaluateWithContext("帮我用 Rust 写一个无锁队列", true, true, "", "")
+	if res1.Target != RouteCloudChat || res1.PrimaryDomain != "code" {
+		t.Fatalf("expected CLOUD_CHAT/code on turn 1, got %s/%s", res1.Target, res1.PrimaryDomain)
+	}
+
+	// 第2轮：短代词追问 "第三行是什么意思" -> 必须继承云端上下文
+	res2 := d.EvaluateWithContext("第三行是什么意思", true, true, string(res1.Target), res1.PrimaryDomain)
+	if res2.Target != RouteCloudChat || res2.PrimaryDomain != "context_followup" {
+		t.Fatalf("expected CLOUD_CHAT/context_followup on turn 2, got %s/%s (%s)", res2.Target, res2.PrimaryDomain, res2.Reason)
 	}
 }
 

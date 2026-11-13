@@ -4,6 +4,7 @@
 #include "MnnLlmEngine.hpp"
 #include "MockCloudLlmEngine.hpp"
 #include "SherpaOnnxPerceptionEngine.hpp"
+#include "IntentArbiter.hpp"
 #include <android/log.h>
 
 #define TAG "AudioAgentNative"
@@ -468,6 +469,35 @@ Java_com_ai_audioagent_nativebridge_AudioAgentNative_nativeGetTopPerformanceCore
         env->SetIntArrayRegion(result, 0, static_cast<jsize>(cores.size()), reinterpret_cast<const jint*>(cores.data()));
     }
     return result;
+}
+
+/**
+ * @brief JNI 导出：调用 C++ IntentArbiter + TinyIntentClassifier 进行统一多域指令分流与上下文复杂度分类
+ */
+JNIEXPORT jstring JNICALL
+Java_com_ai_audioagent_nativebridge_AudioAgentNative_nativeDispatchIntentContext(
+    JNIEnv* env,
+    jclass /*clazz*/,
+    jstring j_query,
+    jstring j_last_route,
+    jstring j_last_domain
+) {
+    if (!j_query) return env->NewStringUTF("");
+    const char* c_query = env->GetStringUTFChars(j_query, nullptr);
+    const char* c_route = j_last_route ? env->GetStringUTFChars(j_last_route, nullptr) : "";
+    const char* c_domain = j_last_domain ? env->GetStringUTFChars(j_last_domain, nullptr) : "";
+
+    std::string result = IntentArbiter::ResolveDispatchJson(
+        c_query ? c_query : "",
+        c_route ? c_route : "",
+        c_domain ? c_domain : ""
+    );
+
+    env->ReleaseStringUTFChars(j_query, c_query);
+    if (j_last_route) env->ReleaseStringUTFChars(j_last_route, c_route);
+    if (j_last_domain) env->ReleaseStringUTFChars(j_last_domain, c_domain);
+
+    return env->NewStringUTF(result.c_str());
 }
 
 /**

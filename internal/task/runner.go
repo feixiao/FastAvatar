@@ -34,6 +34,8 @@ type Runner struct {
 	coord         *orchestrator.Coordinator
 	splitter      *splitter.SentenceSplitter
 	history       []llm.Message
+	lastRoute     string
+	lastDomain    string
 	mu            sync.RWMutex
 	onSpeechChunk func(string)
 	onBondSync    func(persona.BondData)
@@ -261,8 +263,9 @@ func (r *Runner) ClearHistory() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.history = make([]llm.Message, 0)
+	r.lastRoute = ""
+	r.lastDomain = ""
 }
-
 // Run implements orchestrator.TaskRunner.
 func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orchestrator.TaskEvent)) error {
 	now := time.Now()
@@ -349,8 +352,12 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 	var fullResponse string
 	r.splitter.Reset()
 
-	// 意图复杂度仲裁：决定使用端侧小模型还是云端大模型
-	isComplex, complexReason := dispatcher.CheckComplexity(task.GoalSnapshot)
+	// 意图复杂度仲裁 (基于 C++ TinyIntentClassifier + 多轮 DST 状态跟踪)
+	r.mu.RLock()
+	prevRoute := r.lastRoute
+	prevDomain := r.lastDomain
+	r.mu.RUnlock()
+	isComplex, complexReason, currentDomain := dispatcher.CheckComplexityWithContext(task.GoalSnapshot, prevRoute, prevDomain)
 	var actionTriggered bool
 	actionRegex := regexp.MustCompile(`\[ACTION:([a-zA-Z0-9_-]+)\]`)
 	handleActionStream := func(text string) {
@@ -398,8 +405,16 @@ func (r *Runner) Run(ctx context.Context, task orchestrator.Task, emit func(orch
 	if isComplex && cloudGw != nil {
 		routeLabel = "CLOUD_GATEWAY"
 		activeModel = "cloud"
+		r.mu.Lock()
+		r.lastRoute = "CLOUD_CHAT"
+		r.lastDomain = currentDomain
+		r.mu.Unlock()
 	} else {
 		routeLabel = "EDGE_SLM"
+		r.mu.Lock()
+		r.lastRoute = "EDGE_CHAT"
+		r.lastDomain = currentDomain
+		r.mu.Unlock()
 		if edgeCli != nil && edgeCfg.BaseURL != "" {
 			activeClient = edgeCli
 			activeModel = edgeCfg.Model

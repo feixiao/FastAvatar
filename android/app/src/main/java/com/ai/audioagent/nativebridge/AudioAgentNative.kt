@@ -248,5 +248,39 @@ class AudioAgentNative(private val listener: AudioAgentListener? = null) {
 
         @JvmStatic
         external fun nativeGetTopPerformanceCores(topN: Int): IntArray
+
+        @Volatile
+        private var nativeLibLoaded = false
+
+        private fun ensureNativeLoaded(): Boolean {
+            if (nativeLibLoaded) return true
+            return try {
+                System.loadLibrary("audio_agent")
+                nativeLibLoaded = true
+                true
+            } catch (_: Throwable) {
+                false
+            }
+        }
+
+        @JvmStatic
+        external fun nativeDispatchIntentContext(
+            query: String,
+            lastRoute: String,
+            lastDomain: String
+        ): String
+
+        fun dispatchIntentContext(
+            query: String,
+            lastRoute: String = "",
+            lastDomain: String = ""
+        ): String? {
+            if (!ensureNativeLoaded()) return null
+            return try {
+                nativeDispatchIntentContext(query, lastRoute, lastDomain)
+            } catch (_: UnsatisfiedLinkError) {
+                null
+            }
+        }
     }
 }
