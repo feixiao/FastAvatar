@@ -110,20 +110,27 @@ export class PetRenderer {
   }
 
   triggerCue(name, durationMs = 1200) {
+    const cueId = Date.now() + Math.random();
     this.cue = {
-      id: Date.now() + Math.random(),
+      id: cueId,
       name,
     };
     this.resetTrack();
 
     if (durationMs > 0) {
       setTimeout(() => {
-        if (this.cue && this.cue.name === name) {
+        if (this.cue && this.cue.id === cueId) {
           this.cue = null;
           this.resetTrack();
         }
       }, durationMs);
     }
+  }
+
+  clearCue() {
+    if (!this.cue) return;
+    this.cue = null;
+    this.resetTrack();
   }
 
   resetTrack() {

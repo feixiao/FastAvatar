@@ -1217,19 +1217,25 @@
       this.resetTrack();
     }
     triggerCue(name, durationMs = 1200) {
+      const cueId = Date.now() + Math.random();
       this.cue = {
-        id: Date.now() + Math.random(),
+        id: cueId,
         name
       };
       this.resetTrack();
       if (durationMs > 0) {
         setTimeout(() => {
-          if (this.cue && this.cue.name === name) {
+          if (this.cue && this.cue.id === cueId) {
             this.cue = null;
             this.resetTrack();
           }
         }, durationMs);
       }
+    }
+    clearCue() {
+      if (!this.cue) return;
+      this.cue = null;
+      this.resetTrack();
     }
     resetTrack() {
       if (!this.assets) return;
@@ -1456,6 +1462,9 @@
   var roamTimer = null;
   var roamAnimId = null;
   var roamBubbleTimer = null;
+  var isDirectedRoaming = false;
+  var roamWaypoints = [];
+  var roamLastFrameTs = 0;
   var fishFedTotal = 28;
   var patrolStepsTotal = 142;
   var currentMode = "hands_free";
@@ -1687,7 +1696,9 @@
       playWhalePose("sleep-waking", 1600);
     }
     if (state === "idle") {
-      updateAuditTrack("Row 0 (idle)");
+      if (!isDirectedRoaming) {
+        updateAuditTrack("Row 0 (idle)");
+      }
       const cur = subtitleText.textContent || "";
       if (!cur || cur.startsWith("\u6B63\u5728") || cur.startsWith("\u503E\u542C") || cur.startsWith("\u{1F399}\uFE0F")) {
         subtitleText.textContent = currentMode === "hands_free" ? "\u968F\u65F6\u5F00\u53E3\u6216\u6478\u6478\u6211\u7545\u804A..." : "\u6309\u4F4F\u7A7A\u683C\u8BF4\u8BDD...";
@@ -1698,19 +1709,25 @@
       }
       scheduleNextRoamDecision();
     } else if (state === "thinking") {
-      stopRoamingMove();
-      updateAuditTrack("Row 8 (review)");
+      if (!isDirectedRoaming) {
+        stopRoamingMove();
+        updateAuditTrack("Row 8 (review)");
+      }
       subtitleText.textContent = "\u6B63\u5728\u601D\u8003\u5E76\u7EC4\u7EC7\u56DE\u7B54...";
     } else if (state === "listening") {
       stopRoamingMove();
       updateAuditTrack("Row 6 (waiting)");
       subtitleText.textContent = "\u503E\u542C\u4E2D...";
     } else if (state === "speaking") {
-      stopRoamingMove();
-      updateAuditTrack("Row 3 (waving)");
+      if (!isDirectedRoaming) {
+        stopRoamingMove();
+        updateAuditTrack("Row 3 (waving)");
+      }
     } else if (state === "sleep") {
       stopRoamingMove();
       hideBubble();
+    } else if (state === "error") {
+      stopRoamingMove();
     }
     resetSleepTimer();
   }
@@ -1741,11 +1758,14 @@
     }, delay);
   }
   function makeAutonomousMoveDecision() {
-    if (currentState !== "idle" || isDragging || isDrawerOpen) return;
+    if (currentState !== "idle" || isDragging || isDrawerOpen || isDirectedRoaming) return;
     roamTargetOffset = (Math.random() - 0.5) * 60;
     const dx = roamTargetOffset - roamCurrentOffset;
     if (Math.abs(dx) < 6) return;
+    isDirectedRoaming = false;
+    roamWaypoints = [];
     isRoamingMoving = true;
+    roamLastFrameTs = 0;
     patrolStepsTotal += Math.round(Math.abs(dx));
     if (roamPatrolCount) roamPatrolCount.textContent = `${patrolStepsTotal} \u6B65`;
     const dir = dx > 0 ? "right" : "left";
@@ -1755,46 +1775,102 @@
     if (tpmRoamCoord) tpmRoamCoord.textContent = `\u5DE1\u89C6\u4E2D \u2192 ${Math.round(roamTargetOffset)}px`;
     animateRoamStep();
   }
-  function animateRoamStep() {
-    if (!isRoamingMoving || currentState !== "idle" || isDragging) {
+  function animateRoamStep(nowTs) {
+    const stateBlocked = isDirectedRoaming ? currentState === "listening" || currentState === "sleep" || currentState === "error" : currentState !== "idle";
+    if (!isRoamingMoving || stateBlocked || isDragging) {
       stopRoamingMove();
       return;
     }
+    const ts = typeof nowTs === "number" ? nowTs : performance.now();
+    const dtSec = roamLastFrameTs > 0 ? Math.min(0.05, Math.max(4e-3, (ts - roamLastFrameTs) / 1e3)) : 1 / 60;
+    roamLastFrameTs = ts;
     const diff = roamTargetOffset - roamCurrentOffset;
     if (Math.abs(diff) < 2) {
       roamCurrentOffset = roamTargetOffset;
       petStage.style.transform = `translateX(${roamCurrentOffset}px) scale(var(--pet-scale))`;
+      if (roamWaypoints.length > 0) {
+        const nextTarget = roamWaypoints.shift();
+        roamTargetOffset = Math.max(-45, Math.min(45, nextTarget));
+        const nextDiff = roamTargetOffset - roamCurrentOffset;
+        if (Math.abs(nextDiff) >= 2) {
+          const nextDir = nextDiff > 0 ? "right" : "left";
+          petRenderer.setDragDirection(nextDir);
+          updateAuditTrack(nextDir === "right" ? "Row 1 (running-right)" : "Row 2 (running-left)");
+          if (tpmRoamCoord) tpmRoamCoord.textContent = `\u5DE1\u903B\u4E2D \u2192 ${Math.round(roamTargetOffset)}px`;
+          roamAnimId = requestAnimationFrame(animateRoamStep);
+          return;
+        }
+      }
+      const wasDirected = isDirectedRoaming;
       stopRoamingMove();
-      showRoamBubble("\u{1F43E} \u539F\u5730\u8E72\u4E0B\u4F11\u606F\u6253\u76F9...", 2e3);
-      updateAuditTrack("Row 0 (idle)");
-      if (tpmRoamCoord) tpmRoamCoord.textContent = `\u4F11\u61A9\u4E2D (${Math.round(roamCurrentOffset)}px)`;
+      if (wasDirected && currentState === "speaking") {
+        updateAuditTrack("Row 3 (waving)");
+        if (tpmRoamCoord) tpmRoamCoord.textContent = `\u5DE1\u903B\u5B8C\u6210 (${Math.round(roamCurrentOffset)}px)`;
+      } else if (currentState === "idle") {
+        showRoamBubble("\u{1F43E} \u539F\u5730\u8E72\u4E0B\u4F11\u606F\u6253\u76F9...", 2e3);
+        updateAuditTrack("Row 0 (idle)");
+        if (tpmRoamCoord) tpmRoamCoord.textContent = `\u4F11\u61A9\u4E2D (${Math.round(roamCurrentOffset)}px)`;
+      }
       return;
     }
-    const step = Math.sign(diff) * Math.min(Math.abs(diff), 1.8 * roamSpeedFactor);
+    const pxPerSec = 90 * roamSpeedFactor;
+    const step = Math.sign(diff) * Math.min(Math.abs(diff), pxPerSec * dtSec);
     roamCurrentOffset += step;
     petStage.style.transform = `translateX(${roamCurrentOffset}px) scale(var(--pet-scale))`;
     roamAnimId = requestAnimationFrame(animateRoamStep);
   }
   function stopRoamingMove() {
     isRoamingMoving = false;
-    if (roamAnimId) cancelAnimationFrame(roamAnimId);
+    isDirectedRoaming = false;
+    roamWaypoints = [];
+    roamLastFrameTs = 0;
+    if (roamAnimId) {
+      cancelAnimationFrame(roamAnimId);
+      roamAnimId = null;
+    }
     petRenderer.setDragDirection("");
   }
-  function triggerDirectedRoam(offsetDelta) {
-    if (isDragging || isDrawerOpen) return;
-    roamTargetOffset = Math.max(-45, Math.min(45, roamCurrentOffset + offsetDelta));
-    const diff = roamTargetOffset - roamCurrentOffset;
-    if (Math.abs(diff) < 4) {
-      roamTargetOffset = offsetDelta > 0 ? 35 : -35;
+  function startRoamSequence(waypoints, bubbleText) {
+    if (isDragging || isDrawerOpen || currentForm !== "pet") return false;
+    if (!Array.isArray(waypoints) || waypoints.length === 0) return false;
+    const clamped = waypoints.map((w) => Math.max(-45, Math.min(45, w)));
+    const firstTarget = clamped.shift();
+    const diff = firstTarget - roamCurrentOffset;
+    if (Math.abs(diff) < 4 && clamped.length === 0) return false;
+    if (roamAnimId) {
+      cancelAnimationFrame(roamAnimId);
+      roamAnimId = null;
     }
-    const dir = roamTargetOffset - roamCurrentOffset > 0 ? "right" : "left";
+    clearTimeout(roamTimer);
+    isDirectedRoaming = true;
     isRoamingMoving = true;
-    patrolStepsTotal += Math.round(Math.abs(roamTargetOffset - roamCurrentOffset));
+    roamLastFrameTs = 0;
+    roamTargetOffset = firstTarget;
+    roamWaypoints = clamped;
+    let totalDist = Math.abs(firstTarget - roamCurrentOffset);
+    let prev = firstTarget;
+    for (const wp of clamped) {
+      totalDist += Math.abs(wp - prev);
+      prev = wp;
+    }
+    patrolStepsTotal += Math.round(totalDist);
     if (roamPatrolCount) roamPatrolCount.textContent = `${patrolStepsTotal} \u6B65`;
+    const dir = roamTargetOffset - roamCurrentOffset >= 0 ? "right" : "left";
+    petRenderer.clearCue();
     petRenderer.setDragDirection(dir);
-    showRoamBubble(dir === "right" ? "\u{1F43E} \u6536\u5230\u6307\u4EE4\uFF0C\u5411\u53F3\u5DE1\u89C6..." : "\u{1F43E} \u6536\u5230\u6307\u4EE4\uFF0C\u5411\u5DE6\u5DE1\u89C6...", 2500);
+    showRoamBubble(bubbleText || (dir === "right" ? "\u{1F43E} \u6536\u5230\u6307\u4EE4\uFF0C\u5411\u53F3\u5DE1\u89C6..." : "\u{1F43E} \u6536\u5230\u6307\u4EE4\uFF0C\u5411\u5DE6\u5DE1\u89C6..."), 2500);
     updateAuditTrack(dir === "right" ? "Row 1 (running-right)" : "Row 2 (running-left)");
+    if (tpmRoamCoord) tpmRoamCoord.textContent = `\u5DE1\u903B\u4E2D \u2192 ${Math.round(roamTargetOffset)}px`;
     animateRoamStep();
+    return true;
+  }
+  function triggerDirectedRoam(offsetDelta) {
+    const target = Math.max(-45, Math.min(45, roamCurrentOffset + offsetDelta));
+    if (Math.abs(target - roamCurrentOffset) < 10) {
+      const bounce = offsetDelta > 0 ? [-18, 42] : [18, -42];
+      return startRoamSequence(bounce);
+    }
+    return startRoamSequence([target]);
   }
   function toggleAutoRoaming() {
     isAutoRoamingEnabled = !isAutoRoamingEnabled;
@@ -2740,8 +2816,19 @@
     window.runtime.EventsOn("avatar:pet_action", (act) => {
       if (!act) return;
       resetSleepTimer();
+      let roamStarted = false;
+      if (act.move === "right") {
+        roamStarted = triggerDirectedRoam(42);
+      } else if (act.move === "left") {
+        roamStarted = triggerDirectedRoam(-42);
+      } else if (act.action === "roam") {
+        const patrolPath = roamCurrentOffset > 0 ? [-42, 42, 0] : [42, -42, 0];
+        roamStarted = startRoamSequence(patrolPath, "\u{1F43E} \u5DE1\u903B\u5954\u8DD1\u4E2D...");
+      }
       const cue = act.cue || "jumping";
-      petRenderer.triggerCue(cue, 1400);
+      if (!roamStarted) {
+        petRenderer.triggerCue(cue, 1400);
+      }
       const xpText = act.xp > 0 ? `+${act.xp} XP` : "";
       if (act.action === "feed" || act.action === "rice" || act.action === "turbo") {
         fishFedTotal += 1;
@@ -2762,17 +2849,12 @@
       if (act.message) {
         showBubble(act.message, 3e3);
       }
-      if (act.move === "right") {
-        triggerDirectedRoam(35);
-      } else if (act.move === "left") {
-        triggerDirectedRoam(-35);
-      } else if (act.action === "roam") {
-        triggerDirectedRoam(roamCurrentOffset > 0 ? -30 : 30);
-      }
       if (act.bond) {
         updateBondUI(act.bond);
       }
-      updateAuditTrack(`Voice Action: ${act.action} -> ${cue}`);
+      if (!roamStarted) {
+        updateAuditTrack(`Voice Action: ${act.action} -> ${cue}`);
+      }
     });
   }
   function initApp() {

@@ -216,7 +216,7 @@ class FastDispatcher {
             PetActionResult("jump", "jumping", "", "好嘞！翻个跟头跳给你看！喵呜~") to listOf("跳一下", "跳一个", "跳跳", "翻个跟头", "翻跟头", "蹦一下", "蹦一个", "空翻", "跳起来", "转圈", "跳舞", "跳", "蹦"),
             PetActionResult("roam_right", "running-right", "right", "收到！向右边巡视小跑，守护你的屏幕！") to listOf("向右跑", "往右跑", "去右边", "向右走", "往右走", "右边巡视"),
             PetActionResult("roam_left", "running-left", "left", "好嘞！向左边巡视小跑，守护你的屏幕！") to listOf("向左跑", "往左跑", "去左边", "向左走", "往左走", "左边巡视"),
-            PetActionResult("roam", "running", "", "巡逻任务启动！周围安全就交给我啦！") to listOf("巡视桌面", "去巡逻", "巡视", "巡逻", "到处逛逛", "溜达溜达", "走两步", "转悠转悠"),
+            PetActionResult("roam", "running", "", "巡逻任务启动！周围安全就交给我啦！") to listOf("巡视桌面", "去巡逻", "巡视", "巡逻", "到处逛逛", "溜达溜达", "走两步", "跑两步", "跑一跑", "跑一下", "跑起来", "往前跑", "小跑", "跑", "转悠转悠"),
             PetActionResult("failed", "failed", "", "收到，原地定住不动啦！") to listOf("别动", "停下", "停", "装死", "倒下", "晕一个", "犯错", "晕倒"),
             PetActionResult("wave", "waving", "", "嗨！向你挥挥小爪子，今天也要开心哦！") to listOf("打个招呼", "挥手", "打招呼", "招招手", "握手", "握个手", "伸手"),
             PetActionResult("pet", "jumping", "", "呼噜呼噜~ 摸摸头好舒服呀~") to listOf("摸摸头", "摸摸你", "摸摸", "蹭蹭", "抱抱"),

@@ -143,6 +143,9 @@ let roamTargetOffset = 0;
 let roamTimer = null;
 let roamAnimId = null;
 let roamBubbleTimer = null;
+let isDirectedRoaming = false;
+let roamWaypoints = [];
+let roamLastFrameTs = 0;
 let fishFedTotal = 28;
 let patrolStepsTotal = 142;
 let dragInitialMouseX = 0;
@@ -424,7 +427,9 @@ function applyState(state) {
 
   // 5. 状态机动作轨道流转与自主漫游联动 (模式 B 规范)
   if (state === "idle") {
-    updateAuditTrack("Row 0 (idle)");
+    if (!isDirectedRoaming) {
+      updateAuditTrack("Row 0 (idle)");
+    }
     const cur = subtitleText.textContent || "";
     if (!cur || cur.startsWith("正在") || cur.startsWith("倾听") || cur.startsWith("🎙️")) {
       subtitleText.textContent =
@@ -436,8 +441,10 @@ function applyState(state) {
     }
     scheduleNextRoamDecision();
   } else if (state === "thinking") {
-    stopRoamingMove();
-    updateAuditTrack("Row 8 (review)");
+    if (!isDirectedRoaming) {
+      stopRoamingMove();
+      updateAuditTrack("Row 8 (review)");
+    }
     subtitleText.textContent = "正在思考并组织回答...";
   } else if (state === "listening") {
     // 打断或进入倾听：≤50ms 强制收口闭嘴，瞬切 Row 6 前倾倾听
@@ -445,13 +452,16 @@ function applyState(state) {
     updateAuditTrack("Row 6 (waiting)");
     subtitleText.textContent = "倾听中...";
   } else if (state === "speaking") {
-    stopRoamingMove();
-    updateAuditTrack("Row 3 (waving)");
+    if (!isDirectedRoaming) {
+      stopRoamingMove();
+      updateAuditTrack("Row 3 (waving)");
+    }
   } else if (state === "sleep") {
     stopRoamingMove();
     hideBubble();
+  } else if (state === "error") {
+    stopRoamingMove();
   }
-
   resetSleepTimer();
 }
 
@@ -487,13 +497,16 @@ function scheduleNextRoamDecision() {
 }
 
 function makeAutonomousMoveDecision() {
-  if (currentState !== "idle" || isDragging || isDrawerOpen) return;
+  if (currentState !== "idle" || isDragging || isDrawerOpen || isDirectedRoaming) return;
 
   roamTargetOffset = (Math.random() - 0.5) * 60; // -30px ~ +30px 漫游
   const dx = roamTargetOffset - roamCurrentOffset;
   if (Math.abs(dx) < 6) return;
 
+  isDirectedRoaming = false;
+  roamWaypoints = [];
   isRoamingMoving = true;
+  roamLastFrameTs = 0;
   patrolStepsTotal += Math.round(Math.abs(dx));
   if (roamPatrolCount) roamPatrolCount.textContent = `${patrolStepsTotal} 步`;
 
@@ -506,23 +519,53 @@ function makeAutonomousMoveDecision() {
   animateRoamStep();
 }
 
-function animateRoamStep() {
-  if (!isRoamingMoving || currentState !== "idle" || isDragging) {
+function animateRoamStep(nowTs) {
+  const stateBlocked = isDirectedRoaming
+    ? currentState === "listening" || currentState === "sleep" || currentState === "error"
+    : currentState !== "idle";
+  if (!isRoamingMoving || stateBlocked || isDragging) {
     stopRoamingMove();
     return;
   }
+
+  const ts = typeof nowTs === "number" ? nowTs : performance.now();
+  const dtSec = roamLastFrameTs > 0 ? Math.min(0.05, Math.max(0.004, (ts - roamLastFrameTs) / 1000)) : 1 / 60;
+  roamLastFrameTs = ts;
+
   const diff = roamTargetOffset - roamCurrentOffset;
   if (Math.abs(diff) < 2) {
     roamCurrentOffset = roamTargetOffset;
     petStage.style.transform = `translateX(${roamCurrentOffset}px) scale(var(--pet-scale))`;
+
+    if (roamWaypoints.length > 0) {
+      const nextTarget = roamWaypoints.shift();
+      roamTargetOffset = Math.max(-45, Math.min(45, nextTarget));
+      const nextDiff = roamTargetOffset - roamCurrentOffset;
+      if (Math.abs(nextDiff) >= 2) {
+        const nextDir = nextDiff > 0 ? "right" : "left";
+        petRenderer.setDragDirection(nextDir);
+        updateAuditTrack(nextDir === "right" ? "Row 1 (running-right)" : "Row 2 (running-left)");
+        if (tpmRoamCoord) tpmRoamCoord.textContent = `巡逻中 → ${Math.round(roamTargetOffset)}px`;
+        roamAnimId = requestAnimationFrame(animateRoamStep);
+        return;
+      }
+    }
+
+    const wasDirected = isDirectedRoaming;
     stopRoamingMove();
-    showRoamBubble("🐾 原地蹲下休息打盹...", 2000);
-    updateAuditTrack("Row 0 (idle)");
-    if (tpmRoamCoord) tpmRoamCoord.textContent = `休憩中 (${Math.round(roamCurrentOffset)}px)`;
+    if (wasDirected && currentState === "speaking") {
+      updateAuditTrack("Row 3 (waving)");
+      if (tpmRoamCoord) tpmRoamCoord.textContent = `巡逻完成 (${Math.round(roamCurrentOffset)}px)`;
+    } else if (currentState === "idle") {
+      showRoamBubble("🐾 原地蹲下休息打盹...", 2000);
+      updateAuditTrack("Row 0 (idle)");
+      if (tpmRoamCoord) tpmRoamCoord.textContent = `休憩中 (${Math.round(roamCurrentOffset)}px)`;
+    }
     return;
   }
 
-  const step = Math.sign(diff) * Math.min(Math.abs(diff), 1.8 * roamSpeedFactor);
+  const pxPerSec = 90 * roamSpeedFactor;
+  const step = Math.sign(diff) * Math.min(Math.abs(diff), pxPerSec * dtSec);
   roamCurrentOffset += step;
   petStage.style.transform = `translateX(${roamCurrentOffset}px) scale(var(--pet-scale))`;
   roamAnimId = requestAnimationFrame(animateRoamStep);
@@ -530,26 +573,63 @@ function animateRoamStep() {
 
 function stopRoamingMove() {
   isRoamingMoving = false;
-  if (roamAnimId) cancelAnimationFrame(roamAnimId);
+  isDirectedRoaming = false;
+  roamWaypoints = [];
+  roamLastFrameTs = 0;
+  if (roamAnimId) {
+    cancelAnimationFrame(roamAnimId);
+    roamAnimId = null;
+  }
   petRenderer.setDragDirection("");
 }
 
-function triggerDirectedRoam(offsetDelta) {
-  if (isDragging || isDrawerOpen) return;
-  roamTargetOffset = Math.max(-45, Math.min(45, roamCurrentOffset + offsetDelta));
-  const diff = roamTargetOffset - roamCurrentOffset;
-  if (Math.abs(diff) < 4) {
-    roamTargetOffset = offsetDelta > 0 ? 35 : -35;
+function startRoamSequence(waypoints, bubbleText) {
+  if (isDragging || isDrawerOpen || currentForm !== "pet") return false;
+  if (!Array.isArray(waypoints) || waypoints.length === 0) return false;
+
+  const clamped = waypoints.map((w) => Math.max(-45, Math.min(45, w)));
+  const firstTarget = clamped.shift();
+  const diff = firstTarget - roamCurrentOffset;
+  if (Math.abs(diff) < 4 && clamped.length === 0) return false;
+
+  if (roamAnimId) {
+    cancelAnimationFrame(roamAnimId);
+    roamAnimId = null;
   }
-  const dir = (roamTargetOffset - roamCurrentOffset) > 0 ? "right" : "left";
+  clearTimeout(roamTimer);
+
+  isDirectedRoaming = true;
   isRoamingMoving = true;
-  patrolStepsTotal += Math.round(Math.abs(roamTargetOffset - roamCurrentOffset));
+  roamLastFrameTs = 0;
+  roamTargetOffset = firstTarget;
+  roamWaypoints = clamped;
+
+  let totalDist = Math.abs(firstTarget - roamCurrentOffset);
+  let prev = firstTarget;
+  for (const wp of clamped) {
+    totalDist += Math.abs(wp - prev);
+    prev = wp;
+  }
+  patrolStepsTotal += Math.round(totalDist);
   if (roamPatrolCount) roamPatrolCount.textContent = `${patrolStepsTotal} 步`;
 
+  const dir = (roamTargetOffset - roamCurrentOffset) >= 0 ? "right" : "left";
+  petRenderer.clearCue();
   petRenderer.setDragDirection(dir);
-  showRoamBubble(dir === "right" ? "🐾 收到指令，向右巡视..." : "🐾 收到指令，向左巡视...", 2500);
+  showRoamBubble(bubbleText || (dir === "right" ? "🐾 收到指令，向右巡视..." : "🐾 收到指令，向左巡视..."), 2500);
   updateAuditTrack(dir === "right" ? "Row 1 (running-right)" : "Row 2 (running-left)");
+  if (tpmRoamCoord) tpmRoamCoord.textContent = `巡逻中 → ${Math.round(roamTargetOffset)}px`;
   animateRoamStep();
+  return true;
+}
+
+function triggerDirectedRoam(offsetDelta) {
+  const target = Math.max(-45, Math.min(45, roamCurrentOffset + offsetDelta));
+  if (Math.abs(target - roamCurrentOffset) < 10) {
+    const bounce = offsetDelta > 0 ? [-18, 42] : [18, -42];
+    return startRoamSequence(bounce);
+  }
+  return startRoamSequence([target]);
 }
 
 function toggleAutoRoaming() {
@@ -1626,11 +1706,24 @@ if (window.runtime) {
     if (!act) return;
     resetSleepTimer();
 
-    // 1. 触发对应的动画轨道
-    const cue = act.cue || "jumping";
-    petRenderer.triggerCue(cue, 1400);
+    // 1. 漫游与空间位移联动判定
+    let roamStarted = false;
+    if (act.move === "right") {
+      roamStarted = triggerDirectedRoam(42);
+    } else if (act.move === "left") {
+      roamStarted = triggerDirectedRoam(-42);
+    } else if (act.action === "roam") {
+      const patrolPath = roamCurrentOffset > 0 ? [-42, 42, 0] : [42, -42, 0];
+      roamStarted = startRoamSequence(patrolPath, "🐾 巡逻奔跑中...");
+    }
 
-    // 2. 特效与气泡
+    // 2. 触发对应的动画轨道 (若未启动奔跑漫游，则回退为瞬时 Cue 动画)
+    const cue = act.cue || "jumping";
+    if (!roamStarted) {
+      petRenderer.triggerCue(cue, 1400);
+    }
+
+    // 3. 特效与气泡
     const xpText = act.xp > 0 ? `+${act.xp} XP` : "";
     if (act.action === "feed" || act.action === "rice" || act.action === "turbo") {
       fishFedTotal += 1;
@@ -1653,20 +1746,13 @@ if (window.runtime) {
       showBubble(act.message, 3000);
     }
 
-    // 3. 漫游与空间位移联动
-    if (act.move === "right") {
-      triggerDirectedRoam(35);
-    } else if (act.move === "left") {
-      triggerDirectedRoam(-35);
-    } else if (act.action === "roam") {
-      triggerDirectedRoam(roamCurrentOffset > 0 ? -30 : 30);
-    }
-
     // 4. 羁绊数值同步
     if (act.bond) {
       updateBondUI(act.bond);
     }
-    updateAuditTrack(`Voice Action: ${act.action} -> ${cue}`);
+    if (!roamStarted) {
+      updateAuditTrack(`Voice Action: ${act.action} -> ${cue}`);
+    }
   });
 }
 

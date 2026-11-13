@@ -1043,6 +1043,13 @@ static void TestIntentArbiterSuite() {
         assert(std::string(move_res.action_cmd.motion.direction) == "right");
         assert(move_res.action_cmd.motion.distance > 0.0f);
 
+
+        // 3b. 跑两步 (无方向前缀的前进/奔跑动作元语)
+        auto run_res = IntentArbiter::Arbitrate("跑两步");
+        assert(run_res.status == ArbiterStatus::MATCHED);
+        assert(run_res.domain == ArbiterDomain::ACTION_COMMAND);
+        assert(run_res.action == "move_forward");
+        assert(run_res.action_cmd.type == ActionType::MOVE_FORWARD);
         // 4. 别动 / 停下
         auto stop_res = IntentArbiter::Arbitrate("别动");
         assert(stop_res.status == ArbiterStatus::MATCHED);

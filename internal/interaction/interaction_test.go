@@ -241,6 +241,43 @@ func TestFastPathPetAction(t *testing.T) {
 	}
 }
 
+func TestFastPathPatrolRoamAction(t *testing.T) {
+	mockTTS := &testTrackingSynth{}
+	coord := orchestrator.NewCoordinator("test-sess-roam")
+	fp := NewFastPathHandler(nil, nil)
+	player := NewSpeechPlayer(mockTTS)
+	runner := &mockTaskRunner{}
+	manager := NewManager(coord, fp, player, runner)
+
+	var events []string
+	var capturedAction PetActionPayload
+	coord.SetStateChangeCallback(func(s orchestrator.State) {
+		events = append(events, "state:"+string(s))
+	})
+	manager.SetSpeechChunkCallback(func(s string) {
+		events = append(events, "speech:"+s)
+	})
+	manager.SetPetActionCallback(func(act PetActionPayload) {
+		capturedAction = act
+		events = append(events, "action:"+act.Action)
+	})
+
+	_, err := manager.Submit(context.Background(), orchestrator.UserInput{
+		InputType: orchestrator.InputTypeVoice,
+		Text:      "去巡逻",
+		Stability: orchestrator.StabilityFinal,
+	})
+	if err != nil {
+		t.Fatalf("Submit error: %v", err)
+	}
+	if capturedAction.Action != "roam" {
+		t.Fatalf("expected action 'roam', got %+v", capturedAction)
+	}
+	if len(events) < 4 || events[0] != "action:roam" || events[1] != "state:speaking" {
+		t.Fatalf("unexpected event sequence: %v", events)
+	}
+}
+
 func TestFastPathLocalOnlyAndOfflineHandling(t *testing.T) {
 	mockTTS := &testTrackingSynth{}
 	coord := orchestrator.NewCoordinator("test-sess")
