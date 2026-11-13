@@ -17,6 +17,7 @@ import (
 )
 
 func TestAppVoiceIntegration(t *testing.T) {
+	t.Setenv("AVATAR_CONFIG_PATH", t.TempDir()+"/config.json")
 	mockASR := asr.NewMockEngine()
 	cfg := config.LoadConfig()
 
@@ -256,6 +257,7 @@ func TestApp_CloudRoutingAndLogging(t *testing.T) {
 }
 
 func TestApp_LuoxiaoheiAndRoaming(t *testing.T) {
+	t.Setenv("AVATAR_CONFIG_PATH", t.TempDir()+"/config.json")
 	app := NewApp()
 
 	// 1. Verify default skin is luoxiaohei2d

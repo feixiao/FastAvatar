@@ -139,6 +139,9 @@ func init() {
 }
 
 func ConfigPath() string {
+	if custom := os.Getenv("AVATAR_CONFIG_PATH"); custom != "" {
+		return custom
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "avatar_config.json"
@@ -175,6 +178,9 @@ func LoadConfig() AppConfig {
 	}
 	if loaded.PetScale == 0 {
 		loaded.PetScale = 1.15
+	}
+	if loaded.Mode == "" {
+		loaded.Mode = ModeHandsFree
 	}
 	if loaded.ASR.Engine == "" {
 		loaded.ASR.Engine = "native_mac"

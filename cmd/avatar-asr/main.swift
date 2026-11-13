@@ -24,6 +24,17 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
 
     private let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
     private var audioConverter: AVAudioConverter?
+    private var reconfigureWorkItem: DispatchWorkItem?
+
+    private func handleConfigurationChange() {
+        guard isListening else { return }
+        reconfigureWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.reconfigureAudioEngine()
+        }
+        reconfigureWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: workItem)
+    }
 
     init(localeId: String = "zh-CN", mode: String = "hands_free") {
         super.init()
@@ -33,7 +44,7 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
         setupRecognizer(localeId: localeId)
 
         NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: audioEngine, queue: .main) { [weak self] _ in
-            self?.reconfigureAudioEngine()
+            self?.handleConfigurationChange()
         }
     }
 
