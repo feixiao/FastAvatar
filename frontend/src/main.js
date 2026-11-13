@@ -28,31 +28,68 @@ const btnPetSend = document.getElementById("btnPetSend");
 const btnPetMic = document.getElementById("btnPetMic");
 const btnPetChat = document.getElementById("btnPetChat");
 const btnPetFeed = document.getElementById("btnPetFeed");
+const btnPetRoam = document.getElementById("btnPetRoam");
 const btnPetTouch = document.getElementById("btnPetTouch");
+const btnPetRice = document.getElementById("btnPetRice");
+const btnPetTurbo = document.getElementById("btnPetTurbo");
+const btnPetDialKit = document.getElementById("btnPetDialKit");
 const btnPetPersona = document.getElementById("btnPetPersona");
 const btnPetToCapsule = document.getElementById("btnPetToCapsule");
 const btnPetDrawer = document.getElementById("btnPetDrawer");
 const btnPetStop = document.getElementById("btnPetStop");
-const btnPetRice = document.getElementById("btnPetRice");
-const btnPetTurbo = document.getElementById("btnPetTurbo");
+
+const roamBubble = document.getElementById("roamBubble");
+const macPetShadow = document.getElementById("macPetShadow");
 
 // 右键菜单
 const petContextMenu = document.getElementById("petContextMenu");
 const menuPetTitle = document.getElementById("menuPetTitle");
 const menuActionPet = document.getElementById("menuActionPet");
-const menuActionFeed = document.getElementById("menuActionFeed");
-const menuActionChat = document.getElementById("menuActionChat");
+const menuActionFish = document.getElementById("menuActionFish");
 const menuActionRice = document.getElementById("menuActionRice");
 const menuActionTurbo = document.getElementById("menuActionTurbo");
 const menuActionGrass = document.getElementById("menuActionGrass");
+const menuToggleRoam = document.getElementById("menuToggleRoam");
+const roamStatusMenuText = document.getElementById("roamStatusMenuText");
+const menuActionChat = document.getElementById("menuActionChat");
 const skinSubmenu = document.getElementById("skinSubmenu");
 const personaSubmenu = document.getElementById("personaSubmenu");
 const menuToggleForm = document.getElementById("menuToggleForm");
 const menuToggleTop = document.getElementById("menuToggleTop");
 const topStatusText = document.getElementById("topStatusText");
+const menuOpenAudit = document.getElementById("menuOpenAudit");
 const menuOpenDrawer = document.getElementById("menuOpenDrawer");
 const menuQuitApp = document.getElementById("menuQuitApp");
 
+// Things 3 速记流与模型端侧抽屉 DOM
+const memoCardsList = document.getElementById("memoCardsList");
+const newMemoInput = document.getElementById("newMemoInput");
+const btnQuickAddMemo = document.getElementById("btnQuickAddMemo");
+const fishFeedCount = document.getElementById("fishFeedCount");
+const roamPatrolCount = document.getElementById("roamPatrolCount");
+
+const cfgEdgeBaseUrl = document.getElementById("cfgEdgeBaseUrl");
+const cfgEdgeModel = document.getElementById("cfgEdgeModel");
+const cfgCloudUrl = document.getElementById("cfgCloudUrl");
+const chkCloudConsent = document.getElementById("chkCloudConsent");
+const btnSaveModelConfig = document.getElementById("btnSaveModelConfig");
+
+// TPM 实时审计与 DialKit HUD
+const tpmHudPanel = document.getElementById("tpmHudPanel");
+const btnCloseTpmHud = document.getElementById("btnCloseTpmHud");
+const tpmRoamCoord = document.getElementById("tpmRoamCoord");
+const tpmRoamDesc = document.getElementById("tpmRoamDesc");
+const tpmRmsValue = document.getElementById("tpmRmsValue");
+const tpmRmsBar = document.getElementById("tpmRmsBar");
+const tpmActiveTrack = document.getElementById("tpmActiveTrack");
+
+const dialKitHud = document.getElementById("dialKitHud");
+const btnCloseDialKit = document.getElementById("btnCloseDialKit");
+const sliderScale = document.getElementById("sliderScale");
+const sliderSpeed = document.getElementById("sliderSpeed");
+const valScale = document.getElementById("valScale");
+const valSpeed = document.getElementById("valSpeed");
+const btnCopyDialTokens = document.getElementById("btnCopyDialTokens");
 // 胶囊 DOM
 const capsule = document.getElementById("capsule");
 const orbContainer = document.getElementById("orbContainer");
@@ -95,7 +132,21 @@ const xpBarFill = document.getElementById("xpBarFill");
 const xpLabelText = document.getElementById("xpLabelText");
 // ==================== 2. 全局状态与宠物渲染器初始化 ====================
 let currentForm = "pet"; // "pet" | "capsule"
-let currentSkin = "whale"; // 默认大肥鱼
+let currentSkin = "luoxiaohei2d"; // 默认官方宠伴: 罗小黑 2D
+let isAutoRoamingEnabled = true;
+let roamSpeedFactor = 1.2;
+let petScale = 1.15;
+let currentRms = 0.0;
+let isRoamingMoving = false;
+let roamCurrentOffset = 0;
+let roamTargetOffset = 0;
+let roamTimer = null;
+let roamAnimId = null;
+let roamBubbleTimer = null;
+let fishFedTotal = 28;
+let patrolStepsTotal = 142;
+let dragInitialMouseX = 0;
+let dragInitialMouseY = 0;
 let currentMode = "hands_free";
 let currentState = "idle";
 let recognition = null;
@@ -194,7 +245,7 @@ function playFoxtailInteraction() {
 }
 
 function applySkin(skinId, notifyBackend = true) {
-  const targetSkin = skinId || "whale";
+  const targetSkin = skinId || "luoxiaohei2d";
   currentSkin = targetSkin;
   stopWhalePose();
 
@@ -208,6 +259,7 @@ function applySkin(skinId, notifyBackend = true) {
   }
 
   const skinNames = {
+    luoxiaohei2d: "罗小黑 2D (官方宠伴)",
     whale: "大肥鱼 (鲸鱼娘)",
     cat: "橘宝喵 (桌宠伴侣)",
     fox: "灵狐小九 (桌宠伴侣)",
@@ -224,10 +276,11 @@ function applySkin(skinId, notifyBackend = true) {
 
 // 刷新皮肤卡片与子菜单
 const defaultSkins = [
+  { id: "luoxiaohei2d", display_name: "罗小黑 2D", description: "官方默认宠伴：纯黑灵动小猫、黄绿大眼、呆萌耳朵与分叉尾巴，支持桌面自由漫步与全双工打断", type: "builtin" },
   { id: "whale", display_name: "大肥鱼 (鲸鱼娘)", description: "呆萌温和、爱吃白饭，嘴型随说话起伏自然张合", type: "builtin" },
-  { id: "cat", display_name: "橘宝喵", description: "软萌可爱的橘猫伴侣，活泼好动，拥有眨眼等完整帧", type: "builtin" },
+  { id: "cat", display_name: "橘宝喵", description: "软萌可爱的橘猫伴侣，活泼好动，拥有眨眼等完整动作帧", type: "builtin" },
   { id: "fox", display_name: "灵狐小九", description: "仙气灵动的治愈系赤狐，摇着毛茸茸大尾巴", type: "builtin" },
-  { id: "spirit", display_name: "星灵露露", description: "软萌发光的奇幻小水滴星灵，律动跳跃", type: "builtin" },
+  { id: "spirit", display_name: "星灵露露", description: "软萌发光的奇幻小水滴星灵，律动跳跃，温暖治愈", type: "builtin" },
 ];
 
 function renderSkinList(list) {
@@ -369,7 +422,9 @@ function applyState(state) {
     playWhalePose("sleep-waking", 1600);
   }
 
+  // 5. 状态机动作轨道流转与自主漫游联动 (模式 B 规范)
   if (state === "idle") {
+    updateAuditTrack("Row 0 (idle)");
     const cur = subtitleText.textContent || "";
     if (!cur || cur.startsWith("正在") || cur.startsWith("倾听") || cur.startsWith("🎙️")) {
       subtitleText.textContent =
@@ -379,18 +434,132 @@ function applyState(state) {
       clearTimeout(bubbleHideTimer);
       bubbleHideTimer = setTimeout(hideBubble, 3000);
     }
+    scheduleNextRoamDecision();
   } else if (state === "thinking") {
+    stopRoamingMove();
+    updateAuditTrack("Row 8 (review)");
     subtitleText.textContent = "正在思考并组织回答...";
   } else if (state === "listening") {
+    // 打断或进入倾听：≤50ms 强制收口闭嘴，瞬切 Row 6 前倾倾听
+    stopRoamingMove();
+    updateAuditTrack("Row 6 (waiting)");
     subtitleText.textContent = "倾听中...";
+  } else if (state === "speaking") {
+    stopRoamingMove();
+    updateAuditTrack("Row 3 (waving)");
   } else if (state === "sleep") {
+    stopRoamingMove();
     hideBubble();
   }
 
   resetSleepTimer();
 }
 
-// ==================== 5. 桌面宠物交互事件 ====================
+// ==================== 5. 桌面宠物交互事件 & 活体自主自由漫步 ====================
+
+function showRoamBubble(text, durationMs = 2500) {
+  if (!roamBubble) return;
+  roamBubble.textContent = text;
+  roamBubble.style.display = "flex";
+  roamBubble.style.opacity = "1";
+  clearTimeout(roamBubbleTimer);
+  roamBubbleTimer = setTimeout(() => {
+    roamBubble.style.opacity = "0";
+    setTimeout(() => {
+      if (roamBubble.style.opacity === "0") {
+        roamBubble.style.display = "none";
+      }
+    }, 200);
+  }, durationMs);
+}
+
+function scheduleNextRoamDecision() {
+  clearTimeout(roamTimer);
+  if (!isAutoRoamingEnabled) return;
+
+  const delay = Math.random() * 4000 + 3500; // 3.5 ~ 7.5 秒思考时间
+  roamTimer = setTimeout(() => {
+    if (currentState === "idle" && !isDragging && currentForm === "pet" && !isDrawerOpen) {
+      makeAutonomousMoveDecision();
+    }
+    scheduleNextRoamDecision();
+  }, delay);
+}
+
+function makeAutonomousMoveDecision() {
+  if (currentState !== "idle" || isDragging || isDrawerOpen) return;
+
+  roamTargetOffset = (Math.random() - 0.5) * 60; // -30px ~ +30px 漫游
+  const dx = roamTargetOffset - roamCurrentOffset;
+  if (Math.abs(dx) < 6) return;
+
+  isRoamingMoving = true;
+  patrolStepsTotal += Math.round(Math.abs(dx));
+  if (roamPatrolCount) roamPatrolCount.textContent = `${patrolStepsTotal} 步`;
+
+  const dir = dx > 0 ? "right" : "left";
+  petRenderer.setDragDirection(dir);
+  showRoamBubble(dx > 0 ? "🐾 向右边巡视小跑..." : "🐾 向左边巡视小跑...", 2500);
+  updateAuditTrack(dir === "right" ? "Row 1 (running-right)" : "Row 2 (running-left)");
+  if (tpmRoamCoord) tpmRoamCoord.textContent = `巡视中 → ${Math.round(roamTargetOffset)}px`;
+
+  animateRoamStep();
+}
+
+function animateRoamStep() {
+  if (!isRoamingMoving || currentState !== "idle" || isDragging) {
+    stopRoamingMove();
+    return;
+  }
+  const diff = roamTargetOffset - roamCurrentOffset;
+  if (Math.abs(diff) < 2) {
+    roamCurrentOffset = roamTargetOffset;
+    petStage.style.transform = `translateX(${roamCurrentOffset}px) scale(var(--pet-scale))`;
+    stopRoamingMove();
+    showRoamBubble("🐾 原地蹲下休息打盹...", 2000);
+    updateAuditTrack("Row 0 (idle)");
+    if (tpmRoamCoord) tpmRoamCoord.textContent = `休憩中 (${Math.round(roamCurrentOffset)}px)`;
+    return;
+  }
+
+  const step = Math.sign(diff) * Math.min(Math.abs(diff), 1.8 * roamSpeedFactor);
+  roamCurrentOffset += step;
+  petStage.style.transform = `translateX(${roamCurrentOffset}px) scale(var(--pet-scale))`;
+  roamAnimId = requestAnimationFrame(animateRoamStep);
+}
+
+function stopRoamingMove() {
+  isRoamingMoving = false;
+  if (roamAnimId) cancelAnimationFrame(roamAnimId);
+  petRenderer.setDragDirection("");
+}
+
+function toggleAutoRoaming() {
+  isAutoRoamingEnabled = !isAutoRoamingEnabled;
+  if (window.go && window.go.main && window.go.main.App) {
+    window.go.main.App.SetAutoRoaming(isAutoRoamingEnabled);
+  }
+  updateRoamingUI();
+}
+
+function updateRoamingUI() {
+  if (roamStatusMenuText) {
+    roamStatusMenuText.textContent = isAutoRoamingEnabled ? "已开启" : "已暂停";
+  }
+  if (btnPetRoam) {
+    btnPetRoam.style.opacity = isAutoRoamingEnabled ? "1" : "0.5";
+    btnPetRoam.title = isAutoRoamingEnabled ? "桌面自由漫步：开启中 (点击暂停)" : "自由漫步：已暂停 (点击开启)";
+  }
+  if (isAutoRoamingEnabled) {
+    scheduleNextRoamDecision();
+    showRoamBubble("桌面自由漫步：开启中", 2000);
+  } else {
+    stopRoamingMove();
+    roamCurrentOffset = 0;
+    petStage.style.transform = `translateX(0px) scale(var(--pet-scale))`;
+    showRoamBubble("自由漫步：已暂停", 2000);
+  }
+}
 
 // 轻戳 / 抚摸 / 拖拽方向检测
 let dragStartX = 0;
@@ -410,6 +579,7 @@ petStage.addEventListener("pointerdown", (e) => {
   dragStartX = e.clientX;
   dragStartY = e.clientY;
   isDragging = false;
+  stopRoamingMove();
   lastMoveTime = performance.now();
   resetSleepTimer();
 });
@@ -419,13 +589,18 @@ window.addEventListener("pointermove", (e) => {
   const dx = e.clientX - dragStartX;
   const dy = e.clientY - dragStartY;
   if (Math.hypot(dx, dy) > 8) {
-    isDragging = true;
+    if (!isDragging) {
+      isDragging = true;
+      showRoamBubble("⚡ 被主人揪起后颈皮！", 3000);
+    }
     const now = performance.now();
-    if (now - lastMoveTime > 80) {
+    if (now - lastMoveTime > 60) {
       if (dx > 4) {
         petRenderer.setDragDirection("right");
+        updateAuditTrack("Row 1 (running-right)");
       } else if (dx < -4) {
         petRenderer.setDragDirection("left");
+        updateAuditTrack("Row 2 (running-left)");
       }
       lastMoveTime = now;
     }
@@ -438,18 +613,41 @@ window.addEventListener("pointerup", (e) => {
   const dy = e.clientY - dragStartY;
   const wasClick = Math.hypot(dx, dy) < 6;
 
+  if (isDragging) {
+    showRoamBubble("🐾 平稳落地，继续巡视...", 2000);
+    // 边缘吸附检查
+    if (window.go && window.go.main && window.go.main.App && window.go.main.App.GetWindowPosition) {
+      window.go.main.App.GetWindowPosition().then((pos) => {
+        if (pos && pos.length >= 2) {
+          const [wx, wy] = pos;
+          if (wx < 30 || wy < 30) {
+            window.go.main.App.SetWindowPosition(wx, wy);
+          }
+        }
+      });
+    }
+  }
+
   resetDragState();
 
   if (wasClick && currentForm === "pet") {
-    // 视为单击戳了桌宠一下
     handlePetAction("poke");
+  } else {
+    scheduleNextRoamDecision();
   }
 });
 
 window.addEventListener("pointercancel", resetDragState);
 window.addEventListener("blur", resetDragState);
 window.addEventListener("mouseleave", resetDragState);
-// 抚摸互动
+
+// 双击罗小黑身体：平滑滑出 Things 3 纯白极简手账中枢面板 (Companion Journal)
+petStage.addEventListener("dblclick", (e) => {
+  e.stopPropagation();
+  setDrawerOpen(!isDrawerOpen);
+  petRenderer.triggerCue("jumping", 800);
+  petRenderer.spawnHearts(100, 70, "📘 案头手账");
+});
 function handlePetAction(action) {
   resetSleepTimer();
   if (window.go && window.go.main && window.go.main.App) {
@@ -472,17 +670,23 @@ function handlePetAction(action) {
 
       const xpLabel = res.xp ? `+5 XP (${res.xp} XP)` : "+5 XP";
       if (action === "pet") {
+        updateAuditTrack("Row 4 (jumping)");
         petRenderer.spawnHearts(100, 70, `❤️ ${xpLabel}`);
       } else if (action === "rice" || action === "turbo") {
+        updateAuditTrack("Row 7 (feed)");
         petRenderer.spawnHearts(100, 70, `🍚 干饭 ${xpLabel}`);
       } else if (action === "feed") {
+        fishFedTotal += 1;
+        if (fishFeedCount) fishFeedCount.textContent = `${fishFedTotal} 次`;
+        updateAuditTrack("Row 7 (feed)");
         petRenderer.spawnHearts(100, 70, `🐟 饱腹 ${xpLabel}`);
       } else if (action === "grass") {
+        updateAuditTrack("Row 4 (jumping)");
         petRenderer.spawnHearts(100, 70, `🌾 逗草 ${xpLabel}`);
       } else {
+        updateAuditTrack("Row 4 (jumping)");
         petRenderer.spawnHearts(100, 70, xpLabel);
       }
-
       if (res.message) {
         showBubble(res.message);
       }
@@ -490,10 +694,7 @@ function handlePetAction(action) {
   }
 }
 
-// 双击桌宠触发摸摸头
-petStage.addEventListener("dblclick", () => {
-  handlePetAction("pet");
-});
+
 
 // 快捷工具栏按钮事件
 btnPetTouch.addEventListener("click", (e) => {
@@ -507,17 +708,46 @@ if (btnPetFeed) {
     handlePetAction("feed");
   });
 }
+if (btnPetRoam) {
+  btnPetRoam.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleAutoRoaming();
+  });
+}
+if (btnPetDialKit) {
+  btnPetDialKit.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleDialKit();
+  });
+}
 if (btnPetRice) {
   btnPetRice.addEventListener("click", (e) => {
     e.stopPropagation();
     handlePetAction("rice");
   });
 }
-
 if (btnPetTurbo) {
   btnPetTurbo.addEventListener("click", (e) => {
     e.stopPropagation();
     handlePetAction("turbo");
+  });
+}
+if (menuActionFish) {
+  menuActionFish.addEventListener("click", () => {
+    handlePetAction("feed");
+    closeContextMenu();
+  });
+}
+if (menuToggleRoam) {
+  menuToggleRoam.addEventListener("click", () => {
+    toggleAutoRoaming();
+    closeContextMenu();
+  });
+}
+if (menuOpenAudit) {
+  menuOpenAudit.addEventListener("click", () => {
+    toggleDialKit();
+    closeContextMenu();
   });
 }
 
@@ -721,6 +951,7 @@ btnDoImportSkin.addEventListener("click", () => {
 function setDrawerOpen(open) {
   isDrawerOpen = open;
   if (open) {
+    stopRoamingMove();
     document.body.classList.add("drawer-open");
     manageDrawer.classList.add("open");
     inputDrawer.classList.remove("open");
@@ -730,15 +961,225 @@ function setDrawerOpen(open) {
     }
     refreshSkins();
     refreshMemory();
+    renderMemos();
     refreshPersonas();
     refreshBond();
+    refreshModelConfig();
   } else {
     document.body.classList.remove("drawer-open");
     manageDrawer.classList.remove("open");
     if (window.go && window.go.main && window.go.main.App) {
       window.go.main.App.SetWindowExpanded(false);
     }
+    scheduleNextRoamDecision();
   }
+}
+
+// ==================== 7.5 TPM 实时审计与 DialKit 手感调参 ====================
+
+function updateAuditTrack(trackName) {
+  if (tpmActiveTrack) tpmActiveTrack.textContent = trackName;
+  const tagMap = {
+    "idle": "tagRow0",
+    "Row 0 (idle)": "tagRow0",
+    "running-right": "tagRow1",
+    "Row 1 (running-right)": "tagRow1",
+    "running-left": "tagRow2",
+    "Row 2 (running-left)": "tagRow2",
+    "speaking": "tagRow3",
+    "waving": "tagRow3",
+    "Row 3 (waving)": "tagRow3",
+    "Row 3 (waving-excited)": "tagRow3",
+    "jumping": "tagRow4",
+    "Row 4 (jumping)": "tagRow4",
+    "listening": "tagRow6",
+    "waiting": "tagRow6",
+    "Row 6 (waiting)": "tagRow6",
+    "running": "tagRow7",
+    "feed": "tagRow7",
+    "Row 7 (feed)": "tagRow7",
+    "thinking": "tagRow8",
+    "review": "tagRow8",
+    "Row 8 (review)": "tagRow8",
+  };
+  document.querySelectorAll(".track-tag").forEach((el) => el.classList.remove("active"));
+  const tagId = tagMap[trackName];
+  if (tagId && document.getElementById(tagId)) {
+    document.getElementById(tagId).classList.add("active");
+  }
+}
+
+function updateRmsMeter(energy) {
+  if (tpmRmsValue) tpmRmsValue.textContent = energy.toFixed(2);
+  if (tpmRmsBar) {
+    const pct = Math.min(100, Math.round(energy * 120));
+    tpmRmsBar.style.width = `${pct}%`;
+  }
+}
+
+function toggleDialKit() {
+  if (!dialKitHud) return;
+  dialKitHud.classList.toggle("hidden");
+  if (tpmHudPanel) {
+    tpmHudPanel.classList.toggle("hidden");
+  }
+}
+
+if (btnCloseDialKit) {
+  btnCloseDialKit.addEventListener("click", () => {
+    dialKitHud.classList.add("hidden");
+    if (tpmHudPanel) tpmHudPanel.classList.add("hidden");
+  });
+}
+if (btnCloseTpmHud) {
+  btnCloseTpmHud.addEventListener("click", () => {
+    if (tpmHudPanel) tpmHudPanel.classList.add("hidden");
+  });
+}
+
+if (sliderScale) {
+  sliderScale.addEventListener("input", (e) => updateDialParam("scale", e.target.value));
+}
+if (sliderSpeed) {
+  sliderSpeed.addEventListener("input", (e) => updateDialParam("speed", e.target.value));
+}
+
+function updateDialParam(key, val) {
+  const num = parseFloat(val);
+  if (key === "scale") {
+    petScale = num;
+    document.documentElement.style.setProperty("--pet-scale", num);
+    if (valScale) valScale.textContent = `${num.toFixed(2)}x`;
+  } else if (key === "speed") {
+    roamSpeedFactor = num;
+    if (valSpeed) valSpeed.textContent = `${num.toFixed(1)}x`;
+  }
+  if (window.go && window.go.main && window.go.main.App && window.go.main.App.SetDialParam) {
+    window.go.main.App.SetDialParam(key, num);
+  }
+}
+
+function copyDialTokens() {
+  const tokens = {
+    pet_scale: petScale,
+    roam_speed: roamSpeedFactor,
+    pet_skin: currentSkin,
+    auto_roaming: isAutoRoamingEnabled,
+  };
+  navigator.clipboard.writeText(JSON.stringify(tokens, null, 2)).then(() => {
+    showBubble("📋 配置 Tokens 已复制到剪贴板！", 2500);
+  });
+}
+if (btnCopyDialTokens) {
+  btnCopyDialTokens.addEventListener("click", copyDialTokens);
+}
+
+// 快捷键 D / d 唤起调参 HUD
+window.addEventListener("keydown", (e) => {
+  if ((e.key === "d" || e.key === "D") && !["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) {
+    toggleDialKit();
+  }
+});
+
+// ==================== 7.6 Things 3 灵感速记流与模型端侧抽屉 ====================
+
+let localMemos = [
+  { id: "1", time: "09:41 · 语音捕获", content: "下午 4 点找架构师对齐全双工打断协议" },
+  { id: "2", time: "10:15 · 快捷速记", content: "优化罗小黑 2D 贴边吸附物理手感与声学分级" },
+];
+
+function renderMemos() {
+  if (!memoCardsList) return;
+  memoCardsList.innerHTML = "";
+  if (localMemos.length === 0) {
+    memoCardsList.innerHTML = '<div style="font-size:12px;color:#94a3b8;text-align:center;padding:12px 0;">暂无灵感速记，随手记一条吧~</div>';
+    return;
+  }
+  localMemos.forEach((memo) => {
+    const card = document.createElement("div");
+    card.className = "memo-card-item";
+    card.innerHTML = `
+      <div class="memo-card-header">
+        <span>${memo.time}</span>
+      </div>
+      <div class="memo-card-content">${memo.content}</div>
+      <div class="memo-card-actions">
+        <button class="memo-action-btn" data-act="copy">复制</button>
+        <button class="memo-action-btn" data-act="archive">归档</button>
+      </div>
+    `;
+    card.querySelector('[data-act="copy"]')?.addEventListener("click", () => {
+      navigator.clipboard.writeText(memo.content);
+      showBubble("已复制灵感内容到剪贴板！", 2000);
+    });
+    card.querySelector('[data-act="archive"]')?.addEventListener("click", () => {
+      localMemos = localMemos.filter((m) => m.id !== memo.id);
+      renderMemos();
+      showBubble("已归档该条速记", 1500);
+    });
+    memoCardsList.appendChild(card);
+  });
+}
+
+function addQuickMemo(text) {
+  if (!text) return;
+  const now = new Date();
+  const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} · 案头速记`;
+  localMemos.unshift({
+    id: String(Date.now()),
+    time: timeStr,
+    content: text,
+  });
+  renderMemos();
+  showBubble("💡 灵感已捕获至案头手账！", 2500);
+  if (window.go && window.go.main && window.go.main.App) {
+    window.go.main.App.AddEpisode(text, ["灵感速记"]);
+  }
+}
+
+if (btnQuickAddMemo && newMemoInput) {
+  btnQuickAddMemo.addEventListener("click", () => {
+    addQuickMemo(newMemoInput.value.trim());
+    newMemoInput.value = "";
+  });
+  newMemoInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      addQuickMemo(newMemoInput.value.trim());
+      newMemoInput.value = "";
+    }
+  });
+}
+
+function refreshModelConfig() {
+  if (window.go && window.go.main && window.go.main.App) {
+    if (window.go.main.App.GetDualModelInfo) {
+      window.go.main.App.GetDualModelInfo().then((info) => {
+        if (!info) return;
+        if (cfgEdgeBaseUrl && info.edge_url) cfgEdgeBaseUrl.value = info.edge_url;
+        if (cfgEdgeModel && info.edge_model) cfgEdgeModel.value = info.edge_model;
+        if (cfgCloudUrl && info.cloud_gateway) cfgCloudUrl.value = info.cloud_gateway;
+      });
+    }
+    if (window.go.main.App.GetCloudConsent) {
+      window.go.main.App.GetCloudConsent().then((c) => {
+        if (chkCloudConsent) chkCloudConsent.checked = c;
+      });
+    }
+  }
+}
+
+if (btnSaveModelConfig) {
+  btnSaveModelConfig.addEventListener("click", () => {
+    if (window.go && window.go.main && window.go.main.App) {
+      if (cfgCloudUrl && window.go.main.App.SetCloudServerURL) {
+        window.go.main.App.SetCloudServerURL(cfgCloudUrl.value.trim());
+      }
+      if (chkCloudConsent && window.go.main.App.SetCloudConsent) {
+        window.go.main.App.SetCloudConsent(chkCloudConsent.checked);
+      }
+    }
+    showBubble("✅ 模型与端侧配置已保存！", 2500);
+  });
 }
 
 if (orbContainer) {
@@ -1080,8 +1521,43 @@ if (window.runtime) {
     applyState("thinking");
   });
   window.runtime.EventsOn("avatar:mic_energy", (energy) => {
+    currentRms = energy;
+    updateRmsMeter(energy);
+
+    // 模式 B 声学驱动规范：
+    // E < 0.05 语间停顿/换气强制归位待机姿势，严禁假唱抽搐
+    // 0.05 <= E < 0.45 平滑播放 Row 3 动作
+    // E >= 0.45 重音兴奋挥爪
+    if (currentState === "speaking") {
+      if (energy < 0.05) {
+        // 停顿归位呼吸
+      } else if (energy >= 0.45) {
+        updateAuditTrack("Row 3 (waving-excited)");
+      } else {
+        updateAuditTrack("Row 3 (waving)");
+      }
+    }
+
     if ((currentState === "listening" || currentState === "idle") && energy > 0.05) {
       resetSleepTimer();
+    }
+  });
+  window.runtime.EventsOn("avatar:auto_roaming", (enabled) => {
+    isAutoRoamingEnabled = enabled;
+    updateRoamingUI();
+  });
+  window.runtime.EventsOn("avatar:dial_param", (param) => {
+    if (param && param.key) {
+      if (param.key === "scale") {
+        petScale = param.val;
+        document.documentElement.style.setProperty("--pet-scale", param.val);
+        if (sliderScale) sliderScale.value = param.val;
+        if (valScale) valScale.textContent = `${param.val.toFixed(2)}x`;
+      } else if (param.key === "speed") {
+        roamSpeedFactor = param.val;
+        if (sliderSpeed) sliderSpeed.value = param.val;
+        if (valSpeed) valSpeed.textContent = `${param.val.toFixed(1)}x`;
+      }
     }
   });
   window.runtime.EventsOn("avatar:speech", (sentence) => {
@@ -1139,7 +1615,7 @@ if (window.runtime) {
 // ==================== 13. DOM 就绪自启 ====================
 
 window.addEventListener("DOMContentLoaded", () => {
-  // 获取后端保存的形态和皮肤
+  // 获取后端保存的形态、皮肤与自主漫游配置
   if (window.go && window.go.main && window.go.main.App) {
     window.go.main.App.GetDisplayForm().then((form) => applyDisplayForm(form));
     window.go.main.App.GetPetSkin().then((skin) => applySkin(skin, false));
@@ -1150,17 +1626,38 @@ window.addEventListener("DOMContentLoaded", () => {
         subtitleText.textContent = m === "hands_free" ? "随时开口与我畅聊..." : "按住空格说话...";
       }
     });
+    if (window.go.main.App.GetAutoRoaming) {
+      window.go.main.App.GetAutoRoaming().then((r) => {
+        isAutoRoamingEnabled = r;
+        updateRoamingUI();
+      });
+    }
+    if (window.go.main.App.GetDialParams) {
+      window.go.main.App.GetDialParams().then((dial) => {
+        if (dial && dial.scale) {
+          updateDialParam("scale", dial.scale);
+          if (sliderScale) sliderScale.value = dial.scale;
+        }
+        if (dial && dial.speed) {
+          updateDialParam("speed", dial.speed);
+          if (sliderSpeed) sliderSpeed.value = dial.speed;
+        }
+      });
+    }
   } else {
     applyDisplayForm("pet");
-    applySkin("whale", false);
+    applySkin("luoxiaohei2d", false);
+    updateRoamingUI();
   }
 
   applyState("idle");
+  renderMemos();
   initPTTKeyboard();
 
   setTimeout(() => {
     refreshSkins();
     refreshPersonas();
     refreshBond();
+    refreshModelConfig();
   }, 300);
 });

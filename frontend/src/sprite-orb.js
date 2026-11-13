@@ -41,14 +41,14 @@ function rowAnimation(
 export function defaultAnimations() {
   return {
     idle: idleAnimation(),
-    "running-right": rowAnimation(1, 8, 120, 220),
-    "running-left": rowAnimation(2, 8, 120, 220),
-    waving: rowAnimation(3, 4, 140, 280),
-    jumping: rowAnimation(4, 5, 140, 280),
-    failed: rowAnimation(5, 8, 140, 240),
-    waiting: rowAnimation(6, 6, 150, 260),
-    running: rowAnimation(7, 6, 120, 220),
-    review: rowAnimation(8, 6, 150, 280),
+    "running-right": rowAnimation(1, 8, 91, 91),
+    "running-left": rowAnimation(2, 8, 91, 91),
+    waving: rowAnimation(3, 4, 125, 125),
+    jumping: rowAnimation(4, 5, 83, 120),
+    failed: rowAnimation(5, 8, 125, 125),
+    waiting: rowAnimation(6, 6, 166, 166),
+    running: rowAnimation(7, 6, 100, 100),
+    review: rowAnimation(8, 6, 166, 166),
   };
 }
 
@@ -67,9 +67,12 @@ export const PET_EVENT_ANIMATION_POLICY = Object.freeze({
   click: "jumping",
   wake: "jumping",
   pet: "jumping",
-  feed: "jumping",
+  poke: "jumping",
+  feed: "running",
+  rice: "running",
+  turbo: "running",
+  grass: "jumping",
 });
-
 export function spriteAnimationForEvent(event) {
   return PET_EVENT_ANIMATION_POLICY[event] || null;
 }

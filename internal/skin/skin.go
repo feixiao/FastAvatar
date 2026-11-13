@@ -34,6 +34,13 @@ type PetManifest struct {
 
 var BuiltinSkins = []SkinInfo{
 	{
+		ID:                  "luoxiaohei2d",
+		DisplayName:         "罗小黑 2D",
+		Description:         "纯黑灵动小猫、黄绿大眼、呆萌耳朵与分叉尾巴（源自 Codex Pets 官方生态），支持自主桌面巡视漫步与全双工打断",
+		Type:                "builtin",
+		SpriteVersionNumber: 1,
+	},
+	{
 		ID:                  "whale",
 		DisplayName:         "大肥鱼 (鲸鱼娘)",
 		Description:         "生活在桌面上的专属大肥鱼/鲸鱼娘，呆萌温和、爱吃白饭，嘴型随说话起伏自然张合",

@@ -35,6 +35,9 @@ function renderSpritesheet(ctx, skinId) {
       ctx.translate(cx, cy);
 
       switch (skinId) {
+        case "luoxiaohei2d":
+          drawLuoxiaoheiFrame(ctx, row, col);
+          break;
         case "whale":
           drawWhaleFrame(ctx, row, col);
           break;
@@ -45,14 +48,207 @@ function renderSpritesheet(ctx, skinId) {
           drawSpiritFrame(ctx, row, col);
           break;
         case "cat":
-        default:
           drawCatFrame(ctx, row, col);
+          break;
+        default:
+          drawLuoxiaoheiFrame(ctx, row, col);
           break;
       }
 
       ctx.restore();
     }
   }
+}
+
+// ==================== -1. 默认官方宠伴: 罗小黑 2D (Luoxiaohei 2D) ====================
+function drawLuoxiaoheiFrame(ctx, row, col) {
+  const catBlack = "#0f131c";
+  const eyeGreen = "#bef264";
+  const eyePupil = "#090d16";
+  const earInner = "#2a3447";
+  const mouthPink = "#f43f5e";
+
+  let bodyScaleX = 1;
+  let bodyScaleY = 1;
+  let offsetY = 0;
+  let offsetX = 0;
+  let isBlinking = false;
+  let tailAngle = 0;
+  let pawLift = 0;
+  let mouthOpen = false;
+
+  switch (row) {
+    case 0: // idle: breathing & blinking
+      offsetY = Math.sin(col * 1.05) * 3;
+      bodyScaleY = 1 + Math.sin(col * 1.05) * 0.04;
+      tailAngle = Math.sin(col * 1.2) * 12;
+      if (col === 3 || col === 4) isBlinking = true;
+      break;
+    case 1: // running-right
+      offsetX = 6;
+      offsetY = (col % 2 === 0 ? -4 : 2);
+      tailAngle = -25 + (col % 2) * 15;
+      pawLift = (col % 2 === 0 ? 6 : -4);
+      break;
+    case 2: // running-left
+      offsetX = -6;
+      offsetY = (col % 2 === 0 ? -4 : 2);
+      tailAngle = 25 - (col % 2) * 15;
+      pawLift = (col % 2 === 0 ? -4 : 6);
+      break;
+    case 3: // waving / speaking
+      offsetY = (col % 2) * -3;
+      mouthOpen = true;
+      pawLift = 12 + (col % 2) * 6;
+      tailAngle = Math.sin(col * 1.5) * 15;
+      break;
+    case 4: // jumping
+      offsetY = -12 - col * 3;
+      bodyScaleY = 1.08;
+      bodyScaleX = 0.94;
+      pawLift = 14;
+      tailAngle = 10;
+      break;
+    case 5: // failed / error
+      offsetY = 4;
+      bodyScaleY = 0.92;
+      bodyScaleX = 1.06;
+      tailAngle = -30;
+      break;
+    case 6: // waiting / listening
+      offsetY = -2;
+      tailAngle = 5;
+      break;
+    case 7: // running / feed
+      offsetY = -4 + (col % 2) * 4;
+      mouthOpen = true;
+      tailAngle = 20;
+      pawLift = 8;
+      break;
+    case 8: // review / thinking
+      offsetY = Math.sin(col * 0.8) * 2;
+      tailAngle = -10 + col * 4;
+      break;
+  }
+
+  ctx.save();
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(bodyScaleX, bodyScaleY);
+
+  // 1. 分叉尾巴 (Split Tail)
+  ctx.save();
+  ctx.translate(-28, 28);
+  ctx.rotate((tailAngle * Math.PI) / 180);
+  ctx.strokeStyle = catBlack;
+  ctx.lineWidth = 9;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(-18, -10, -28, -22);
+  ctx.stroke();
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(-28, -22);
+  ctx.lineTo(-36, -30);
+  ctx.moveTo(-28, -22);
+  ctx.lineTo(-32, -35);
+  ctx.stroke();
+  ctx.restore();
+
+  // 2. 纯黑身躯
+  ctx.fillStyle = catBlack;
+  ctx.beginPath();
+  ctx.ellipse(0, 16, 44, 38, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 3. 猫耳朵
+  ctx.beginPath();
+  ctx.moveTo(-36, -14);
+  ctx.lineTo(-48, -54);
+  ctx.lineTo(-14, -30);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(36, -14);
+  ctx.lineTo(48, -54);
+  ctx.lineTo(14, -30);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = earInner;
+  ctx.beginPath();
+  ctx.moveTo(-32, -18);
+  ctx.lineTo(-42, -48);
+  ctx.lineTo(-18, -28);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(32, -18);
+  ctx.lineTo(42, -48);
+  ctx.lineTo(18, -28);
+  ctx.closePath();
+  ctx.fill();
+
+  // 4. 黄绿大眼睛
+  if (!isBlinking && row !== 5) {
+    ctx.fillStyle = eyeGreen;
+    ctx.beginPath();
+    ctx.ellipse(-19, -2, 14, 16, 0, 0, Math.PI * 2);
+    ctx.ellipse(19, -2, 14, 16, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = eyePupil;
+    let pupilOffsetX = 0;
+    if (row === 1) pupilOffsetX = 4;
+    else if (row === 2) pupilOffsetX = -4;
+    else if (row === 8) pupilOffsetX = Math.sin(col) * 5;
+
+    ctx.beginPath();
+    ctx.ellipse(-19 + pupilOffsetX, -2, 6, 11, 0, 0, Math.PI * 2);
+    ctx.ellipse(19 + pupilOffsetX, -2, 6, 11, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(-22 + pupilOffsetX, -6, 3.5, 0, Math.PI * 2);
+    ctx.arc(16 + pupilOffsetX, -6, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (row === 5) {
+    ctx.strokeStyle = eyeGreen;
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(-26, -8); ctx.lineTo(-12, 4);
+    ctx.moveTo(-12, -8); ctx.lineTo(-26, 4);
+    ctx.moveTo(12, -8); ctx.lineTo(26, 4);
+    ctx.moveTo(26, -8); ctx.lineTo(12, 4);
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = eyeGreen;
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.arc(-19, -2, 10, 0.1 * Math.PI, 0.9 * Math.PI);
+    ctx.arc(19, -2, 10, 0.1 * Math.PI, 0.9 * Math.PI);
+    ctx.stroke();
+  }
+
+  // 5. 嘴巴
+  if (mouthOpen) {
+    ctx.fillStyle = mouthPink;
+    ctx.beginPath();
+    ctx.ellipse(0, 14, 5, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 6. 小爪子
+  ctx.fillStyle = catBlack;
+  ctx.beginPath();
+  ctx.arc(-18, 42 - (row === 3 ? pawLift : 0), 9, 0, Math.PI * 2);
+  ctx.arc(18, 42 - (row === 1 || row === 7 ? pawLift : 0), 9, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
 }
 
 // ==================== 0. 大肥鱼 / 鲸鱼娘 (Whale) ====================

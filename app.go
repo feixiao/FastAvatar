@@ -667,12 +667,12 @@ func (a *App) SetDisplayForm(form string) string {
 	return form
 }
 
-// GetPetSkin 获取当前桌宠皮肤 ID
+// GetPetSkin 获取当前桌宠皮肤 ID (默认官方宠伴: luoxiaohei2d)
 func (a *App) GetPetSkin() string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.cfg.PetSkin == "" {
-		return "cat"
+		return "luoxiaohei2d"
 	}
 	return a.cfg.PetSkin
 }
@@ -683,7 +683,7 @@ func (a *App) SetPetSkin(skinID string) string {
 	defer a.mu.Unlock()
 
 	if skinID == "" {
-		skinID = "whale"
+		skinID = "luoxiaohei2d"
 	}
 	if a.cfg.PetSkin == skinID {
 		return skinID
@@ -738,7 +738,9 @@ func (a *App) InteractPet(action string) map[string]interface{} {
 	cue := "jumping"
 	switch action {
 	case "pet":
-		if a.cfg.PetSkin == "whale" {
+		if a.cfg.PetSkin == "luoxiaohei2d" {
+			msg = "罗小黑舒服地眯起黄绿大眼，欢快摇了摇分叉尾巴~ (亲密度 +5!)"
+		} else if a.cfg.PetSkin == "whale" {
 			msg = "舒服地眯起眼睛晃动鱼鳍~ (亲密度 +5!)"
 		} else if a.cfg.PetSkin == "cat" {
 			msg = "舒服地眯起眼睛发出呼噜声~ (亲密度 +5!)"
@@ -749,40 +751,58 @@ func (a *App) InteractPet(action string) map[string]interface{} {
 		}
 		cue = "jumping"
 	case "feed":
-		if a.cfg.PetSkin == "whale" {
+		if a.cfg.PetSkin == "luoxiaohei2d" {
+			msg = "罗小黑敏捷暴风干饭，一口吞下小鱼干！(亲密度 +5!)"
+		} else if a.cfg.PetSkin == "whale" {
 			msg = "嗷呜一口吃掉白饭配鱼片，满脸满足！"
 		} else if a.cfg.PetSkin == "cat" {
 			msg = "嗷呜一口吃掉小鱼干，吧唧着嘴巴超开心！"
 		} else {
 			msg = "嗷呜一口吃掉小零食，满脸满足！"
 		}
-		cue = "jumping"
+		cue = "running"
 	case "rice":
-		if a.cfg.PetSkin == "whale" {
+		if a.cfg.PetSkin == "luoxiaohei2d" {
+			msg = "罗小黑狼吞虎咽狂吃大米饭，满足地打了个饱嗝~ (亲密度 +5!)"
+		} else if a.cfg.PetSkin == "whale" {
 			msg = "捧着热气腾腾的大米饭大口干饭！真香~ (亲密度 +5!)"
 		} else if a.cfg.PetSkin == "cat" {
 			msg = "把小脑袋埋进大白饭碗里大口吧唧吧唧！(亲密度 +5!)"
 		} else {
 			msg = "开心地享用大米饭，满脸满足！(亲密度 +5!)"
 		}
-		cue = "rice"
+		cue = "running"
 	case "turbo":
-		if a.cfg.PetSkin == "whale" {
+		if a.cfg.PetSkin == "luoxiaohei2d" {
+			msg = "罗小黑飞身扑向食物，两只爪子疯狂刨饭！(亲密度 +5!)"
+		} else if a.cfg.PetSkin == "whale" {
 			msg = "抱紧钢盆疯狂干饭，两只小脚丫欢快扑腾乱蹬！(亲密度 +5!)"
 		} else if a.cfg.PetSkin == "cat" {
 			msg = "抱住大碗狂吃一空，心满意足地舔着胡须！(亲密度 +5!)"
 		} else {
 			msg = "风卷残云般狂吃大餐，元气满满！(亲密度 +5!)"
 		}
-		cue = "turbo"
+		cue = "running"
 	case "grass":
-		msg = "一个飞扑按住小草玩具，尾巴得意地摇了摇~ (亲密度 +5!)"
-		cue = "grass"
+		if a.cfg.PetSkin == "luoxiaohei2d" {
+			msg = "罗小黑敏捷纵跳扑住逗猫草，耳朵开心地抖了抖~ (亲密度 +5!)"
+		} else {
+			msg = "一个飞扑按住小草玩具，尾巴得意地摇了摇~ (亲密度 +5!)"
+		}
+		cue = "jumping"
 	case "poke":
-		msg = "歪过头眨巴着眼睛看着你：怎么啦？"
+		if a.cfg.PetSkin == "luoxiaohei2d" {
+			msg = "罗小黑转过头眨了眨黄绿大眼睛，双耳竖起看着你：喵？"
+		} else {
+			msg = "歪过头眨巴着眼睛看着你：怎么啦？"
+		}
 		cue = "jumping"
 	case "wake":
-		msg = "揉了揉眼睛，元气满满地醒来啦！"
+		if a.cfg.PetSkin == "luoxiaohei2d" {
+			msg = "罗小黑伸了个懒腰抖抖耳朵，迈着轻盈猫步开始巡视桌面啦！"
+		} else {
+			msg = "揉了揉眼睛，元气满满地醒来啦！"
+		}
 		if a.personaMgr != nil {
 			active := a.personaMgr.GetActiveSlot()
 			if active.Greeting != "" {
@@ -818,6 +838,100 @@ func (a *App) ToggleAlwaysOnTop() bool {
 		runtime.WindowSetAlwaysOnTop(a.ctx, a.cfg.AlwaysOnTop)
 	}
 	return a.cfg.AlwaysOnTop
+}
+
+// ==================== 自主漫游与手感调参 (DialKit) API ====================
+
+// ToggleAutoRoaming 切换桌面自主漫游开关
+func (a *App) ToggleAutoRoaming() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.cfg.AutoRoaming = !a.cfg.AutoRoaming
+	_ = config.SaveConfig(a.cfg)
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "avatar:auto_roaming", a.cfg.AutoRoaming)
+	}
+	return a.cfg.AutoRoaming
+}
+
+// GetAutoRoaming 获取桌面自主漫游开关状态
+func (a *App) GetAutoRoaming() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.cfg.AutoRoaming
+}
+
+// SetAutoRoaming 设置桌面自主漫游开关
+func (a *App) SetAutoRoaming(enable bool) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.cfg.AutoRoaming = enable
+	_ = config.SaveConfig(a.cfg)
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "avatar:auto_roaming", a.cfg.AutoRoaming)
+	}
+	return a.cfg.AutoRoaming
+}
+
+// GetDialParams 获取 DialKit 调参参数 (scale, speed)
+func (a *App) GetDialParams() map[string]float64 {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	scale := a.cfg.PetScale
+	if scale == 0 {
+		scale = 1.15
+	}
+	speed := a.cfg.RoamSpeed
+	if speed == 0 {
+		speed = 1.2
+	}
+	return map[string]float64{
+		"scale": scale,
+		"speed": speed,
+	}
+}
+
+// SetDialParam 设置 DialKit 参数
+func (a *App) SetDialParam(key string, val float64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	switch key {
+	case "scale":
+		a.cfg.PetScale = val
+	case "speed":
+		a.cfg.RoamSpeed = val
+	}
+	_ = config.SaveConfig(a.cfg)
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "avatar:dial_param", map[string]interface{}{
+			"key": key,
+			"val": val,
+		})
+	}
+}
+
+// GetWindowPosition 获取原生窗口坐标
+func (a *App) GetWindowPosition() []int {
+	if a.ctx == nil {
+		return []int{0, 0}
+	}
+	x, y := runtime.WindowGetPosition(a.ctx)
+	return []int{x, y}
+}
+
+// SetWindowPosition 设置原生窗口坐标并支持贴边吸附
+func (a *App) SetWindowPosition(x, y int) {
+	if a.ctx == nil {
+		return
+	}
+	// 距离屏幕左边缘 < 30px 自动贴边
+	if x < 30 && x >= 0 {
+		x = 0
+	}
+	if y < 30 && y >= 0 {
+		y = 0
+	}
+	runtime.WindowSetPosition(a.ctx, x, y)
 }
 
 // QuitApp 退出应用

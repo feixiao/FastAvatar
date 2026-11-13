@@ -31,14 +31,14 @@
   function defaultAnimations() {
     return {
       idle: idleAnimation(),
-      "running-right": rowAnimation(1, 8, 120, 220),
-      "running-left": rowAnimation(2, 8, 120, 220),
-      waving: rowAnimation(3, 4, 140, 280),
-      jumping: rowAnimation(4, 5, 140, 280),
-      failed: rowAnimation(5, 8, 140, 240),
-      waiting: rowAnimation(6, 6, 150, 260),
-      running: rowAnimation(7, 6, 120, 220),
-      review: rowAnimation(8, 6, 150, 280)
+      "running-right": rowAnimation(1, 8, 91, 91),
+      "running-left": rowAnimation(2, 8, 91, 91),
+      waving: rowAnimation(3, 4, 125, 125),
+      jumping: rowAnimation(4, 5, 83, 120),
+      failed: rowAnimation(5, 8, 125, 125),
+      waiting: rowAnimation(6, 6, 166, 166),
+      running: rowAnimation(7, 6, 100, 100),
+      review: rowAnimation(8, 6, 166, 166)
     };
   }
   var PET_STATE_ANIMATION_POLICY = Object.freeze({
@@ -54,7 +54,11 @@
     click: "jumping",
     wake: "jumping",
     pet: "jumping",
-    feed: "jumping"
+    poke: "jumping",
+    feed: "running",
+    rice: "running",
+    turbo: "running",
+    grass: "jumping"
   });
   function spritePlaybackSelection({
     state,
@@ -190,6 +194,9 @@
         ctx.save();
         ctx.translate(cx, cy);
         switch (skinId) {
+          case "luoxiaohei2d":
+            drawLuoxiaoheiFrame(ctx, row, col);
+            break;
           case "whale":
             drawWhaleFrame(ctx, row, col);
             break;
@@ -200,13 +207,186 @@
             drawSpiritFrame(ctx, row, col);
             break;
           case "cat":
-          default:
             drawCatFrame(ctx, row, col);
+            break;
+          default:
+            drawLuoxiaoheiFrame(ctx, row, col);
             break;
         }
         ctx.restore();
       }
     }
+  }
+  function drawLuoxiaoheiFrame(ctx, row, col) {
+    const catBlack = "#0f131c";
+    const eyeGreen = "#bef264";
+    const eyePupil = "#090d16";
+    const earInner = "#2a3447";
+    const mouthPink = "#f43f5e";
+    let bodyScaleX = 1;
+    let bodyScaleY = 1;
+    let offsetY = 0;
+    let offsetX = 0;
+    let isBlinking = false;
+    let tailAngle = 0;
+    let pawLift = 0;
+    let mouthOpen = false;
+    switch (row) {
+      case 0:
+        offsetY = Math.sin(col * 1.05) * 3;
+        bodyScaleY = 1 + Math.sin(col * 1.05) * 0.04;
+        tailAngle = Math.sin(col * 1.2) * 12;
+        if (col === 3 || col === 4) isBlinking = true;
+        break;
+      case 1:
+        offsetX = 6;
+        offsetY = col % 2 === 0 ? -4 : 2;
+        tailAngle = -25 + col % 2 * 15;
+        pawLift = col % 2 === 0 ? 6 : -4;
+        break;
+      case 2:
+        offsetX = -6;
+        offsetY = col % 2 === 0 ? -4 : 2;
+        tailAngle = 25 - col % 2 * 15;
+        pawLift = col % 2 === 0 ? -4 : 6;
+        break;
+      case 3:
+        offsetY = col % 2 * -3;
+        mouthOpen = true;
+        pawLift = 12 + col % 2 * 6;
+        tailAngle = Math.sin(col * 1.5) * 15;
+        break;
+      case 4:
+        offsetY = -12 - col * 3;
+        bodyScaleY = 1.08;
+        bodyScaleX = 0.94;
+        pawLift = 14;
+        tailAngle = 10;
+        break;
+      case 5:
+        offsetY = 4;
+        bodyScaleY = 0.92;
+        bodyScaleX = 1.06;
+        tailAngle = -30;
+        break;
+      case 6:
+        offsetY = -2;
+        tailAngle = 5;
+        break;
+      case 7:
+        offsetY = -4 + col % 2 * 4;
+        mouthOpen = true;
+        tailAngle = 20;
+        pawLift = 8;
+        break;
+      case 8:
+        offsetY = Math.sin(col * 0.8) * 2;
+        tailAngle = -10 + col * 4;
+        break;
+    }
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(bodyScaleX, bodyScaleY);
+    ctx.save();
+    ctx.translate(-28, 28);
+    ctx.rotate(tailAngle * Math.PI / 180);
+    ctx.strokeStyle = catBlack;
+    ctx.lineWidth = 9;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(-18, -10, -28, -22);
+    ctx.stroke();
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(-28, -22);
+    ctx.lineTo(-36, -30);
+    ctx.moveTo(-28, -22);
+    ctx.lineTo(-32, -35);
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = catBlack;
+    ctx.beginPath();
+    ctx.ellipse(0, 16, 44, 38, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-36, -14);
+    ctx.lineTo(-48, -54);
+    ctx.lineTo(-14, -30);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(36, -14);
+    ctx.lineTo(48, -54);
+    ctx.lineTo(14, -30);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = earInner;
+    ctx.beginPath();
+    ctx.moveTo(-32, -18);
+    ctx.lineTo(-42, -48);
+    ctx.lineTo(-18, -28);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(32, -18);
+    ctx.lineTo(42, -48);
+    ctx.lineTo(18, -28);
+    ctx.closePath();
+    ctx.fill();
+    if (!isBlinking && row !== 5) {
+      ctx.fillStyle = eyeGreen;
+      ctx.beginPath();
+      ctx.ellipse(-19, -2, 14, 16, 0, 0, Math.PI * 2);
+      ctx.ellipse(19, -2, 14, 16, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = eyePupil;
+      let pupilOffsetX = 0;
+      if (row === 1) pupilOffsetX = 4;
+      else if (row === 2) pupilOffsetX = -4;
+      else if (row === 8) pupilOffsetX = Math.sin(col) * 5;
+      ctx.beginPath();
+      ctx.ellipse(-19 + pupilOffsetX, -2, 6, 11, 0, 0, Math.PI * 2);
+      ctx.ellipse(19 + pupilOffsetX, -2, 6, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(-22 + pupilOffsetX, -6, 3.5, 0, Math.PI * 2);
+      ctx.arc(16 + pupilOffsetX, -6, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (row === 5) {
+      ctx.strokeStyle = eyeGreen;
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(-26, -8);
+      ctx.lineTo(-12, 4);
+      ctx.moveTo(-12, -8);
+      ctx.lineTo(-26, 4);
+      ctx.moveTo(12, -8);
+      ctx.lineTo(26, 4);
+      ctx.moveTo(26, -8);
+      ctx.lineTo(12, 4);
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = eyeGreen;
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.arc(-19, -2, 10, 0.1 * Math.PI, 0.9 * Math.PI);
+      ctx.arc(19, -2, 10, 0.1 * Math.PI, 0.9 * Math.PI);
+      ctx.stroke();
+    }
+    if (mouthOpen) {
+      ctx.fillStyle = mouthPink;
+      ctx.beginPath();
+      ctx.ellipse(0, 14, 5, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = catBlack;
+    ctx.beginPath();
+    ctx.arc(-18, 42 - (row === 3 ? pawLift : 0), 9, 0, Math.PI * 2);
+    ctx.arc(18, 42 - (row === 1 || row === 7 ? pawLift : 0), 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
   function drawWhaleFrame(ctx, row, col) {
     const whaleBlue = "#2563eb";
@@ -957,7 +1137,7 @@
       this.canvas = canvasElement;
       this.ctx = canvasElement.getContext("2d");
       this.particleContainer = particleContainer;
-      this.skinId = "cat";
+      this.skinId = "luoxiaohei2d";
       this.state = "idle";
       this.dragDirection = "";
       this.cue = null;
@@ -990,6 +1170,32 @@
       }
     }
     loadBuiltin(skinId) {
+      if (skinId === "luoxiaohei2d") {
+        const img = new Image();
+        img.onload = () => {
+          this.geometry = spriteGeometry({});
+          this.animations = defaultAnimations();
+          this.assets = {
+            image: img,
+            geometry: this.geometry,
+            animations: this.animations
+          };
+          this.resetTrack();
+        };
+        img.onerror = () => {
+          const sheetCanvas2 = getBuiltinPetSpritesheet("luoxiaohei2d");
+          this.geometry = spriteGeometry({});
+          this.animations = defaultAnimations();
+          this.assets = {
+            image: sheetCanvas2,
+            geometry: this.geometry,
+            animations: this.animations
+          };
+          this.resetTrack();
+        };
+        img.src = "./assets/luoxiaohei2d/spritesheet.webp";
+        return;
+      }
       const sheetCanvas = getBuiltinPetSpritesheet(skinId);
       this.geometry = spriteGeometry({});
       this.animations = defaultAnimations();
@@ -1149,28 +1355,59 @@
   var btnPetMic = document.getElementById("btnPetMic");
   var btnPetChat = document.getElementById("btnPetChat");
   var btnPetFeed = document.getElementById("btnPetFeed");
+  var btnPetRoam = document.getElementById("btnPetRoam");
   var btnPetTouch = document.getElementById("btnPetTouch");
+  var btnPetRice = document.getElementById("btnPetRice");
+  var btnPetTurbo = document.getElementById("btnPetTurbo");
+  var btnPetDialKit = document.getElementById("btnPetDialKit");
   var btnPetPersona = document.getElementById("btnPetPersona");
   var btnPetToCapsule = document.getElementById("btnPetToCapsule");
   var btnPetDrawer = document.getElementById("btnPetDrawer");
   var btnPetStop = document.getElementById("btnPetStop");
-  var btnPetRice = document.getElementById("btnPetRice");
-  var btnPetTurbo = document.getElementById("btnPetTurbo");
+  var roamBubble = document.getElementById("roamBubble");
+  var macPetShadow = document.getElementById("macPetShadow");
   var petContextMenu = document.getElementById("petContextMenu");
   var menuPetTitle = document.getElementById("menuPetTitle");
   var menuActionPet = document.getElementById("menuActionPet");
-  var menuActionFeed = document.getElementById("menuActionFeed");
-  var menuActionChat = document.getElementById("menuActionChat");
+  var menuActionFish = document.getElementById("menuActionFish");
   var menuActionRice = document.getElementById("menuActionRice");
   var menuActionTurbo = document.getElementById("menuActionTurbo");
   var menuActionGrass = document.getElementById("menuActionGrass");
+  var menuToggleRoam = document.getElementById("menuToggleRoam");
+  var roamStatusMenuText = document.getElementById("roamStatusMenuText");
+  var menuActionChat = document.getElementById("menuActionChat");
   var skinSubmenu = document.getElementById("skinSubmenu");
   var personaSubmenu = document.getElementById("personaSubmenu");
   var menuToggleForm = document.getElementById("menuToggleForm");
   var menuToggleTop = document.getElementById("menuToggleTop");
   var topStatusText = document.getElementById("topStatusText");
+  var menuOpenAudit = document.getElementById("menuOpenAudit");
   var menuOpenDrawer = document.getElementById("menuOpenDrawer");
   var menuQuitApp = document.getElementById("menuQuitApp");
+  var memoCardsList = document.getElementById("memoCardsList");
+  var newMemoInput = document.getElementById("newMemoInput");
+  var btnQuickAddMemo = document.getElementById("btnQuickAddMemo");
+  var fishFeedCount = document.getElementById("fishFeedCount");
+  var roamPatrolCount = document.getElementById("roamPatrolCount");
+  var cfgEdgeBaseUrl = document.getElementById("cfgEdgeBaseUrl");
+  var cfgEdgeModel = document.getElementById("cfgEdgeModel");
+  var cfgCloudUrl = document.getElementById("cfgCloudUrl");
+  var chkCloudConsent = document.getElementById("chkCloudConsent");
+  var btnSaveModelConfig = document.getElementById("btnSaveModelConfig");
+  var tpmHudPanel = document.getElementById("tpmHudPanel");
+  var btnCloseTpmHud = document.getElementById("btnCloseTpmHud");
+  var tpmRoamCoord = document.getElementById("tpmRoamCoord");
+  var tpmRoamDesc = document.getElementById("tpmRoamDesc");
+  var tpmRmsValue = document.getElementById("tpmRmsValue");
+  var tpmRmsBar = document.getElementById("tpmRmsBar");
+  var tpmActiveTrack = document.getElementById("tpmActiveTrack");
+  var dialKitHud = document.getElementById("dialKitHud");
+  var btnCloseDialKit = document.getElementById("btnCloseDialKit");
+  var sliderScale = document.getElementById("sliderScale");
+  var sliderSpeed = document.getElementById("sliderSpeed");
+  var valScale = document.getElementById("valScale");
+  var valSpeed = document.getElementById("valSpeed");
+  var btnCopyDialTokens = document.getElementById("btnCopyDialTokens");
   var capsule = document.getElementById("capsule");
   var orbContainer = document.getElementById("orbContainer");
   var statusIndicator = document.getElementById("statusIndicator");
@@ -1208,7 +1445,19 @@
   var xpBarFill = document.getElementById("xpBarFill");
   var xpLabelText = document.getElementById("xpLabelText");
   var currentForm = "pet";
-  var currentSkin = "whale";
+  var currentSkin = "luoxiaohei2d";
+  var isAutoRoamingEnabled = true;
+  var roamSpeedFactor = 1.2;
+  var petScale = 1.15;
+  var currentRms = 0;
+  var isRoamingMoving = false;
+  var roamCurrentOffset = 0;
+  var roamTargetOffset = 0;
+  var roamTimer = null;
+  var roamAnimId = null;
+  var roamBubbleTimer = null;
+  var fishFedTotal = 28;
+  var patrolStepsTotal = 142;
   var currentMode = "hands_free";
   var currentState = "idle";
   var isDrawerOpen = false;
@@ -1289,7 +1538,7 @@
     }, 2200);
   }
   function applySkin(skinId, notifyBackend = true) {
-    const targetSkin = skinId || "whale";
+    const targetSkin = skinId || "luoxiaohei2d";
     currentSkin = targetSkin;
     stopWhalePose();
     if (currentSkin === "whale") {
@@ -1301,6 +1550,7 @@
       petRenderer.loadSkin(currentSkin);
     }
     const skinNames = {
+      luoxiaohei2d: "\u7F57\u5C0F\u9ED1 2D (\u5B98\u65B9\u5BA0\u4F34)",
       whale: "\u5927\u80A5\u9C7C (\u9CB8\u9C7C\u5A18)",
       cat: "\u6A58\u5B9D\u55B5 (\u684C\u5BA0\u4F34\u4FA3)",
       fox: "\u7075\u72D0\u5C0F\u4E5D (\u684C\u5BA0\u4F34\u4FA3)",
@@ -1315,10 +1565,11 @@
     refreshSkinUI();
   }
   var defaultSkins = [
+    { id: "luoxiaohei2d", display_name: "\u7F57\u5C0F\u9ED1 2D", description: "\u5B98\u65B9\u9ED8\u8BA4\u5BA0\u4F34\uFF1A\u7EAF\u9ED1\u7075\u52A8\u5C0F\u732B\u3001\u9EC4\u7EFF\u5927\u773C\u3001\u5446\u840C\u8033\u6735\u4E0E\u5206\u53C9\u5C3E\u5DF4\uFF0C\u652F\u6301\u684C\u9762\u81EA\u7531\u6F2B\u6B65\u4E0E\u5168\u53CC\u5DE5\u6253\u65AD", type: "builtin" },
     { id: "whale", display_name: "\u5927\u80A5\u9C7C (\u9CB8\u9C7C\u5A18)", description: "\u5446\u840C\u6E29\u548C\u3001\u7231\u5403\u767D\u996D\uFF0C\u5634\u578B\u968F\u8BF4\u8BDD\u8D77\u4F0F\u81EA\u7136\u5F20\u5408", type: "builtin" },
-    { id: "cat", display_name: "\u6A58\u5B9D\u55B5", description: "\u8F6F\u840C\u53EF\u7231\u7684\u6A58\u732B\u4F34\u4FA3\uFF0C\u6D3B\u6CFC\u597D\u52A8\uFF0C\u62E5\u6709\u7728\u773C\u7B49\u5B8C\u6574\u5E27", type: "builtin" },
+    { id: "cat", display_name: "\u6A58\u5B9D\u55B5", description: "\u8F6F\u840C\u53EF\u7231\u7684\u6A58\u732B\u4F34\u4FA3\uFF0C\u6D3B\u6CFC\u597D\u52A8\uFF0C\u62E5\u6709\u7728\u773C\u7B49\u5B8C\u6574\u52A8\u4F5C\u5E27", type: "builtin" },
     { id: "fox", display_name: "\u7075\u72D0\u5C0F\u4E5D", description: "\u4ED9\u6C14\u7075\u52A8\u7684\u6CBB\u6108\u7CFB\u8D64\u72D0\uFF0C\u6447\u7740\u6BDB\u8338\u8338\u5927\u5C3E\u5DF4", type: "builtin" },
-    { id: "spirit", display_name: "\u661F\u7075\u9732\u9732", description: "\u8F6F\u840C\u53D1\u5149\u7684\u5947\u5E7B\u5C0F\u6C34\u6EF4\u661F\u7075\uFF0C\u5F8B\u52A8\u8DF3\u8DC3", type: "builtin" }
+    { id: "spirit", display_name: "\u661F\u7075\u9732\u9732", description: "\u8F6F\u840C\u53D1\u5149\u7684\u5947\u5E7B\u5C0F\u6C34\u6EF4\u661F\u7075\uFF0C\u5F8B\u52A8\u8DF3\u8DC3\uFF0C\u6E29\u6696\u6CBB\u6108", type: "builtin" }
   ];
   function renderSkinList(list) {
     skinGrid.innerHTML = "";
@@ -1436,6 +1687,7 @@
       playWhalePose("sleep-waking", 1600);
     }
     if (state === "idle") {
+      updateAuditTrack("Row 0 (idle)");
       const cur = subtitleText.textContent || "";
       if (!cur || cur.startsWith("\u6B63\u5728") || cur.startsWith("\u503E\u542C") || cur.startsWith("\u{1F399}\uFE0F")) {
         subtitleText.textContent = currentMode === "hands_free" ? "\u968F\u65F6\u5F00\u53E3\u6216\u6478\u6478\u6211\u7545\u804A..." : "\u6309\u4F4F\u7A7A\u683C\u8BF4\u8BDD...";
@@ -1444,14 +1696,114 @@
         clearTimeout(bubbleHideTimer);
         bubbleHideTimer = setTimeout(hideBubble, 3e3);
       }
+      scheduleNextRoamDecision();
     } else if (state === "thinking") {
+      stopRoamingMove();
+      updateAuditTrack("Row 8 (review)");
       subtitleText.textContent = "\u6B63\u5728\u601D\u8003\u5E76\u7EC4\u7EC7\u56DE\u7B54...";
     } else if (state === "listening") {
+      stopRoamingMove();
+      updateAuditTrack("Row 6 (waiting)");
       subtitleText.textContent = "\u503E\u542C\u4E2D...";
+    } else if (state === "speaking") {
+      stopRoamingMove();
+      updateAuditTrack("Row 3 (waving)");
     } else if (state === "sleep") {
+      stopRoamingMove();
       hideBubble();
     }
     resetSleepTimer();
+  }
+  function showRoamBubble(text, durationMs = 2500) {
+    if (!roamBubble) return;
+    roamBubble.textContent = text;
+    roamBubble.style.display = "flex";
+    roamBubble.style.opacity = "1";
+    clearTimeout(roamBubbleTimer);
+    roamBubbleTimer = setTimeout(() => {
+      roamBubble.style.opacity = "0";
+      setTimeout(() => {
+        if (roamBubble.style.opacity === "0") {
+          roamBubble.style.display = "none";
+        }
+      }, 200);
+    }, durationMs);
+  }
+  function scheduleNextRoamDecision() {
+    clearTimeout(roamTimer);
+    if (!isAutoRoamingEnabled) return;
+    const delay = Math.random() * 4e3 + 3500;
+    roamTimer = setTimeout(() => {
+      if (currentState === "idle" && !isDragging && currentForm === "pet" && !isDrawerOpen) {
+        makeAutonomousMoveDecision();
+      }
+      scheduleNextRoamDecision();
+    }, delay);
+  }
+  function makeAutonomousMoveDecision() {
+    if (currentState !== "idle" || isDragging || isDrawerOpen) return;
+    roamTargetOffset = (Math.random() - 0.5) * 60;
+    const dx = roamTargetOffset - roamCurrentOffset;
+    if (Math.abs(dx) < 6) return;
+    isRoamingMoving = true;
+    patrolStepsTotal += Math.round(Math.abs(dx));
+    if (roamPatrolCount) roamPatrolCount.textContent = `${patrolStepsTotal} \u6B65`;
+    const dir = dx > 0 ? "right" : "left";
+    petRenderer.setDragDirection(dir);
+    showRoamBubble(dx > 0 ? "\u{1F43E} \u5411\u53F3\u8FB9\u5DE1\u89C6\u5C0F\u8DD1..." : "\u{1F43E} \u5411\u5DE6\u8FB9\u5DE1\u89C6\u5C0F\u8DD1...", 2500);
+    updateAuditTrack(dir === "right" ? "Row 1 (running-right)" : "Row 2 (running-left)");
+    if (tpmRoamCoord) tpmRoamCoord.textContent = `\u5DE1\u89C6\u4E2D \u2192 ${Math.round(roamTargetOffset)}px`;
+    animateRoamStep();
+  }
+  function animateRoamStep() {
+    if (!isRoamingMoving || currentState !== "idle" || isDragging) {
+      stopRoamingMove();
+      return;
+    }
+    const diff = roamTargetOffset - roamCurrentOffset;
+    if (Math.abs(diff) < 2) {
+      roamCurrentOffset = roamTargetOffset;
+      petStage.style.transform = `translateX(${roamCurrentOffset}px) scale(var(--pet-scale))`;
+      stopRoamingMove();
+      showRoamBubble("\u{1F43E} \u539F\u5730\u8E72\u4E0B\u4F11\u606F\u6253\u76F9...", 2e3);
+      updateAuditTrack("Row 0 (idle)");
+      if (tpmRoamCoord) tpmRoamCoord.textContent = `\u4F11\u61A9\u4E2D (${Math.round(roamCurrentOffset)}px)`;
+      return;
+    }
+    const step = Math.sign(diff) * Math.min(Math.abs(diff), 1.8 * roamSpeedFactor);
+    roamCurrentOffset += step;
+    petStage.style.transform = `translateX(${roamCurrentOffset}px) scale(var(--pet-scale))`;
+    roamAnimId = requestAnimationFrame(animateRoamStep);
+  }
+  function stopRoamingMove() {
+    isRoamingMoving = false;
+    if (roamAnimId) cancelAnimationFrame(roamAnimId);
+    petRenderer.setDragDirection("");
+  }
+  function toggleAutoRoaming() {
+    isAutoRoamingEnabled = !isAutoRoamingEnabled;
+    if (window.go && window.go.main && window.go.main.App) {
+      window.go.main.App.SetAutoRoaming(isAutoRoamingEnabled);
+    }
+    updateRoamingUI();
+  }
+  function updateRoamingUI() {
+    if (roamStatusMenuText) {
+      roamStatusMenuText.textContent = isAutoRoamingEnabled ? "\u5DF2\u5F00\u542F" : "\u5DF2\u6682\u505C";
+    }
+    if (btnPetRoam) {
+      btnPetRoam.style.opacity = isAutoRoamingEnabled ? "1" : "0.5";
+      btnPetRoam.title = isAutoRoamingEnabled ? "\u684C\u9762\u81EA\u7531\u6F2B\u6B65\uFF1A\u5F00\u542F\u4E2D (\u70B9\u51FB\u6682\u505C)" : "\u81EA\u7531\u6F2B\u6B65\uFF1A\u5DF2\u6682\u505C (\u70B9\u51FB\u5F00\u542F)";
+    }
+    if (isAutoRoamingEnabled) {
+      scheduleNextRoamDecision();
+      showRoamBubble("\u684C\u9762\u81EA\u7531\u6F2B\u6B65\uFF1A\u5F00\u542F\u4E2D", 2e3);
+    } else {
+      stopRoamingMove();
+      roamCurrentOffset = 0;
+      petStage.style.transform = `translateX(0px) scale(var(--pet-scale))`;
+      showRoamBubble("\u81EA\u7531\u6F2B\u6B65\uFF1A\u5DF2\u6682\u505C", 2e3);
+    }
   }
   var dragStartX = 0;
   var dragStartY = 0;
@@ -1468,6 +1820,7 @@
     dragStartX = e.clientX;
     dragStartY = e.clientY;
     isDragging = false;
+    stopRoamingMove();
     lastMoveTime = performance.now();
     resetSleepTimer();
   });
@@ -1476,13 +1829,18 @@
     const dx = e.clientX - dragStartX;
     const dy = e.clientY - dragStartY;
     if (Math.hypot(dx, dy) > 8) {
-      isDragging = true;
+      if (!isDragging) {
+        isDragging = true;
+        showRoamBubble("\u26A1 \u88AB\u4E3B\u4EBA\u63EA\u8D77\u540E\u9888\u76AE\uFF01", 3e3);
+      }
       const now = performance.now();
-      if (now - lastMoveTime > 80) {
+      if (now - lastMoveTime > 60) {
         if (dx > 4) {
           petRenderer.setDragDirection("right");
+          updateAuditTrack("Row 1 (running-right)");
         } else if (dx < -4) {
           petRenderer.setDragDirection("left");
+          updateAuditTrack("Row 2 (running-left)");
         }
         lastMoveTime = now;
       }
@@ -1493,14 +1851,35 @@
     const dx = e.clientX - dragStartX;
     const dy = e.clientY - dragStartY;
     const wasClick = Math.hypot(dx, dy) < 6;
+    if (isDragging) {
+      showRoamBubble("\u{1F43E} \u5E73\u7A33\u843D\u5730\uFF0C\u7EE7\u7EED\u5DE1\u89C6...", 2e3);
+      if (window.go && window.go.main && window.go.main.App && window.go.main.App.GetWindowPosition) {
+        window.go.main.App.GetWindowPosition().then((pos) => {
+          if (pos && pos.length >= 2) {
+            const [wx, wy] = pos;
+            if (wx < 30 || wy < 30) {
+              window.go.main.App.SetWindowPosition(wx, wy);
+            }
+          }
+        });
+      }
+    }
     resetDragState();
     if (wasClick && currentForm === "pet") {
       handlePetAction("poke");
+    } else {
+      scheduleNextRoamDecision();
     }
   });
   window.addEventListener("pointercancel", resetDragState);
   window.addEventListener("blur", resetDragState);
   window.addEventListener("mouseleave", resetDragState);
+  petStage.addEventListener("dblclick", (e) => {
+    e.stopPropagation();
+    setDrawerOpen(!isDrawerOpen);
+    petRenderer.triggerCue("jumping", 800);
+    petRenderer.spawnHearts(100, 70, "\u{1F4D8} \u6848\u5934\u624B\u8D26");
+  });
   function handlePetAction(action) {
     resetSleepTimer();
     if (window.go && window.go.main && window.go.main.App) {
@@ -1520,14 +1899,21 @@
         }
         const xpLabel = res.xp ? `+5 XP (${res.xp} XP)` : "+5 XP";
         if (action === "pet") {
+          updateAuditTrack("Row 4 (jumping)");
           petRenderer.spawnHearts(100, 70, `\u2764\uFE0F ${xpLabel}`);
         } else if (action === "rice" || action === "turbo") {
+          updateAuditTrack("Row 7 (feed)");
           petRenderer.spawnHearts(100, 70, `\u{1F35A} \u5E72\u996D ${xpLabel}`);
         } else if (action === "feed") {
+          fishFedTotal += 1;
+          if (fishFeedCount) fishFeedCount.textContent = `${fishFedTotal} \u6B21`;
+          updateAuditTrack("Row 7 (feed)");
           petRenderer.spawnHearts(100, 70, `\u{1F41F} \u9971\u8179 ${xpLabel}`);
         } else if (action === "grass") {
+          updateAuditTrack("Row 4 (jumping)");
           petRenderer.spawnHearts(100, 70, `\u{1F33E} \u9017\u8349 ${xpLabel}`);
         } else {
+          updateAuditTrack("Row 4 (jumping)");
           petRenderer.spawnHearts(100, 70, xpLabel);
         }
         if (res.message) {
@@ -1536,9 +1922,6 @@
       });
     }
   }
-  petStage.addEventListener("dblclick", () => {
-    handlePetAction("pet");
-  });
   btnPetTouch.addEventListener("click", (e) => {
     e.stopPropagation();
     handlePetAction("pet");
@@ -1547,6 +1930,18 @@
     btnPetFeed.addEventListener("click", (e) => {
       e.stopPropagation();
       handlePetAction("feed");
+    });
+  }
+  if (btnPetRoam) {
+    btnPetRoam.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleAutoRoaming();
+    });
+  }
+  if (btnPetDialKit) {
+    btnPetDialKit.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleDialKit();
     });
   }
   if (btnPetRice) {
@@ -1559,6 +1954,24 @@
     btnPetTurbo.addEventListener("click", (e) => {
       e.stopPropagation();
       handlePetAction("turbo");
+    });
+  }
+  if (menuActionFish) {
+    menuActionFish.addEventListener("click", () => {
+      handlePetAction("feed");
+      closeContextMenu();
+    });
+  }
+  if (menuToggleRoam) {
+    menuToggleRoam.addEventListener("click", () => {
+      toggleAutoRoaming();
+      closeContextMenu();
+    });
+  }
+  if (menuOpenAudit) {
+    menuOpenAudit.addEventListener("click", () => {
+      toggleDialKit();
+      closeContextMenu();
     });
   }
   if (menuActionRice) {
@@ -1726,6 +2139,7 @@
   function setDrawerOpen(open) {
     isDrawerOpen = open;
     if (open) {
+      stopRoamingMove();
       document.body.classList.add("drawer-open");
       manageDrawer.classList.add("open");
       inputDrawer.classList.remove("open");
@@ -1735,15 +2149,206 @@
       }
       refreshSkins();
       refreshMemory();
+      renderMemos();
       refreshPersonas();
       refreshBond();
+      refreshModelConfig();
     } else {
       document.body.classList.remove("drawer-open");
       manageDrawer.classList.remove("open");
       if (window.go && window.go.main && window.go.main.App) {
         window.go.main.App.SetWindowExpanded(false);
       }
+      scheduleNextRoamDecision();
     }
+  }
+  function updateAuditTrack(trackName) {
+    if (tpmActiveTrack) tpmActiveTrack.textContent = trackName;
+    const tagMap = {
+      "idle": "tagRow0",
+      "Row 0 (idle)": "tagRow0",
+      "running-right": "tagRow1",
+      "Row 1 (running-right)": "tagRow1",
+      "running-left": "tagRow2",
+      "Row 2 (running-left)": "tagRow2",
+      "speaking": "tagRow3",
+      "waving": "tagRow3",
+      "Row 3 (waving)": "tagRow3",
+      "Row 3 (waving-excited)": "tagRow3",
+      "jumping": "tagRow4",
+      "Row 4 (jumping)": "tagRow4",
+      "listening": "tagRow6",
+      "waiting": "tagRow6",
+      "Row 6 (waiting)": "tagRow6",
+      "running": "tagRow7",
+      "feed": "tagRow7",
+      "Row 7 (feed)": "tagRow7",
+      "thinking": "tagRow8",
+      "review": "tagRow8",
+      "Row 8 (review)": "tagRow8"
+    };
+    document.querySelectorAll(".track-tag").forEach((el) => el.classList.remove("active"));
+    const tagId = tagMap[trackName];
+    if (tagId && document.getElementById(tagId)) {
+      document.getElementById(tagId).classList.add("active");
+    }
+  }
+  function updateRmsMeter(energy) {
+    if (tpmRmsValue) tpmRmsValue.textContent = energy.toFixed(2);
+    if (tpmRmsBar) {
+      const pct = Math.min(100, Math.round(energy * 120));
+      tpmRmsBar.style.width = `${pct}%`;
+    }
+  }
+  function toggleDialKit() {
+    if (!dialKitHud) return;
+    dialKitHud.classList.toggle("hidden");
+    if (tpmHudPanel) {
+      tpmHudPanel.classList.toggle("hidden");
+    }
+  }
+  if (btnCloseDialKit) {
+    btnCloseDialKit.addEventListener("click", () => {
+      dialKitHud.classList.add("hidden");
+      if (tpmHudPanel) tpmHudPanel.classList.add("hidden");
+    });
+  }
+  if (btnCloseTpmHud) {
+    btnCloseTpmHud.addEventListener("click", () => {
+      if (tpmHudPanel) tpmHudPanel.classList.add("hidden");
+    });
+  }
+  if (sliderScale) {
+    sliderScale.addEventListener("input", (e) => updateDialParam("scale", e.target.value));
+  }
+  if (sliderSpeed) {
+    sliderSpeed.addEventListener("input", (e) => updateDialParam("speed", e.target.value));
+  }
+  function updateDialParam(key, val) {
+    const num = parseFloat(val);
+    if (key === "scale") {
+      petScale = num;
+      document.documentElement.style.setProperty("--pet-scale", num);
+      if (valScale) valScale.textContent = `${num.toFixed(2)}x`;
+    } else if (key === "speed") {
+      roamSpeedFactor = num;
+      if (valSpeed) valSpeed.textContent = `${num.toFixed(1)}x`;
+    }
+    if (window.go && window.go.main && window.go.main.App && window.go.main.App.SetDialParam) {
+      window.go.main.App.SetDialParam(key, num);
+    }
+  }
+  function copyDialTokens() {
+    const tokens = {
+      pet_scale: petScale,
+      roam_speed: roamSpeedFactor,
+      pet_skin: currentSkin,
+      auto_roaming: isAutoRoamingEnabled
+    };
+    navigator.clipboard.writeText(JSON.stringify(tokens, null, 2)).then(() => {
+      showBubble("\u{1F4CB} \u914D\u7F6E Tokens \u5DF2\u590D\u5236\u5230\u526A\u8D34\u677F\uFF01", 2500);
+    });
+  }
+  if (btnCopyDialTokens) {
+    btnCopyDialTokens.addEventListener("click", copyDialTokens);
+  }
+  window.addEventListener("keydown", (e) => {
+    if ((e.key === "d" || e.key === "D") && !["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) {
+      toggleDialKit();
+    }
+  });
+  var localMemos = [
+    { id: "1", time: "09:41 \xB7 \u8BED\u97F3\u6355\u83B7", content: "\u4E0B\u5348 4 \u70B9\u627E\u67B6\u6784\u5E08\u5BF9\u9F50\u5168\u53CC\u5DE5\u6253\u65AD\u534F\u8BAE" },
+    { id: "2", time: "10:15 \xB7 \u5FEB\u6377\u901F\u8BB0", content: "\u4F18\u5316\u7F57\u5C0F\u9ED1 2D \u8D34\u8FB9\u5438\u9644\u7269\u7406\u624B\u611F\u4E0E\u58F0\u5B66\u5206\u7EA7" }
+  ];
+  function renderMemos() {
+    if (!memoCardsList) return;
+    memoCardsList.innerHTML = "";
+    if (localMemos.length === 0) {
+      memoCardsList.innerHTML = '<div style="font-size:12px;color:#94a3b8;text-align:center;padding:12px 0;">\u6682\u65E0\u7075\u611F\u901F\u8BB0\uFF0C\u968F\u624B\u8BB0\u4E00\u6761\u5427~</div>';
+      return;
+    }
+    localMemos.forEach((memo) => {
+      const card = document.createElement("div");
+      card.className = "memo-card-item";
+      card.innerHTML = `
+      <div class="memo-card-header">
+        <span>${memo.time}</span>
+      </div>
+      <div class="memo-card-content">${memo.content}</div>
+      <div class="memo-card-actions">
+        <button class="memo-action-btn" data-act="copy">\u590D\u5236</button>
+        <button class="memo-action-btn" data-act="archive">\u5F52\u6863</button>
+      </div>
+    `;
+      card.querySelector('[data-act="copy"]')?.addEventListener("click", () => {
+        navigator.clipboard.writeText(memo.content);
+        showBubble("\u5DF2\u590D\u5236\u7075\u611F\u5185\u5BB9\u5230\u526A\u8D34\u677F\uFF01", 2e3);
+      });
+      card.querySelector('[data-act="archive"]')?.addEventListener("click", () => {
+        localMemos = localMemos.filter((m) => m.id !== memo.id);
+        renderMemos();
+        showBubble("\u5DF2\u5F52\u6863\u8BE5\u6761\u901F\u8BB0", 1500);
+      });
+      memoCardsList.appendChild(card);
+    });
+  }
+  function addQuickMemo(text) {
+    if (!text) return;
+    const now = /* @__PURE__ */ new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} \xB7 \u6848\u5934\u901F\u8BB0`;
+    localMemos.unshift({
+      id: String(Date.now()),
+      time: timeStr,
+      content: text
+    });
+    renderMemos();
+    showBubble("\u{1F4A1} \u7075\u611F\u5DF2\u6355\u83B7\u81F3\u6848\u5934\u624B\u8D26\uFF01", 2500);
+    if (window.go && window.go.main && window.go.main.App) {
+      window.go.main.App.AddEpisode(text, ["\u7075\u611F\u901F\u8BB0"]);
+    }
+  }
+  if (btnQuickAddMemo && newMemoInput) {
+    btnQuickAddMemo.addEventListener("click", () => {
+      addQuickMemo(newMemoInput.value.trim());
+      newMemoInput.value = "";
+    });
+    newMemoInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        addQuickMemo(newMemoInput.value.trim());
+        newMemoInput.value = "";
+      }
+    });
+  }
+  function refreshModelConfig() {
+    if (window.go && window.go.main && window.go.main.App) {
+      if (window.go.main.App.GetDualModelInfo) {
+        window.go.main.App.GetDualModelInfo().then((info) => {
+          if (!info) return;
+          if (cfgEdgeBaseUrl && info.edge_url) cfgEdgeBaseUrl.value = info.edge_url;
+          if (cfgEdgeModel && info.edge_model) cfgEdgeModel.value = info.edge_model;
+          if (cfgCloudUrl && info.cloud_gateway) cfgCloudUrl.value = info.cloud_gateway;
+        });
+      }
+      if (window.go.main.App.GetCloudConsent) {
+        window.go.main.App.GetCloudConsent().then((c) => {
+          if (chkCloudConsent) chkCloudConsent.checked = c;
+        });
+      }
+    }
+  }
+  if (btnSaveModelConfig) {
+    btnSaveModelConfig.addEventListener("click", () => {
+      if (window.go && window.go.main && window.go.main.App) {
+        if (cfgCloudUrl && window.go.main.App.SetCloudServerURL) {
+          window.go.main.App.SetCloudServerURL(cfgCloudUrl.value.trim());
+        }
+        if (chkCloudConsent && window.go.main.App.SetCloudConsent) {
+          window.go.main.App.SetCloudConsent(chkCloudConsent.checked);
+        }
+      }
+      showBubble("\u2705 \u6A21\u578B\u4E0E\u7AEF\u4FA7\u914D\u7F6E\u5DF2\u4FDD\u5B58\uFF01", 2500);
+    });
   }
   if (orbContainer) {
     orbContainer.addEventListener("click", () => {
@@ -2041,8 +2646,36 @@
       applyState("thinking");
     });
     window.runtime.EventsOn("avatar:mic_energy", (energy) => {
+      currentRms = energy;
+      updateRmsMeter(energy);
+      if (currentState === "speaking") {
+        if (energy < 0.05) {
+        } else if (energy >= 0.45) {
+          updateAuditTrack("Row 3 (waving-excited)");
+        } else {
+          updateAuditTrack("Row 3 (waving)");
+        }
+      }
       if ((currentState === "listening" || currentState === "idle") && energy > 0.05) {
         resetSleepTimer();
+      }
+    });
+    window.runtime.EventsOn("avatar:auto_roaming", (enabled) => {
+      isAutoRoamingEnabled = enabled;
+      updateRoamingUI();
+    });
+    window.runtime.EventsOn("avatar:dial_param", (param) => {
+      if (param && param.key) {
+        if (param.key === "scale") {
+          petScale = param.val;
+          document.documentElement.style.setProperty("--pet-scale", param.val);
+          if (sliderScale) sliderScale.value = param.val;
+          if (valScale) valScale.textContent = `${param.val.toFixed(2)}x`;
+        } else if (param.key === "speed") {
+          roamSpeedFactor = param.val;
+          if (sliderSpeed) sliderSpeed.value = param.val;
+          if (valSpeed) valSpeed.textContent = `${param.val.toFixed(1)}x`;
+        }
       }
     });
     window.runtime.EventsOn("avatar:speech", (sentence) => {
@@ -2106,16 +2739,37 @@
           subtitleText.textContent = m === "hands_free" ? "\u968F\u65F6\u5F00\u53E3\u4E0E\u6211\u7545\u804A..." : "\u6309\u4F4F\u7A7A\u683C\u8BF4\u8BDD...";
         }
       });
+      if (window.go.main.App.GetAutoRoaming) {
+        window.go.main.App.GetAutoRoaming().then((r) => {
+          isAutoRoamingEnabled = r;
+          updateRoamingUI();
+        });
+      }
+      if (window.go.main.App.GetDialParams) {
+        window.go.main.App.GetDialParams().then((dial) => {
+          if (dial && dial.scale) {
+            updateDialParam("scale", dial.scale);
+            if (sliderScale) sliderScale.value = dial.scale;
+          }
+          if (dial && dial.speed) {
+            updateDialParam("speed", dial.speed);
+            if (sliderSpeed) sliderSpeed.value = dial.speed;
+          }
+        });
+      }
     } else {
       applyDisplayForm("pet");
-      applySkin("whale", false);
+      applySkin("luoxiaohei2d", false);
+      updateRoamingUI();
     }
     applyState("idle");
+    renderMemos();
     initPTTKeyboard();
     setTimeout(() => {
       refreshSkins();
       refreshPersonas();
       refreshBond();
+      refreshModelConfig();
     }, 300);
   });
 })();

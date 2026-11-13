@@ -17,7 +17,7 @@ export class PetRenderer {
     this.ctx = canvasElement.getContext("2d");
     this.particleContainer = particleContainer;
 
-    this.skinId = "cat";
+    this.skinId = "luoxiaohei2d";
     this.state = "idle";
     this.dragDirection = "";
     this.cue = null;
@@ -59,6 +59,33 @@ export class PetRenderer {
   }
 
   loadBuiltin(skinId) {
+    if (skinId === "luoxiaohei2d") {
+      const img = new Image();
+      img.onload = () => {
+        this.geometry = spriteGeometry({});
+        this.animations = defaultAnimations();
+        this.assets = {
+          image: img,
+          geometry: this.geometry,
+          animations: this.animations,
+        };
+        this.resetTrack();
+      };
+      img.onerror = () => {
+        const sheetCanvas = getBuiltinPetSpritesheet("luoxiaohei2d");
+        this.geometry = spriteGeometry({});
+        this.animations = defaultAnimations();
+        this.assets = {
+          image: sheetCanvas,
+          geometry: this.geometry,
+          animations: this.animations,
+        };
+        this.resetTrack();
+      };
+      img.src = "./assets/luoxiaohei2d/spritesheet.webp";
+      return;
+    }
+
     const sheetCanvas = getBuiltinPetSpritesheet(skinId);
     this.geometry = spriteGeometry({});
     this.animations = defaultAnimations();

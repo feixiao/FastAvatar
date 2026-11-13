@@ -254,3 +254,52 @@ func TestApp_CloudRoutingAndLogging(t *testing.T) {
 		t.Fatalf("expected text message to route to CLOUD_GATEWAY, got %s", routeRecorded)
 	}
 }
+
+func TestApp_LuoxiaoheiAndRoaming(t *testing.T) {
+	app := NewApp()
+
+	// 1. Verify default skin is luoxiaohei2d
+	skinID := app.GetPetSkin()
+	if skinID != "luoxiaohei2d" {
+		t.Fatalf("expected default skin 'luoxiaohei2d', got '%s'", skinID)
+	}
+
+	// 2. Verify luoxiaohei2d interactions
+	resPet := app.InteractPet("pet")
+	if msg, ok := resPet["message"].(string); !ok || msg == "" {
+		t.Fatalf("expected pet message for luoxiaohei2d, got %v", resPet)
+	}
+
+	resFeed := app.InteractPet("feed")
+	if cue, ok := resFeed["cue"].(string); !ok || cue != "running" {
+		t.Fatalf("expected cue 'running' (Row 7) for feed action, got %v", resFeed)
+	}
+
+	resPoke := app.InteractPet("poke")
+	if msg, ok := resPoke["message"].(string); !ok || msg == "" {
+		t.Fatalf("expected poke message for luoxiaohei2d, got %v", resPoke)
+	}
+
+	// 3. Verify roaming toggle
+	initialRoaming := app.GetAutoRoaming()
+	toggled := app.ToggleAutoRoaming()
+	if toggled == initialRoaming {
+		t.Fatalf("expected roaming toggle to change from %v", initialRoaming)
+	}
+	_ = app.SetAutoRoaming(true)
+	if !app.GetAutoRoaming() {
+		t.Fatalf("expected AutoRoaming to be true after SetAutoRoaming(true)")
+	}
+
+	// 4. Verify DialKit params
+	dial := app.GetDialParams()
+	if dial["scale"] == 0 || dial["speed"] == 0 {
+		t.Fatalf("expected valid default scale and speed, got %v", dial)
+	}
+	app.SetDialParam("scale", 1.25)
+	app.SetDialParam("speed", 1.5)
+	dialUpdated := app.GetDialParams()
+	if dialUpdated["scale"] != 1.25 || dialUpdated["speed"] != 1.5 {
+		t.Fatalf("expected updated dial params, got %v", dialUpdated)
+	}
+}

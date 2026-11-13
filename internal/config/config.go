@@ -71,7 +71,10 @@ type ASRConfig struct {
 
 type AppConfig struct {
 	DisplayForm    string          `json:"display_form"`     // "pet" (桌面宠物) 或 "capsule" (极简胶囊)
-	PetSkin        string          `json:"pet_skin"`         // "cat", "fox", "spirit" 或自定义皮肤 ID
+	PetSkin        string          `json:"pet_skin"`         // "luoxiaohei2d", "whale", "cat", "fox", "spirit" 或自定义皮肤 ID
+	AutoRoaming    bool            `json:"auto_roaming"`     // 桌面自主自由漫步开关 (默认开启)
+	RoamSpeed      float64         `json:"roam_speed"`       // 漫游巡视速度倍率 (默认 1.2)
+	PetScale       float64         `json:"pet_scale"`        // 桌宠渲染缩放倍率 (默认 1.15)
 	Mode           InteractionMode `json:"mode"`
 	AlwaysOnTop    bool            `json:"always_on_top"`
 	Hotkey         string          `json:"hotkey"`           // 例如 "Option+Space"
@@ -88,7 +91,10 @@ type AppConfig struct {
 var (
 	defaultConfig = AppConfig{
 		DisplayForm:    "pet",
-		PetSkin:        "whale",
+		PetSkin:        "luoxiaohei2d",
+		AutoRoaming:    true,
+		RoamSpeed:      1.2,
+		PetScale:       1.15,
 		Mode:           ModeHandsFree,
 		AlwaysOnTop:    true,
 		Hotkey:         "Option+Space",
@@ -127,6 +133,7 @@ var (
 	current AppConfig
 )
 
+
 func init() {
 	current = defaultConfig
 }
@@ -160,8 +167,14 @@ func LoadConfig() AppConfig {
 	if loaded.DisplayForm == "" {
 		loaded.DisplayForm = "pet"
 	}
-	if loaded.PetSkin == "" {
-		loaded.PetSkin = "whale"
+	if loaded.PetSkin == "" || loaded.PetSkin == "whale" {
+		loaded.PetSkin = "luoxiaohei2d"
+	}
+	if loaded.RoamSpeed == 0 {
+		loaded.RoamSpeed = 1.2
+	}
+	if loaded.PetScale == 0 {
+		loaded.PetScale = 1.15
 	}
 	if loaded.ASR.Engine == "" {
 		loaded.ASR.Engine = "native_mac"
