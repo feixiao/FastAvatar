@@ -25,6 +25,7 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
     private let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
     private var audioConverter: AVAudioConverter?
     private var reconfigureWorkItem: DispatchWorkItem?
+    private var isReconfiguring: Bool = false
 
     private func handleConfigurationChange() {
         guard isListening else { return }
@@ -33,7 +34,7 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
             self?.reconfigureAudioEngine()
         }
         reconfigureWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: workItem)
     }
 
     init(localeId: String = "zh-CN", mode: String = "hands_free") {
@@ -55,26 +56,31 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
     }
 
     private func reconfigureAudioEngine() {
-        guard isListening else { return }
+        guard isListening, !isReconfiguring else { return }
+        isReconfiguring = true
+        defer { isReconfiguring = false }
+
         fputs("[avatar-asr] Audio engine route/configuration changed, reconfiguring...\n", stderr)
         if tapInstalled {
             audioEngine.inputNode.removeTap(onBus: 0)
             tapInstalled = false
         }
         audioEngine.stop()
+        audioEngine.reset()
 
         let inputNode = audioEngine.inputNode
-        let inputFormat = inputNode.outputFormat(forBus: 0)
-        audioConverter = AVAudioConverter(from: inputFormat, to: targetFormat)
+        audioConverter = nil
 
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, time in
+        // Passing format: nil uses the bus's natural hardware format and prevents NSException format mismatch crashes
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
             self?.processAudioBuffer(buffer)
         }
         tapInstalled = true
 
         do {
             try audioEngine.start()
-            fputs("[avatar-asr] Audio engine restarted with format: \(inputFormat)\n", stderr)
+            let currentFormat = inputNode.outputFormat(forBus: 0)
+            fputs("[avatar-asr] Audio engine restarted with format: \(currentFormat)\n", stderr)
             if mode == "hands_free" {
                 startRecognitionSession()
             }
@@ -87,11 +93,10 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
         guard !isListening else { return }
 
         let inputNode = audioEngine.inputNode
-        let inputFormat = inputNode.outputFormat(forBus: 0)
-        audioConverter = AVAudioConverter(from: inputFormat, to: targetFormat)
+        audioConverter = nil
 
         if !tapInstalled {
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, time in
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
                 self?.processAudioBuffer(buffer)
             }
             tapInstalled = true
@@ -103,7 +108,8 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
             if mode == "hands_free" {
                 startRecognitionSession()
             }
-            fputs("[avatar-asr] Audio engine started. Format: \(inputFormat)\n", stderr)
+            let currentFormat = inputNode.outputFormat(forBus: 0)
+            fputs("[avatar-asr] Audio engine started. Format: \(currentFormat)\n", stderr)
             sendJSON([
                 "event": "ready",
                 "locale": localeId,
@@ -259,6 +265,9 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
                 recognitionRequest?.append(buffer)
             }
         } else {
+            if audioConverter == nil || audioConverter?.inputFormat != inputFormat {
+                audioConverter = AVAudioConverter(from: inputFormat, to: targetFormat)
+            }
             let ratio = 16000.0 / inputFormat.sampleRate
             let cap = AVAudioFrameCount(Double(buffer.frameLength) * ratio)
             if let outBuffer = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: max(cap, 1024)),
