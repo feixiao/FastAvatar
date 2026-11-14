@@ -107,18 +107,21 @@ func (m *Manager) Submit(ctx context.Context, input orchestrator.UserInput) (orc
 					actCb(*petAction)
 				}
 			}
-			m.coord.SetState(orchestrator.StateSpeaking)
-			m.mu.RLock()
-			speechCb := m.onSpeechChunk
-			m.mu.RUnlock()
-			if speechCb != nil {
-				speechCb(confirm)
-			}
+			// 仅当存在口语确认时才进入 Speaking 状态并发声；
+			// 纯物理动作指令保持静默执行（confirm == ""），零听觉打扰，直接完成。
+			if confirm != "" {
+				m.coord.SetState(orchestrator.StateSpeaking)
+				m.mu.RLock()
+				speechCb := m.onSpeechChunk
+				m.mu.RUnlock()
+				if speechCb != nil {
+					speechCb(confirm)
+				}
 
-			if m.player != nil {
-				_, _ = m.player.Speak(taskCtx, confirm)
+				if m.player != nil {
+					_, _ = m.player.Speak(taskCtx, confirm)
+				}
 			}
-
 			m.coord.SetState(orchestrator.StateIdle)
 			m.coord.FinishTask(task.TaskID, orchestrator.TaskStateCompleted, confirm, nil)
 			fmt.Printf("[交互调度] 本地快环处理完成 (TurnID: %s) | 耗时: < 150ms | 100%% 端侧本地响应，未走云端\n", turn.TurnID)

@@ -39,6 +39,7 @@ enum class ActionType : uint16_t {
     STAND,          // 起立、站起来、站好、起床
     JUMP,           // 跳跃、纵跳、翻跟头、空翻
     REST,           // 休息、打盹、卧倒休眠
+    ROLL,           // 翻滚、打滚、打个滚、滚一圈
 
     // 空间运动类动作 (带矢量参数)
     MOVE_FORWARD,   // 前进、向前走

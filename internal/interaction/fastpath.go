@@ -134,71 +134,59 @@ func (f *FastPathHandler) Evaluate(userInput string) (handled bool, confirmation
 
 func buildPetActionResponse(act, cue, move string) (PetActionPayload, string) {
 	msg := "高兴地跳了起来！"
-	confirm := "好嘞！翻个跟头跳给你看！喵呜~"
+	confirm := "" // 物理动作与肢体互动默认静默执行，只动不说，杜绝模态冗余与听觉打扰
 	xp := 5
 	switch act {
 	case "jump":
-		confirm = "好嘞！翻个跟头跳给你看！喵呜~"
 		msg = "欢快地纵身一跃，在空中翻了个利落的跟头！(亲密度 +5!)"
 		xp = 5
+	case "roll":
+		msg = "罗小黑欢快地在桌面上打了个滚，骨碌碌翻了一圈！(亲密度 +5!)"
+		xp = 5
 	case "feed":
-		confirm = "哇，小鱼干！嗷呜一口吃掉！真香~"
 		msg = "罗小黑敏捷暴风干饭，一口吞下小鱼干！(亲密度 +5!)"
 		xp = 5
 	case "rice":
-		confirm = "热气腾腾的大米饭！大口开饭啦~"
 		msg = "狼吞虎咽狂吃大米饭，满足地打了个饱嗝~ (亲密度 +5!)"
 		xp = 5
 	case "turbo":
-		confirm = "疯狂干饭！两只爪子疯狂刨饭，真好吃！"
 		msg = "罗小黑飞身扑向食物，两只爪子疯狂刨饭！(亲密度 +5!)"
 		xp = 5
 	case "grass":
-		confirm = "逗猫草！看我敏捷飞扑！抓到啦！"
 		msg = "罗小黑敏捷纵跳扑住逗猫草，耳朵开心地抖了抖~ (亲密度 +5!)"
 		xp = 5
 	case "wave":
-		confirm = "嗨！向你挥挥小爪子，今天也要开心哦！"
 		msg = "开心地挥了挥爪爪打招呼~ (亲密度 +5!)"
 		xp = 5
 	case "pet":
-		confirm = "呼噜呼噜~ 摸摸头好舒服呀~"
 		msg = "舒服地眯起黄绿大眼贴了贴你，尾巴轻轻摇晃~ (亲密度 +5!)"
 		xp = 5
 	case "roam_right":
-		confirm = "收到！本喵去右边巡视巡视，看看有没有Bug！"
 		msg = "迈着轻快猫步向右边巡视小跑~"
 		xp = 2
 	case "roam_left":
-		confirm = "好嘞！向左边巡逻一圈，守护你的桌面！"
 		msg = "迈着轻快猫步向左边巡视小跑~"
 		xp = 2
 	case "roam":
-		confirm = "巡逻任务启动！桌面安全就交给我啦！"
 		msg = "罗小黑开始在桌面上欢快漫游巡视~"
 		xp = 2
 	case "failed":
-		confirm = "哎呀呀，晕倒啦……装死中，勿扰喵~"
 		msg = "两眼一翻倒在桌面上装死，一动不动~"
 		xp = 2
 	case "review":
-		confirm = "嗯……让本喵歪头仔细观察审视一下！"
 		msg = "歪过小脑瓜，黄绿大眼睛凝神审视着屏幕~"
 		xp = 2
 	case "sleep":
-		confirm = "哈欠~ 困啦困啦，趴下打个盹，晚安喵~"
 		msg = "罗小黑收起小爪子趴下打盹，进入香甜梦乡~"
 		xp = 2
 	case "sit":
-		confirm = "好嘞，乖乖蹲坐好啦~ 喵呜！"
 		msg = "罗小黑乖巧蹲坐下来，大眼睛安静地望着你~"
 		xp = 3
 	case "wake":
-		confirm = "伸个大大的懒腰，我精神满满起来啦！喵~"
 		msg = "罗小黑敏捷纵跳起身，精神抖擞！"
 		xp = 3
 	case "meow":
-		confirm = "喵呜~~ 喵~~"
+		confirm = "喵呜~"
 		msg = "罗小黑仰起小脑袋软软地叫了一声：喵呜~"
 		xp = 3
 	}

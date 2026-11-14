@@ -236,8 +236,94 @@ func TestFastPathPetAction(t *testing.T) {
 	if capturedAction.Action != "jump" || capturedAction.Cue != "jumping" {
 		t.Fatalf("unexpected action payload: %+v", capturedAction)
 	}
-	if len(mockTTS.spoken) == 0 {
-		t.Fatal("expected confirmation voice to be spoken")
+	// 纯物理动作静默执行，零口语打扰
+	if len(mockTTS.spoken) != 0 {
+		t.Fatalf("expected pet physical action to be silent, but got spoken: %v", mockTTS.spoken)
+	}
+	if coord.State() != orchestrator.StateIdle {
+		t.Fatalf("expected coordinator to remain idle, got %s", coord.State())
+	}
+}
+func TestFastPathPetRollActionSilent(t *testing.T) {
+	mockTTS := &testTrackingSynth{}
+	coord := orchestrator.NewCoordinator("test-sess-roll")
+	fp := NewFastPathHandler(nil, nil)
+	player := NewSpeechPlayer(mockTTS)
+	runner := &mockTaskRunner{}
+	manager := NewManager(coord, fp, player, runner)
+
+	var capturedAction PetActionPayload
+	actionCalled := false
+	manager.SetPetActionCallback(func(act PetActionPayload) {
+		actionCalled = true
+		capturedAction = act
+	})
+
+	input := orchestrator.UserInput{
+		InputType: orchestrator.InputTypeText,
+		Text:      "滚一圈",
+		Stability: orchestrator.StabilityFinal,
+	}
+
+	turnID, err := manager.Submit(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Submit error: %v", err)
+	}
+	if turnID == "" {
+		t.Fatal("expected valid turn ID")
+	}
+	if runner.called {
+		t.Fatal("expected '滚一圈' to be intercepted by fast-path without invoking LLM")
+	}
+	if !actionCalled {
+		t.Fatal("expected onPetAction callback to be invoked")
+	}
+	if capturedAction.Action != "roll" || capturedAction.Cue != "jumping" {
+		t.Fatalf("unexpected action payload: %+v", capturedAction)
+	}
+	// 翻滚动作必须静默执行，零口语打扰
+	if len(mockTTS.spoken) != 0 {
+		t.Fatalf("expected pet roll to be silent, but spoke: %v", mockTTS.spoken)
+	}
+	if coord.State() != orchestrator.StateIdle {
+		t.Fatalf("expected coordinator to remain idle, got %s", coord.State())
+	}
+}
+func TestFastPathPetMeowActionVocal(t *testing.T) {
+	mockTTS := &testTrackingSynth{}
+	coord := orchestrator.NewCoordinator("test-sess-meow")
+	fp := NewFastPathHandler(nil, nil)
+	player := NewSpeechPlayer(mockTTS)
+	runner := &mockTaskRunner{}
+	manager := NewManager(coord, fp, player, runner)
+
+	var capturedAction PetActionPayload
+	manager.SetPetActionCallback(func(act PetActionPayload) {
+		capturedAction = act
+	})
+
+	input := orchestrator.UserInput{
+		InputType: orchestrator.InputTypeText,
+		Text:      "叫一声",
+		Stability: orchestrator.StabilityFinal,
+	}
+
+	turnID, err := manager.Submit(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Submit error: %v", err)
+	}
+	if turnID == "" {
+		t.Fatal("expected valid turn ID")
+	}
+	if capturedAction.Action != "meow" {
+		t.Fatalf("expected action 'meow', got %+v", capturedAction)
+	}
+	// 叫声属于明确发声要求，触发简短拟声
+	if len(mockTTS.spoken) != 1 || mockTTS.spoken[0] != "喵呜~" {
+		t.Fatalf("expected vocal confirmation '喵呜~', got: %v", mockTTS.spoken)
+	}
+	if coord.State() != orchestrator.StateIdle {
+		t.Fatalf("expected coordinator to return to idle after meowing, got: %s", coord.State())
 	}
 }
 
@@ -273,8 +359,15 @@ func TestFastPathPatrolRoamAction(t *testing.T) {
 	if capturedAction.Action != "roam" {
 		t.Fatalf("expected action 'roam', got %+v", capturedAction)
 	}
-	if len(events) < 4 || events[0] != "action:roam" || events[1] != "state:speaking" {
-		t.Fatalf("unexpected event sequence: %v", events)
+	// 巡逻动作静默执行：只触发 action，不触发 speech，不进入 speaking 状态
+	if len(events) != 1 || events[0] != "action:roam" {
+		t.Fatalf("expected silent action event only [action:roam], got: %v", events)
+	}
+	if len(mockTTS.spoken) != 0 {
+		t.Fatalf("expected roam to be completely silent, but got: %v", mockTTS.spoken)
+	}
+	if coord.State() != orchestrator.StateIdle {
+		t.Fatalf("expected coordinator to be idle, got: %s", coord.State())
 	}
 }
 

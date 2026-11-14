@@ -1050,6 +1050,12 @@ static void TestIntentArbiterSuite() {
         assert(run_res.domain == ArbiterDomain::ACTION_COMMAND);
         assert(run_res.action == "move_forward");
         assert(run_res.action_cmd.type == ActionType::MOVE_FORWARD);
+        // 3c. 滚一圈 (姿态翻滚动作元语)
+        auto roll_res = IntentArbiter::Arbitrate("滚一圈");
+        assert(roll_res.status == ArbiterStatus::MATCHED);
+        assert(roll_res.domain == ArbiterDomain::ACTION_COMMAND);
+        assert(roll_res.action == "roll");
+        assert(roll_res.action_cmd.type == ActionType::ROLL);
         // 4. 别动 / 停下
         auto stop_res = IntentArbiter::Arbitrate("别动");
         assert(stop_res.status == ArbiterStatus::MATCHED);
@@ -1328,7 +1334,7 @@ static void TestCapiCrossPlatformHarnessSuite() {
     audio_agent_free_string(greeting);
 
     // 2. Test PCM push/pull C-API
-    std::vector<float> mic_data(512, 0.1f);
+    std::vector<float> mic_data(512, 0.0f);
     size_t pushed = audio_agent_pipeline_push_mic_pcm(handle, mic_data.data(), 512);
     assert(pushed == 512);
 

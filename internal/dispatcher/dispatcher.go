@@ -172,6 +172,8 @@ func mapCoreActionToPresentation(coreAction, direction string) (cue string, petA
 		return "jumping", "wake"
 	case "jump":
 		return "jumping", "jump"
+	case "roll":
+		return "jumping", "roll"
 	case "rest":
 		return "idle", "sleep"
 	case "move_left":
