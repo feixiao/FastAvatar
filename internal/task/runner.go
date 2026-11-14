@@ -175,7 +175,7 @@ func resolveActionTag(tag string) interaction.PetActionPayload {
 	case "sit", "squat":
 		return interaction.PetActionPayload{
 			Action:  "sit",
-			Cue:     "idle",
+			Cue:     "waiting",
 			Message: "乖巧地蹲坐下来~",
 			XP:      3,
 		}

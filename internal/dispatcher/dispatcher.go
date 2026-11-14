@@ -167,7 +167,7 @@ func (d *FastDispatcher) EvaluateWithContext(
 func mapCoreActionToPresentation(coreAction, direction string) (cue string, petAction string) {
 	switch coreAction {
 	case "sit":
-		return "idle", "sit"
+		return "waiting", "sit"
 	case "stand":
 		return "jumping", "wake"
 	case "jump":

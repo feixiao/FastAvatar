@@ -170,7 +170,7 @@ class FastDispatcher {
 
     private fun mapCoreActionToPresentation(coreAction: String, direction: String): PetActionResult {
         return when (coreAction) {
-            "sit" -> PetActionResult("sit", "idle", "", "好嘞，乖乖蹲坐好啦~ 喵呜！")
+            "sit" -> PetActionResult("sit", "waiting", "", "好嘞，乖乖蹲坐好啦~ 喵呜！")
             "stand" -> PetActionResult("wake", "jumping", "", "伸个大大的懒腰，我精神满满起来啦！喵~")
             "jump" -> PetActionResult("jump", "jumping", "", "好嘞！翻个跟头跳给你看！喵呜~")
             "rest" -> PetActionResult("sleep", "idle", "", "哈欠~ 困啦困啦，趴下打个盹，晚安喵~")
@@ -211,7 +211,7 @@ class FastDispatcher {
             return null
         }
         val rules = listOf(
-            PetActionResult("sit", "idle", "", "好嘞，乖乖蹲坐好啦~ 喵呜！") to listOf("蹲下", "蹲着", "蹲一个", "蹲", "坐下", "坐着", "坐好", "坐", "趴下", "趴着", "趴好", "趴", "躺下", "躺平", "躺着"),
+            PetActionResult("sit", "waiting", "", "好嘞，乖乖蹲坐好啦~ 喵呜！") to listOf("蹲下", "蹲着", "蹲一个", "蹲", "坐下", "坐着", "坐好", "坐", "趴下", "趴着", "趴好", "趴", "躺下", "躺平", "躺着"),
             PetActionResult("wake", "jumping", "", "伸个大大的懒腰，我精神满满起来啦！喵~") to listOf("站起来", "起来", "站好", "醒醒", "起床"),
             PetActionResult("jump", "jumping", "", "好嘞！翻个跟头跳给你看！喵呜~") to listOf("跳一下", "跳一个", "跳跳", "翻个跟头", "翻跟头", "蹦一下", "蹦一个", "空翻", "跳起来", "转圈", "跳舞", "跳", "蹦"),
             PetActionResult("roam_right", "running-right", "right", "收到！向右边巡视小跑，守护你的屏幕！") to listOf("向右跑", "往右跑", "去右边", "向右走", "往右走", "右边巡视"),

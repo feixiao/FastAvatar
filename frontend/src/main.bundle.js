@@ -2274,7 +2274,12 @@
       "Row 8 (review)": "tagRow8"
     };
     document.querySelectorAll(".track-tag").forEach((el) => el.classList.remove("active"));
-    const tagId = tagMap[trackName];
+    let tagId = tagMap[trackName];
+    if (!tagId && trackName && trackName.includes("->")) {
+      const parts = trackName.split("->");
+      const targetCue = parts[parts.length - 1].trim();
+      tagId = tagMap[targetCue];
+    }
     if (tagId && document.getElementById(tagId)) {
       document.getElementById(tagId).classList.add("active");
     }
@@ -2843,6 +2848,22 @@
       } else if (act.action === "sleep") {
         stopRoamingMove();
         applyState("sleep");
+      } else if (act.action === "sit") {
+        stopRoamingMove();
+        if (desktopPet) {
+          desktopPet.style.transition = "transform 0.25s cubic-bezier(0.25, 1, 0.5, 1)";
+          desktopPet.style.transform = "translateY(8px) scale(1.04, 0.94)";
+          setTimeout(() => {
+            if (desktopPet) {
+              desktopPet.style.transform = "";
+              setTimeout(() => {
+                if (desktopPet) desktopPet.style.transition = "";
+              }, 300);
+            }
+          }, 1400);
+        }
+        petRenderer.spawnHearts(100, 70, `\u{1F43E} ${xpText}`);
+        showRoamBubble("\u{1F43E} \u4E56\u4E56\u8E72\u5750\u597D\u5566...", 2500);
       } else {
         petRenderer.spawnHearts(100, 70, `\u2764\uFE0F ${xpText}`);
       }
