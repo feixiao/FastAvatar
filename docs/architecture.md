@@ -1,7 +1,11 @@
 # Avatar 系统工程架构文档 (System Architecture)
 
 > **版本**：v2.1 (Unified Edge TTS & End-to-End Text Streaming Specification)  
-> **适用范围**：macOS Desktop (Go + Wails + Swift Native ASR)、Android Mobile / In-Vehicle AAOS (Pixel 参考样机 & 车规 QNX 抽象层)、C++17 跨平台高可靠核心运行时 (`core/`)、Cloud Realtime Agent Gateway (Go SSE Streaming Gateway)
+> **适用范围**：macOS Desktop (Go + Wails + Swift Native ASR)、Android Mobile / In-Vehicle AAOS (Pixel 参考样机 & 车规 QNX 抽象层)、C++17 跨平台高可靠核心运行时 (`core/`)、Cloud Realtime Agent Gateway (Go SSE Streaming Gateway)  
+> **关联核心规范**：
+> • 📘 [《01 通用 Agent 端云协同 Harness 架构与技术实现白皮书》](ai-agent-harness-architecture.md)  
+> • ⚡️ [《02 个人语音助手 Harness 与跨端端云架构设计规范》](personal-voice-agent-harness-spec.md)  
+> • 🌐 [《AI Agent 通信协议评估报告：WebRTC / LiveKit vs gRPC 决策矩阵》](webrtc-livekit-vs-grpc-transport.md)
 
 ---
 

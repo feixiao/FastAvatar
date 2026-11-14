@@ -130,5 +130,8 @@ make test-e2e
 
 所有底层技术设计、协议定义与工程规范请查阅 `docs/` 目录：
 - 🌟 **[系统工程架构文档 (System Architecture)](docs/architecture.md)**：双环架构、客户端分层、云端基础设施、时序图、状态机、REST API 契约与安全机制。
+- 📘 **[01 通用 Agent 端云协同 Harness 架构与技术实现白皮书](docs/ai-agent-harness-architecture.md)**：智能座舱与通用 Agent Runtime 线束体系、车规安全互锁、双环协同设计。
+- ⚡️ **[02 个人语音助手 Harness 与跨端端云架构设计规范](docs/personal-voice-agent-harness-spec.md)**：全双工流式状态机、去 WebRTC 单通道 gRPC 架构、双级打断仲裁、三层闲时整固与移动端 ADPF 温控。
+- 🌐 **[AI Agent 实时音视频通信协议选型评估：WebRTC / LiveKit vs gRPC](docs/webrtc-livekit-vs-grpc-transport.md)**：端到端 Omni 语音模型、极薄客户端/IoT、多人协同会议、云端渲染数字人与弱网 QoS 场景的选型决策矩阵。
 - 📱 **[Android 移动端开发指南](android/README.md)**：Pixel 10 客户端构建、测试与前台服务配置。
 - 🐋 **[Desktop Pet 桌面宠物与语音互动指南 (docs/desktop-pet.md)](docs/desktop-pet.md)**：macOS 桌面宠物交互规范、干饭动效、嘴型闭环、大肥鱼及全桌宠自由替换说明。

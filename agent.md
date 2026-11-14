@@ -2,6 +2,10 @@
 
 本文件是面向 AI Coding Agent 与开发者的项目工程指南，记录项目架构、核心设计约定与开发规范。
 
+> **核心架构规范体系**：
+> • 📘 [《01 通用 Agent 端云协同 Harness 架构与技术实现白皮书》](docs/ai-agent-harness-architecture.md)  
+> • ⚡️ [《02 个人语音助手 Harness 与跨端端云架构设计规范》](docs/personal-voice-agent-harness-spec.md)  
+> • 🌟 [《Avatar 系统工程架构设计文档》](docs/architecture.md)
 ---
 
 ## 一、 项目定位与技术栈

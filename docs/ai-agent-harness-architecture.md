@@ -1,5 +1,6 @@
 # AI Agent 端云协同 Harness 架构与技术实现白皮书
 
+> **系列规范**：本篇为《01 通用 Agent 端云协同 Harness 架构与技术实现白皮书》；进阶跨端声学与流式全双工状态机详见《[02 个人语音助手 Harness 与跨端端云架构设计规范](personal-voice-agent-harness-spec.md)》。  
 > **适用范围**：智能座舱（AAOS/QNX/Linux）全双工语音智能体架构研究、端云协同 Runtime 体系设计、Avatar 项目代码实装与车规量产演进。
 
 ---
