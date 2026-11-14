@@ -88,3 +88,58 @@ func TestSherpaRealSynthesis(t *testing.T) {
 		t.Fatalf("Speak failed: %v", err)
 	}
 }
+func TestKokoroVoiceMapping(t *testing.T) {
+	synth := NewSherpaOnnxSynthesizer("bin/sherpa-onnx-offline-tts-play", "models/kokoro-int8-multi-lang-v1_0", 45, 180)
+	if !synth.IsKokoro() {
+		t.Fatal("expected synth to detect Kokoro model")
+	}
+
+	if synth.GetSpeakerID() != 45 {
+		t.Fatalf("expected speaker ID 45 for whale default, got %d", synth.GetSpeakerID())
+	}
+
+	synth.SetVoice("companion")
+	if synth.GetSpeakerID() != 47 {
+		t.Fatalf("expected companion to map to 47 (zf_xiaoxiao), got %d", synth.GetSpeakerID())
+	}
+
+	synth.SetVoice("jarvis")
+	if synth.GetSpeakerID() != 50 {
+		t.Fatalf("expected jarvis to map to 50 (zm_yunxi), got %d", synth.GetSpeakerID())
+	}
+
+	synth.SetVoice("roaster")
+	if synth.GetSpeakerID() != 49 {
+		t.Fatalf("expected roaster to map to 49 (zm_yunjian), got %d", synth.GetSpeakerID())
+	}
+
+	// Test speaker alias direct string
+	synth.SetVoice("zf_xiaoni")
+	if synth.GetSpeakerID() != 46 {
+		t.Fatalf("expected zf_xiaoni to map to 46, got %d", synth.GetSpeakerID())
+	}
+
+	// Test legacy AISHELL-3 ID compatibility
+	synth.SetVoice("66")
+	if synth.GetSpeakerID() != 45 {
+		t.Fatalf("expected legacy 66 to map to 45 in Kokoro, got %d", synth.GetSpeakerID())
+	}
+}
+
+func TestKokoroRealSynthesis(t *testing.T) {
+	binPath := "../../bin/sherpa-onnx-offline-tts-play"
+	if _, err := os.Stat(binPath); os.IsNotExist(err) {
+		t.Skip("sherpa-onnx binary not found, skipping real synthesis test")
+	}
+	modelDir := "../../models/kokoro-int8-multi-lang-v1_0"
+	if _, err := os.Stat(modelDir); os.IsNotExist(err) {
+		t.Skip("kokoro model not found, skipping real synthesis test")
+	}
+	synth := NewSherpaOnnxSynthesizer(binPath, modelDir, 45, 180)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	err := synth.Speak(ctx, "测试Kokoro发音")
+	if err != nil {
+		t.Fatalf("Kokoro Speak failed: %v", err)
+	}
+}

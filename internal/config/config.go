@@ -116,10 +116,10 @@ var (
 		},
 		TTS: TTSConfig{
 			Engine:   "sherpa_onnx",
-			Voice:    "66",
+			Voice:    "whale",
 			Rate:     180,
 			BinPath:  "bin/sherpa-onnx-offline-tts-play",
-			ModelDir: "models/vits-zh-aishell3",
+			ModelDir: "models/kokoro-int8-multi-lang-v1_0",
 		},
 		LocalGGUF:   "models/qwen2.5-1.5b-instruct-q4.gguf",
 		ASR: ASRConfig{

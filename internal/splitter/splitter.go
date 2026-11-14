@@ -6,17 +6,19 @@ import (
 	"unicode"
 )
 type SentenceSplitter struct {
-	buffer         strings.Builder
-	isFirstChunk   bool
-	minFirstLength int
-	minNextLength  int
+	buffer             strings.Builder
+	isFirstChunk       bool
+	minFirstLength     int
+	minNextLength      int
+	minWeakPunctLength int
 }
 
 func NewSentenceSplitter() *SentenceSplitter {
 	return &SentenceSplitter{
-		isFirstChunk:   true,
-		minFirstLength: 4,
-		minNextLength:  6,
+		isFirstChunk:       true,
+		minFirstLength:     4,
+		minNextLength:      6,
+		minWeakPunctLength: 8,
 	}
 }
 
@@ -47,15 +49,6 @@ func (s *SentenceSplitter) Push(token string) []string {
 		bufRunes := []rune(bufStr)
 		bufLen := len(bufRunes)
 
-		threshold := s.minNextLength
-		if s.isFirstChunk || strongPunct[r] {
-			threshold = s.minFirstLength
-		}
-
-		if bufLen < threshold {
-			continue
-		}
-
 		isSplitPoint := false
 
 		if strongPunct[r] {
@@ -63,10 +56,19 @@ func (s *SentenceSplitter) Push(token string) []string {
 			if r == '.' && i > 0 && i+1 < len(runes) && unicode.IsDigit(runes[i-1]) && unicode.IsDigit(runes[i+1]) {
 				isSplitPoint = false
 			} else {
-				isSplitPoint = true
+				threshold := s.minNextLength
+				if s.isFirstChunk {
+					threshold = s.minFirstLength
+				}
+				if bufLen >= threshold {
+					isSplitPoint = true
+				}
 			}
 		} else if weakPunct[r] {
-			isSplitPoint = true
+			// 逗号等弱标点仅在积累足够长度的意群时切分，避免将短从句割裂导致语调生硬坍塌
+			if bufLen >= s.minWeakPunctLength {
+				isSplitPoint = true
+			}
 		}
 
 		if isSplitPoint {

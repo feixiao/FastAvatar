@@ -20,6 +20,22 @@ func TestSentenceSplitter(t *testing.T) {
 		t.Fatalf("expected %v, got %v", expected, sentences)
 	}
 }
+func TestSentenceSplitterWeakPunctProsody(t *testing.T) {
+	s := NewSentenceSplitter()
+	// "好的，我马上来处理。" -> "好的，" 不应该被割裂截断成单独一句导致生硬降调
+	tokens := []string{"好", "的", "，", "我", "马", "上", "来", "处", "理", "。"}
+	var sentences []string
+	for _, tok := range tokens {
+		sentences = append(sentences, s.Push(tok)...)
+	}
+	sentences = append(sentences, s.Flush()...)
+
+	expected := []string{"好的，我马上来处理。"}
+	if !reflect.DeepEqual(sentences, expected) {
+		t.Fatalf("expected unbroken prosody clause %v, got %v", expected, sentences)
+	}
+}
+
 
 func TestCleanSpokenText(t *testing.T) {
 	tests := []struct {

@@ -131,10 +131,19 @@ func NewApp() *App {
 		}
 		modelDir := cfg.TTS.ModelDir
 		if modelDir == "" {
-			modelDir = "models/vits-zh-aishell3"
+			if _, err := os.Stat("models/kokoro-int8-multi-lang-v1_0"); err == nil {
+				modelDir = "models/kokoro-int8-multi-lang-v1_0"
+			} else {
+				modelDir = "models/vits-zh-aishell3"
+			}
+		}
+		if _, err := os.Stat(modelDir); os.IsNotExist(err) {
+			if _, err := os.Stat("models/vits-zh-aishell3"); err == nil {
+				modelDir = "models/vits-zh-aishell3"
+			}
 		}
 		if _, err := os.Stat(binPath); err == nil {
-			sherpaSynth := tts.NewSherpaOnnxSynthesizer(binPath, modelDir, 66, activeRate)
+			sherpaSynth := tts.NewSherpaOnnxSynthesizer(binPath, modelDir, 45, activeRate)
 			sherpaSynth.SetVoice(activeVoice)
 			synth = sherpaSynth
 		} else {
